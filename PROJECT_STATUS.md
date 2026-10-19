@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-10-19 |
-| **Current version** | v1.0.0 (tagged, GitHub Release published) |
-| **Phase** | v1.1 in progress — E2E-in-CI + OneNote import merged |
-| **Overall state** | Feature-complete, all tests green, CI green, public repo |
+| **Current version** | v1.1.0 (release in progress) |
+| **Phase** | v1.1 complete on develop — releasing |
+| **Overall state** | 4 PRs merged for v1.1; 75 unit + 26 E2E green, CI green |
 
 ## TL;DR
 
@@ -18,7 +18,7 @@ Notebook → Section → Page hierarchy on an infinite canvas (Excalidraw), draw
 on anything, import images / text / Markdown / PDF printouts / .excalidraw scenes,
 export PNG / SVG / scenes / full backups, full-text search, soft-delete trash,
 dark mode, and a fully offline installable PWA. All data is local (IndexedDB).
-The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
+v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneNote import phase 1 (.docx + HTML) and drops the template scaffolding.
 
 ## What works today (verified by tests)
 
@@ -38,9 +38,7 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 
 ## In flight
 
-- `chore/remove-scaffolding`: deleting the unused template scaffolding
-  (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`) and every `db:generate`
-  step — the app is local-first and needs no server database.
+- Nothing open. (CI must be green on `develop` and `main` at all times.)
 
 ## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -77,6 +75,9 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — v1.1.0 release**: 4 PRs — duplicate page (#5), Playwright E2E
+  required in CI (#6), OneNote import phase 1 (#7), scaffolding cleanup (#8).
+  75 unit tests, 26 E2E checks, three required CI checks.
 - **2026-10-19 — scaffolding cleanup**: unused Prisma/template leftovers removed;
   `bun install` is now the only setup step and CI no longer generates a client.
 - **2026-10-19 — OneNote import phase 1 (issue #4)**: Word (`.docx`) and OneNote-HTML
