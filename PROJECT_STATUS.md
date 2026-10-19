@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-10-19 |
-| **Current version** | v1.2.0 (release in progress) |
-| **Phase** | v1.2 complete on develop — releasing |
-| **Overall state** | OneNote phase 2 merged (#14); 97 unit + 34 E2E green, CI green |
+| **Current version** | v1.2.0 (tagged, GitHub Release published) |
+| **Phase** | v1.2.0 shipped — v1.3 planning |
+| **Overall state** | v1.2.0 released; 97 unit + 34 E2E green, CI green |
 
 ## TL;DR
 
@@ -45,8 +45,7 @@ styles (plain/ruled/grid).
 
 ## In flight
 
-- Nothing open — v1.2.0 release in flight (bump merged, release PR next).
-  (CI must stay green on `develop` and `main` at all times.)
+- Nothing open — v1.2.0 is live on `main`. (CI must stay green on both branches.)
 
 ## Next up — v1.2 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -86,6 +85,9 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — v1.2.0 live**: release PR #16 merge-committed to main (aae09ed),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.2.0);
+  v1.2.0 milestone closed, v1.3.0 milestone opened.
 - **2026-10-19 — v1.2.0 release**: OneNote import phase 2 merged via PR #14
   (all three required CI checks green); version bumped to 1.2.0.
 - **2026-10-19 — v1.1 close-out PR**: OneNote import phase 2 — `.mht` single-file
