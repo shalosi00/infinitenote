@@ -8,7 +8,7 @@
 |---|---|
 | **Last updated** | 2026-10-19 |
 | **Current version** | v1.0.0 (tagged, GitHub Release published) |
-| **Phase** | v1.1 in progress — E2E-in-CI merged; OneNote import landing |
+| **Phase** | v1.1 in progress — E2E-in-CI + OneNote import merged |
 | **Overall state** | Feature-complete, all tests green, CI green, public repo |
 
 ## TL;DR
@@ -38,16 +38,14 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 
 ## In flight
 
-- `feat/onenote-import` (issue #4): OneNote import phase 1 — `.docx` and
-  OneNote-exported HTML importers (pure, fully unit-tested extractors in
-  `src/lib/docx-import.ts` / `html-import.ts`) wired into the import router;
-  migration guide in `docs/onenote-migration.md`.
+- `chore/remove-scaffolding`: deleting the unused template scaffolding
+  (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`) and every `db:generate`
+  step — the app is local-first and needs no server database.
 
 ## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. OneNote import phase 2: `.mht` single-file pages, embedded images, Microsoft Graph export runbook.
 2. Page templates; print-friendly export.
-3. Remove unused template scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`).
 
 ## Repo map (30 seconds)
 
@@ -70,7 +68,7 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 ## Commands cheat-sheet
 
 ```bash
-bun install && bun run db:generate   # first-time setup
+bun install                            # first-time setup
 bun run dev                          # dev server on :3000
 make test                            # 75 unit tests
 make e2e                             # 26 E2E checks (Playwright; boots the app if needed)
@@ -79,6 +77,8 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — scaffolding cleanup**: unused Prisma/template leftovers removed;
+  `bun install` is now the only setup step and CI no longer generates a client.
 - **2026-10-19 — OneNote import phase 1 (issue #4)**: Word (`.docx`) and OneNote-HTML
   pages import as structured text blocks (headings, nested lists, tables); pure
   extractors, 26 new unit tests, 2 new E2E checks, migration guide added.

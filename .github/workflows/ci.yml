@@ -33,9 +33,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Generate Prisma client (needed by typecheck)
-        run: bun run db:generate
-
       - name: Lint
         run: bun run lint
 
@@ -55,8 +52,6 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Generate Prisma client
-        run: bun run db:generate
       - name: Production build (standalone)
         run: bun run build
       - name: Boot smoke test
@@ -82,8 +77,6 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Generate Prisma client (needed by the build)
-        run: bun run db:generate
       - name: Install Playwright's Chromium
         run: bunx playwright install --with-deps chromium
       - name: Run E2E suite (builds the app, boots it, drives a real browser)

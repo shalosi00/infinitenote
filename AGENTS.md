@@ -29,7 +29,7 @@ Follow this guide to work effectively without wasting context reading the whole 
 
 | What | Command |
 |---|---|
-| Install | `bun install && bun run db:generate` |
+| Install | `bun install` |
 | Dev server | `bun run dev` (port 3000) |
 | Unit tests | `make test` |
 | Lint / typecheck | `make lint` / `make typecheck` |
@@ -52,12 +52,11 @@ Follow this guide to work effectively without wasting context reading the whole 
 - Failure artifacts: HTML report in `e2e-report/`, traces/screenshots in
   `test-results/` (gitignored; CI uploads the report on failure).
 
-## Known template leftovers (safe to ignore, do not "fix" casually)
+## History note
 
-`src/lib/db.ts` + `prisma/` + `src/app/api/route.ts` are sandbox scaffolding, unused
-by the app (all note data is client-side IndexedDB). They are kept only because the
-typecheck pipeline expects the generated Prisma client (`bun run db:generate`).
-Removing them is roadmap item #4 — remove together with the `db:generate` step in CI.
+The initial sandbox scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`)
+was removed in v1.1: the app is fully local-first (client-side IndexedDB via
+Dexie) and has no server database.
 
 ## Conventions
 

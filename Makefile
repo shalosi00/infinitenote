@@ -12,8 +12,8 @@ test:           ## Run the unit test suite
 lint:           ## Run ESLint
 	bun run lint
 
-typecheck:      ## Generate Prisma client types, then typecheck the app
-	bun run db:generate && bunx tsc --noEmit
+typecheck:      ## TypeScript check
+	bunx tsc --noEmit
 
 build:          ## Production build (standalone)
 	bun run build
