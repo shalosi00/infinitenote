@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
+    "dev:e2e": "next dev -p 3000",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
@@ -11,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "test": "bun test src/lib/__tests__"
+    "test": "bun test src/lib/__tests__",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -85,6 +87,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -96,5 +99,5 @@
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
   },
-  "description": "Open-source OneNote-style notebook with an infinite canvas \u2014 local-first PWA for Linux and Android"
+  "description": "Open-source OneNote-style notebook with an infinite canvas — local-first PWA for Linux and Android"
 }
