@@ -21,8 +21,9 @@ data. No account, no cloud, no lock-in.
 - **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder, color, duplicate.
 - **Infinite canvas** — draw, handwrite and type anywhere (Excalidraw engine).
 - **Draw on anything** — ink overlays text, images and PDF printouts.
-- **Import** — images, plain text, Markdown, PDF (rendered as a printout, multi-page)
-  and existing `.excalidraw` scenes.
+- **Import** — images, plain text, Markdown, PDF (rendered as a printout, multi-page),
+  Word documents and OneNote-exported HTML (see the
+  [migration guide](docs/onenote-migration.md)), and `.excalidraw` scenes.
 - **Export** — PNG, SVG, scene JSON, or a full notebook backup file.
 - **Search** — instant full-text search across every page (`Ctrl+K`).
 - **Trash** — OneNote-style soft delete with restore and purge.
@@ -84,7 +85,8 @@ the full browser E2E suite on every PR — all required checks before merge.
 
 Built on outstanding open source: [Excalidraw](https://excalidraw.com) (canvas),
 [Dexie](https://dexie.org) (IndexedDB), [pdf.js](https://mozilla.github.io/pdf.js/),
-[shadcn/ui](https://ui.shadcn.com), [Next.js](https://nextjs.org) and [bun](https://bun.sh).
+[fflate](https://github.com/101arrowz/fflate) (.docx unzip), [shadcn/ui](https://ui.shadcn.com),
+[Next.js](https://nextjs.org) and [bun](https://bun.sh).
 Inspired by Microsoft OneNote; not affiliated with or endorsed by Microsoft.
 
 ## License

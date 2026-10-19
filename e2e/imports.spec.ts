@@ -67,10 +67,26 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
     await expectCount(page, 6);
   });
 
+  test("imports a Word document as structured text blocks", async () => {
+    await page.setInputFiles(
+      'input[aria-label="Import files"]',
+      path.join(FX, "onenote-export.docx"),
+    );
+    await expectCount(page, 16); // 6 + 10 blocks (headings/lists/table)
+  });
+
+  test("imports a OneNote-exported HTML page", async () => {
+    await page.setInputFiles(
+      'input[aria-label="Import files"]',
+      path.join(FX, "onenote-page.html"),
+    );
+    await expectCount(page, 25); // + 9 blocks
+  });
+
   test("imported content persists across a reload", async () => {
     await saveNow(page);
     await page.reload();
     await openPage(page, "Page 2");
-    await expectCount(page, 6);
+    await expectCount(page, 25);
   });
 });

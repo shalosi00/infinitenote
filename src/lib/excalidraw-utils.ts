@@ -10,7 +10,8 @@ import type { ScenePayload } from "./types";
 
 /** Imperative surface the canvas exposes to the rest of the app. */
 export interface CanvasApi {
-  /** Route files by type: images, text/markdown, PDF (printout), .excalidraw. */
+  /** Route files by type: images, text/markdown, PDF (printout), .excalidraw,
+   *  Word documents, HTML pages. */
   importFiles: (files: File[]) => Promise<void>;
   exportPng: () => Promise<void>;
   exportSvg: () => Promise<void>;
@@ -24,7 +25,14 @@ export interface CanvasApi {
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
-export type FileImportKind = "image" | "pdf" | "excalidraw" | "text" | "unknown";
+export type FileImportKind =
+  | "image"
+  | "pdf"
+  | "excalidraw"
+  | "text"
+  | "docx"
+  | "html"
+  | "unknown";
 
 /** Classify an importable file. Order matters: scene files before generic json. */
 export function classifyFile(file: File): FileImportKind {
@@ -34,6 +42,10 @@ export function classifyFile(file: File): FileImportKind {
   if (file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(name)) {
     return "image";
   }
+  // Word documents (OneNote "Save as Word" export) and HTML pages
+  // (OneNote "Save as" HTML export) — both structured text imports.
+  if (name.endsWith(".docx")) return "docx";
+  if (file.type.startsWith("text/html") || /\.html?$/i.test(name)) return "html";
   if (file.type.startsWith("text/") || /\.(txt|md|markdown|csv|json|log|ya?ml)$/i.test(name)) {
     return "text";
   }
