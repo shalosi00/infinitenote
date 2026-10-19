@@ -41,8 +41,10 @@ test.describe.serial("theme and mobile layout", () => {
     await expect(drawer).toBeVisible();
     await page.screenshot({ path: "e2e-artifacts/e2e-mobile.png" });
 
+    // "Brainstorm" lives in the collapsed "Ideas" section — expand it first
+    await drawer.getByRole("button", { name: "Ideas", exact: true }).click();
     const row = drawer.locator('[data-testid="page-row"]').filter({
-      has: page.getByRole("button", { name: "Brainstorm", exact: true }),
+      has: drawer.getByRole("button", { name: "Brainstorm", exact: true }),
     });
     await row.getByRole("button", { name: "Brainstorm", exact: true }).click();
     await expectCount(page, 0); // Brainstorm page is empty

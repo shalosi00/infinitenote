@@ -70,9 +70,11 @@ export function viewBackgroundColor(page: Page): Promise<string> {
 /**
  * Hard-reset the app to the deterministic welcome seed (exactly 2 elements).
  *
- * `__NOTE_RESET__` erases IndexedDB and reloads. The explicit `goto` right
- * after guarantees the next page load runs against the erased (and therefore
- * freshly re-seeded) database, no matter when the hook's own reload lands.
+ * `__NOTE_RESET__` erases IndexedDB and reloads; the app seeds itself on the
+ * next page load. We must NOT issue our own navigation afterwards: a second
+ * load can abort the seed mid-flight (it spans several IndexedDB
+ * transactions), leaving partial data and skipping the seed on the next
+ * boot. Instead we wait for the hook's own reload to settle.
  */
 export async function resetToSeed(page: Page): Promise<void> {
   await page.goto(E2E_BASE);
@@ -82,7 +84,6 @@ export async function resetToSeed(page: Page): Promise<void> {
     { timeout: 30_000 },
   );
   await page.evaluate(() => window.__NOTE_RESET__?.());
-  await page.goto(E2E_BASE);
   await expect
     .poll(() => elementCount(page), { timeout: 45_000, message: "welcome scene re-seeded after reset" })
     .toBe(2);
