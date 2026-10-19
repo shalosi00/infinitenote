@@ -28,6 +28,10 @@ dev.log
 /.secrets/
 /e2e-artifacts/
 
+# playwright
+/e2e-report/
+/test-results/
+
 # sandbox scaffolding (workspace-only, not part of the app)
 /examples/
 /tests/

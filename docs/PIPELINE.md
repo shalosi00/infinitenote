@@ -14,8 +14,9 @@ How work moves from idea to release. Applies to humans and AI agents alike.
 
 | Check | What it does |
 |---|---|
-| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 47 unit tests, plus a secret-leak grep |
+| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 49 unit tests, plus a secret-leak grep |
 | `build-smoke` | `next build` production build + boots standalone server + HTTP 200 probe |
+| `e2e` | Playwright browser E2E against the production build (24 checks) |
 
 CI: `.github/workflows/ci.yml`, runs on every push to `main`/`develop` and every PR
 targeting them. Concurrency group cancels superseded runs on the same ref.
@@ -26,7 +27,7 @@ targeting them. Concurrency group cancels superseded runs on the same ref.
 2. PR title follows Conventional Commits (`feat: duplicate page action`).
 3. Fill in the PR template (summary, testing, checklist) — the checklist includes
    updating `PROJECT_STATUS.md`.
-4. Link issues (`Closes #N`). Wait for both required checks to be green.
+4. Link issues (`Closes #N`). Wait for all required checks to be green.
 5. **Squash-merge** into `develop`. The PR body becomes the squash commit message.
 
 ## Releases
@@ -64,6 +65,6 @@ test: cover duplicate-page id remapping
 make test         # must be green
 make lint         # must be clean
 make typecheck    # must be clean
-make e2e          # before releases / risky changes (needs dev server)
+make e2e          # full browser suite (Playwright; boots the app if needed)
 make status       # orient yourself: branch, tests, status file head
 ```

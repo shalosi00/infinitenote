@@ -7,7 +7,7 @@
 [![CI](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-47%20unit%20%2B%2034%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-49%20unit%20%2B%2024%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 </div>
 
@@ -68,11 +68,11 @@ bun run dev          # http://localhost:3000
 | `make dev` | Run dev server |
 | `make test` | Unit tests (47) |
 | `make lint` / `make typecheck` | Lint / TypeScript check |
-| `make e2e` | E2E suite (34 checks; needs dev server + headless browser) |
+| `make e2e` | Playwright E2E suite (24 checks; boots the app automatically) |
 | `make status` | Quick "where do things stand" snapshot |
 
-CI runs lint, typecheck, unit tests, a production build and a boot smoke test on
-every PR — both are required checks before merge.
+CI runs lint, typecheck, unit tests, a production build, a boot smoke test and
+the full browser E2E suite on every PR — all required checks before merge.
 
 - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** — read this first: current state, in-flight work, next up
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — stack, modules, data flow
