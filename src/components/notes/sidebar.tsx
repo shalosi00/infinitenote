@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Copy,
   FileText,
   FolderClosed,
   FolderOpen,
@@ -447,6 +448,7 @@ function PageNode({
   onNavigate?: () => void;
 }) {
   const rename = useAppStore((s) => s.renamePage);
+  const duplicate = useAppStore((s) => s.duplicatePage);
   const del = useAppStore((s) => s.deletePage);
   const move = useAppStore((s) => s.movePage);
   const selectPage = useAppStore((s) => s.selectPage);
@@ -514,6 +516,9 @@ function PageNode({
         <DropdownMenuContent align="start" className="w-52">
           <DropdownMenuItem onClick={() => setRenaming(page.id)}>
             <Pencil /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void duplicate(page.id)}>
+            <Copy /> Duplicate
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void move(page.id, -1)}>

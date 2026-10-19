@@ -18,7 +18,7 @@ data. No account, no cloud, no lock-in.
 
 ## Features
 
-- **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder, color.
+- **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder, color, duplicate.
 - **Infinite canvas** — draw, handwrite and type anywhere (Excalidraw engine).
 - **Draw on anything** — ink overlays text, images and PDF printouts.
 - **Import** — images, plain text, Markdown, PDF (rendered as a printout, multi-page)

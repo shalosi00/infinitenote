@@ -24,7 +24,7 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 
 | Area | State | Evidence |
 |---|---|---|
-| Notebook/Section/Page CRUD, rename, colors, reorder | Working | 34 E2E checks + unit tests |
+| Notebook/Section/Page CRUD, rename, colors, reorder, duplicate page | Working | 34 E2E checks + unit tests |
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Imports: image, text, Markdown, PDF printout, .excalidraw | Working | E2E with fixture files |
@@ -34,17 +34,18 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | CI: lint, typecheck, unit tests, build, smoke boot | Required checks on every PR | GitHub Actions |
 
-**Totals: 47+ unit tests, 34 E2E checks, 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 49 unit tests, 34 E2E checks, 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing open. (CI must be green on `develop` and `main` at all times.)
+- `develop` is ahead of `main` by the duplicate-page feature (issue #2, PR merged;
+  ships with v1.1.0). CI must be green on `develop` and `main` at all times.
 
 ## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. Port the E2E suite to Playwright so it runs in CI (currently local-only via `scripts/e2e.sh`).
 2. OneNote import path: research + `.docx`/OneNote-HTML import, then a OneNote (Graph export) migration guide.
-3. Duplicate page action; page templates; print-friendly export.
+3. Page templates; print-friendly export.
 4. Remove unused template scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`).
 
 ## Repo map (30 seconds)
@@ -76,6 +77,8 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — duplicate page**: first feature PR through the full pipeline (branch →
+  PR → required CI checks → squash merge into `develop`, closes #2). 49 unit tests.
 - **2026-10-19 — v1.0.0**: First public release. Full app, tests, CI pipeline,
   branch protection, release flow (see GitHub Releases for notes).
 - **2026-10-19 — bootstrap**: repository moved to GitHub, pro pipeline established
