@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# production
+/build/
+/dist/
+server.log
+dev.log
+*.log
+
+# env & secrets — never commit
+.env
+.env.*
+!.env.example
+
+# local runtime data (not part of the app)
+/db/
+/download/
+/worklog.md
+/.secrets/
+/e2e-artifacts/
+
+# sandbox scaffolding (workspace-only, not part of the app)
+/examples/
+/tests/
+/skills/
+/agent-ctx/
+Caddyfile
+prompt
+local-*
+.claude
+.z-ai-config
+
+# misc
+.DS_Store
+*.pem
+/coverage
+.vercel

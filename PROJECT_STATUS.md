@@ -1,0 +1,88 @@
+# Project Status
+
+> **READ THIS FIRST.** This file is the single source of truth for "where does the
+> project stand". It is small on purpose: humans and AI agents should get a complete
+> picture in ~2 minutes without reading the codebase. Every merged PR must update it.
+
+| | |
+|---|---|
+| **Last updated** | 2026-10-19 |
+| **Current version** | v1.0.0 (tagged, GitHub Release published) |
+| **Phase** | v1.0 shipped — maintenance + v1.1 planning |
+| **Overall state** | Feature-complete, all tests green, CI green, public repo |
+
+## TL;DR
+
+InfiniteNote is an open-source OneNote-style notebook for Linux and Android:
+Notebook → Section → Page hierarchy on an infinite canvas (Excalidraw), draw/write
+on anything, import images / text / Markdown / PDF printouts / .excalidraw scenes,
+export PNG / SVG / scenes / full backups, full-text search, soft-delete trash,
+dark mode, and a fully offline installable PWA. All data is local (IndexedDB).
+The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
+
+## What works today (verified by tests)
+
+| Area | State | Evidence |
+|---|---|---|
+| Notebook/Section/Page CRUD, rename, colors, reorder | Working | 34 E2E checks + unit tests |
+| Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
+| Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
+| Imports: image, text, Markdown, PDF printout, .excalidraw | Working | E2E with fixture files |
+| Exports: PNG, SVG, .excalidraw, notebook backup | Working | E2E serialization check |
+| Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
+| Dark mode, mobile drawer navigation | Working | E2E + visual review |
+| PWA install (Linux + Android), offline SW | Working | E2E asset checks |
+| CI: lint, typecheck, unit tests, build, smoke boot | Required checks on every PR | GitHub Actions |
+
+**Totals: 47+ unit tests, 34 E2E checks, 0 known bugs, 0 TODOs in `src/`.**
+
+## In flight
+
+- Nothing open. (CI must be green on `develop` and `main` at all times.)
+
+## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+
+1. Port the E2E suite to Playwright so it runs in CI (currently local-only via `scripts/e2e.sh`).
+2. OneNote import path: research + `.docx`/OneNote-HTML import, then a OneNote (Graph export) migration guide.
+3. Duplicate page action; page templates; print-friendly export.
+4. Remove unused template scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`).
+
+## Repo map (30 seconds)
+
+| Path | What it is |
+|---|---|
+| `src/lib/types.ts` | Data model: Notebook/Section/Page, BackupFile |
+| `src/lib/notes-db.ts` | Dexie schema + CRUD + trash cascade + backup/restore |
+| `src/lib/tree-ops.ts` | OneNote-style selection semantics after delete |
+| `src/lib/search.ts` | Scene text extraction + ranked search |
+| `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
+| `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
+| `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
+| `src/app/` | Next.js App Router entry + layout |
+| `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
+| `scripts/e2e.sh` + `scripts/e2e-fixtures/` | Local E2E suite (needs dev server + `agent-browser`) |
+| `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke (required) |
+| `docs/` | Architecture, roadmap, decisions, pipeline |
+
+## Commands cheat-sheet
+
+```bash
+bun install && bun run db:generate   # first-time setup
+bun run dev                          # dev server on :3000
+make test                            # 47 unit tests
+make e2e                             # 34 E2E checks (dev server + agent-browser)
+make status                          # quick status snapshot (this file's head + git info)
+```
+
+## Recent history
+
+- **2026-10-19 — v1.0.0**: First public release. Full app, tests, CI pipeline,
+  branch protection, release flow (see GitHub Releases for notes).
+- **2026-10-19 — bootstrap**: repository moved to GitHub, pro pipeline established
+  (PR flow, required checks, docs, status system).
+
+## Update protocol
+
+1. Every PR updates the relevant row(s) above (or `In flight` / `Next up`).
+2. On merge, refresh `Last updated` and `Recent history`.
+3. `In flight` must always name the branch or issue currently being worked on.

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: lint-typecheck-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard against leaked secrets
+        run: |
+          if grep -rInE '(ghp_|github_pat_|sk-)[A-Za-z0-9_-]{20,}' \
+              --exclude-dir=node_modules --exclude-dir=.git . ; then
+            echo "::error::Potential secret detected in the tree"
+            exit 1
+          fi
+          echo "No secrets detected"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client (needed by typecheck)
+        run: bun run db:generate
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Unit tests
+        run: bun test src/lib/__tests__
+
+  build-smoke:
+    name: build-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Generate Prisma client
+        run: bun run db:generate
+      - name: Production build (standalone)
+        run: bun run build
+      - name: Boot smoke test
+        run: |
+          (bun run start &) 
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/ -o /dev/null; then
+              echo "Smoke OK: production server responded on :3000"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Production server did not respond within 60s"
+          exit 1
