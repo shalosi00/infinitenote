@@ -30,6 +30,9 @@ import {
   MIME_TYPES,
 } from "@excalidraw/excalidraw";
 import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { extractDocxBlocks } from "./docx-import";
+import { extractHtmlBlocks } from "./html-import";
+import { headingFontSize, type ImportedBlock } from "./import-blocks";
 import type { ScenePayload } from "./types";
 
 const now = () => Date.now();
@@ -128,6 +131,85 @@ export async function importTextFiles(
     y += estHeight;
   }
   return files.length;
+}
+
+/* ------------------------------------------------------------------ */
+/* structured imports (.docx / OneNote-exported HTML)                  */
+/* ------------------------------------------------------------------ */
+
+interface TextSkeleton {
+  type: "text";
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  width: number;
+  id: string;
+}
+
+/** Lay imported blocks out as stacked text elements; headings render larger. */
+function blocksToSkeletons(
+  blocks: ImportedBlock[],
+  anchor: { x: number; y: number },
+): TextSkeleton[] {
+  const skeletons: TextSkeleton[] = [];
+  let y = anchor.y;
+  for (const block of blocks) {
+    const fontSize = block.kind === "heading" ? headingFontSize(block.level) : 20;
+    const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
+    const text = `${prefix}${block.text}`;
+    const width = 720;
+    // rough wrap estimate: chars per line shrinks as the font grows
+    const charsPerLine = Math.max(16, Math.floor(width / (fontSize * 0.52)));
+    const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+    skeletons.push({
+      type: "text",
+      text,
+      x: anchor.x + block.indent * 28,
+      y,
+      fontSize,
+      width,
+      id: crypto.randomUUID(),
+    });
+    y += lines * fontSize * 1.35 + 14;
+  }
+  return skeletons;
+}
+
+/** Append imported blocks to the canvas below existing content. */
+async function insertBlocks(
+  api: ExcalidrawImperativeAPI,
+  blocks: ImportedBlock[],
+  insertAt?: { x: number; y: number },
+): Promise<number> {
+  if (!blocks.length) return 0;
+  const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
+  const skeletons = blocksToSkeletons(blocks, anchor);
+  const created = convertToExcalidrawElements(skeletons, { regenerateIds: false });
+  api.updateScene({
+    elements: [...api.getSceneElements(), ...(created as unknown as ExcalidrawElement[])],
+  });
+  return skeletons.length;
+}
+
+/** Import a Word document (OneNote "Save as Word" export). */
+export async function importDocxFile(
+  api: ExcalidrawImperativeAPI,
+  file: File,
+  insertAt?: { x: number; y: number },
+): Promise<number> {
+  const blocks = extractDocxBlocks(new Uint8Array(await file.arrayBuffer()));
+  return insertBlocks(api, blocks, insertAt);
+}
+
+/** Import an HTML page (OneNote "Save as" HTML export, web articles). */
+export async function importHtmlFile(
+  api: ExcalidrawImperativeAPI,
+  file: File,
+  insertAt?: { x: number; y: number },
+): Promise<number> {
+  const blocks = extractHtmlBlocks(await file.text());
+  return insertBlocks(api, blocks, insertAt);
 }
 
 /* ------------------------------------------------------------------ */

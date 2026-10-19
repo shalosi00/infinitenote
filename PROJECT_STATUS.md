@@ -8,7 +8,7 @@
 |---|---|
 | **Last updated** | 2026-10-19 |
 | **Current version** | v1.0.0 (tagged, GitHub Release published) |
-| **Phase** | v1.1 in progress — E2E-in-CI landing on develop |
+| **Phase** | v1.1 in progress — E2E-in-CI merged; OneNote import landing |
 | **Overall state** | Feature-complete, all tests green, CI green, public repo |
 
 ## TL;DR
@@ -27,25 +27,25 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 | Notebook/Section/Page CRUD, rename, colors, reorder, duplicate page | Working | 34 E2E checks + unit tests |
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
-| Imports: image, text, Markdown, PDF printout, .excalidraw | Working | E2E with fixture files |
+| Imports: image, text, Markdown, PDF printout, Word/OneNote `.docx`, OneNote-exported HTML, .excalidraw | Working | 26 E2E checks with fixture files |
 | Exports: PNG, SVG, .excalidraw, notebook backup | Working | E2E serialization check |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 49 unit tests, 24 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 75 unit tests, 26 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `feat/playwright-e2e` (issue #3): E2E suite ported from the agent-browser shell
-  harness to Playwright (7 parallel spec files, deterministic `resetToSeed`,
-  console-error guard); runs in CI as the required `e2e` job against the
-  production build.
+- `feat/onenote-import` (issue #4): OneNote import phase 1 — `.docx` and
+  OneNote-exported HTML importers (pure, fully unit-tested extractors in
+  `src/lib/docx-import.ts` / `html-import.ts`) wired into the import router;
+  migration guide in `docs/onenote-migration.md`.
 
 ## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. OneNote import path: research + `.docx`/OneNote-HTML import, then a OneNote (Graph export) migration guide.
+1. OneNote import phase 2: `.mht` single-file pages, embedded images, Microsoft Graph export runbook.
 2. Page templates; print-friendly export.
 3. Remove unused template scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`).
 
@@ -59,6 +59,7 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 | `src/lib/search.ts` | Scene text extraction + ranked search |
 | `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
 | `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
+| `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
@@ -71,13 +72,16 @@ The v1.0 feature set is done, tested and released; next up is the v1.1 roadmap.
 ```bash
 bun install && bun run db:generate   # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 49 unit tests
-make e2e                             # 24 E2E checks (Playwright; boots the app if needed)
+make test                            # 75 unit tests
+make e2e                             # 26 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-10-19 — OneNote import phase 1 (issue #4)**: Word (`.docx`) and OneNote-HTML
+  pages import as structured text blocks (headings, nested lists, tables); pure
+  extractors, 26 new unit tests, 2 new E2E checks, migration guide added.
 - **2026-10-19 — E2E in CI (issue #3)**: the 34-check agent-browser shell harness
   became a 24-check Playwright suite (7 parallel spec files, deterministic
   `resetToSeed`, console-error guard) that CI runs against the production build.

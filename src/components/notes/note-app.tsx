@@ -218,7 +218,7 @@ export default function NoteApp() {
           type="file"
           multiple
           className="hidden"
-          accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
+          accept="image/*,.pdf,.docx,.html,.htm,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
           aria-label="Import files"
           onChange={(e) => {
             void handleImportFiles(e.target.files);
@@ -246,7 +246,7 @@ export default function NoteApp() {
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>Insert into current page</DropdownMenuLabel>
             <DropdownMenuItem onClick={openFilePicker}>
-              <ImageIcon /> Images, PDF, text, Markdown…
+              <ImageIcon /> Images, PDF, Word, HTML, text…
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Library</DropdownMenuLabel>
@@ -393,7 +393,7 @@ export default function NoteApp() {
                 <Upload className="mx-auto h-8 w-8 text-primary" />
                 <p className="mt-2 text-sm font-medium">Drop files to insert them</p>
                 <p className="text-xs text-muted-foreground">
-                  Images, PDF printouts, text &amp; Markdown, .excalidraw scenes
+                  Images, PDF printouts, Word &amp; HTML pages, text, .excalidraw scenes
                 </p>
               </div>
             </div>
