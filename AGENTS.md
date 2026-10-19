@@ -29,11 +29,11 @@ Follow this guide to work effectively without wasting context reading the whole 
 
 | What | Command |
 |---|---|
-| Install | `bun install && bun run db:generate` |
+| Install | `bun install` |
 | Dev server | `bun run dev` (port 3000) |
 | Unit tests | `make test` |
 | Lint / typecheck | `make lint` / `make typecheck` |
-| E2E (local) | dev server running, then `make e2e` |
+| E2E | `make e2e` (Playwright; boots the app if :3000 is free) |
 | Status snapshot | `make status` |
 | Build / run prod | `make build` / `make start` |
 
@@ -42,20 +42,21 @@ Follow this guide to work effectively without wasting context reading the whole 
 - The app exposes test hooks **only** when loaded with `?e2e=1`:
   `window.__NOTE_E2E__` (scene/element accessors) and `window.__NOTE_RESET__()`
   (hard data reset for deterministic runs).
-- `scripts/e2e.sh` drives a headless browser (`agent-browser`) with real mouse and
-  keyboard events, asserts state via the hooks, and writes screenshots to
-  `e2e-artifacts/` (override dir with `E2E_SHOTS=...`). Fixtures live in
-  `scripts/e2e-fixtures/`.
-- CI runs lint + typecheck + unit tests + production build + boot smoke test.
-  The full browser E2E suite is currently run locally before releases;
-  porting it to Playwright-in-CI is roadmap item v1.1 (issue #3).
+- `e2e/` holds the Playwright specs (7 files, 24 checks); fixtures live in
+  `e2e/fixtures/`. Every spec resets its own browser context (isolated
+  IndexedDB) via `resetToSeed()` in `e2e/helpers.ts`, so spec files run fully
+  parallel.
+- `make e2e` (or `bunx playwright test`) — Playwright reuses a dev server on
+  :3000 when present, otherwise boots `bun run dev:e2e` itself. In CI it
+  builds the production standalone server and drives that instead.
+- Failure artifacts: HTML report in `e2e-report/`, traces/screenshots in
+  `test-results/` (gitignored; CI uploads the report on failure).
 
-## Known template leftovers (safe to ignore, do not "fix" casually)
+## History note
 
-`src/lib/db.ts` + `prisma/` + `src/app/api/route.ts` are sandbox scaffolding, unused
-by the app (all note data is client-side IndexedDB). They are kept only because the
-typecheck pipeline expects the generated Prisma client (`bun run db:generate`).
-Removing them is roadmap item #4 — remove together with the `db:generate` step in CI.
+The initial sandbox scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`)
+was removed in v1.1: the app is fully local-first (client-side IndexedDB via
+Dexie) and has no server database.
 
 ## Conventions
 

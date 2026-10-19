@@ -22,6 +22,8 @@ import {
   classifyFile,
   getScenePayload,
   importExcalidrawFile,
+  importDocxFile,
+  importHtmlFile,
   importImageFiles,
   importPdfAsPrintout,
   importTextFiles,
@@ -105,6 +107,8 @@ export default function ExcalidrawCanvas({
         const texts = files.filter((f) => classifyFile(f) === "text");
         const pdfs = files.filter((f) => classifyFile(f) === "pdf");
         const scenes = files.filter((f) => classifyFile(f) === "excalidraw");
+        const docxFiles = files.filter((f) => classifyFile(f) === "docx");
+        const htmlFiles = files.filter((f) => classifyFile(f) === "html");
         let touched = false;
         try {
           if (images.length) {
@@ -122,13 +126,30 @@ export default function ExcalidrawCanvas({
             touched = true;
             onToast(`Inserted PDF printout (${n} page${n > 1 ? "s" : ""})`);
           }
+          for (const file of docxFiles) {
+            const n = await importDocxFile(api, file);
+            touched = true;
+            onToast(`Imported "${file.name}" — ${n} text block${n === 1 ? "" : "s"}`);
+          }
+          for (const file of htmlFiles) {
+            const n = await importHtmlFile(api, file);
+            touched = true;
+            onToast(`Imported "${file.name}" — ${n} text block${n === 1 ? "" : "s"}`);
+          }
           for (const sceneFile of scenes) {
             const scene = await importExcalidrawFile(sceneFile);
             appendScene(api, scene);
             touched = true;
             onToast(`Imported scene "${sceneFile.name}"`);
           }
-          if (files.length > images.length + texts.length + pdfs.length + scenes.length) {
+          const known =
+            images.length +
+            texts.length +
+            pdfs.length +
+            scenes.length +
+            docxFiles.length +
+            htmlFiles.length;
+          if (files.length > known) {
             onToast("Some files were skipped (unsupported type)");
           }
           if (touched) {

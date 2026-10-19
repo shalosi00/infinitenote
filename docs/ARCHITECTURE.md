@@ -10,6 +10,7 @@
 | Storage | Dexie 4 over IndexedDB (client-only, offline) |
 | Canvas | `@excalidraw/excalidraw` 0.18 (self-hosted fonts in `public/excalidraw/`) |
 | PDF import | pdfjs-dist 4 with self-hosted worker (`public/pdf.worker.min.mjs`) |
+| Word / OneNote-HTML import | pure extractors in `src/lib/` — `docx-import.ts` (fflate unzip + WordprocessingML scan), `html-import.ts` (tokenizer) → `ImportedBlock[]` |
 | Delivery | PWA (manifest + custom service worker `public/sw.js`), standalone Next server build |
 
 ## Data model
@@ -39,7 +40,8 @@ src/lib/search.ts              scene text extraction + ranked AND-match search
 src/lib/store.ts               Zustand store: single-flight load(), welcome seed,
                                selection state, import/export actions
 src/lib/excalidraw-utils.ts    SSR-safe pure helpers + CanvasApi contract
-src/lib/excalidraw-client.ts   browser runtime: element/image/PDF import, exports
+src/lib/excalidraw-client.ts   browser runtime: element/image/PDF/Word/HTML import,
+                               structured-import layout, exports
                                (PNG/SVG/scene), serializeAsJSON
 src/components/notes/          note-app (shell, menus, drag-drop import/export),
                                sidebar (tree, rename, colors, reorder), canvas-editor
@@ -63,7 +65,8 @@ src/app/                       layout + single route "/" (client app)
 
 ## Testing strategy
 
-- **Unit** (`src/lib/__tests__/`, 47 tests): tree-ops, search, excalidraw-utils,
+- **Unit** (`src/lib/__tests__/`, 75 tests): tree-ops, search, excalidraw-utils,
+  docx/html importers,
   notes-db (via `fake-indexeddb`, per-test DB reset). `bun test` runs them in ~0.6 s.
 - **E2E** (`scripts/e2e.sh`, 34 checks): real browser against the dev server;
   app exposes `?e2e=1` hooks (`window.__NOTE_E2E__`, `window.__NOTE_RESET__`).

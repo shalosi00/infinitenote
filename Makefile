@@ -12,8 +12,8 @@ test:           ## Run the unit test suite
 lint:           ## Run ESLint
 	bun run lint
 
-typecheck:      ## Generate Prisma client types, then typecheck the app
-	bun run db:generate && bunx tsc --noEmit
+typecheck:      ## TypeScript check
+	bunx tsc --noEmit
 
 build:          ## Production build (standalone)
 	bun run build
@@ -21,8 +21,8 @@ build:          ## Production build (standalone)
 start:          ## Boot the production server (after `make build`)
 	bun run start
 
-e2e:            ## Run the E2E suite (needs `make dev` running on :3000)
-	bash scripts/e2e.sh
+e2e:            ## Run the Playwright E2E suite (boots the app if :3000 is free)
+	bunx playwright test
 
 status:         ## Print a quick project status snapshot
 	bash scripts/status.sh
