@@ -7,7 +7,7 @@
 [![CI](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-49%20unit%20%2B%2024%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-97%20unit%20%2B%2034%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 </div>
 
@@ -22,11 +22,13 @@ data. No account, no cloud, no lock-in.
 - **Infinite canvas** — draw, handwrite and type anywhere (Excalidraw engine).
 - **Draw on anything** — ink overlays text, images and PDF printouts.
 - **Import** — images, plain text, Markdown, PDF (rendered as a printout, multi-page),
-  Word documents and OneNote-exported HTML (see the
-  [migration guide](docs/onenote-migration.md)), and `.excalidraw` scenes.
+  Word documents, OneNote-exported HTML **and OneNote `.mht` single-file pages with
+  embedded images** (see the [migration guide](docs/onenote-migration.md)), and
+  `.excalidraw` scenes.
 - **Export** — PNG, SVG, scene JSON, or a full notebook backup file.
 - **Search** — instant full-text search across every page (`Ctrl+K`).
 - **Trash** — OneNote-style soft delete with restore and purge.
+- **Paper styles** — plain, ruled and grid paper per page.
 - **Dark mode** and responsive layout with a mobile drawer.
 - **Local-first** — data lives in your browser's IndexedDB; works fully offline.
 - **Installable PWA** — one tap / one click to install on Linux and Android.
@@ -66,9 +68,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server |
-| `make test` | Unit tests (47) |
+| `make test` | Unit tests (97) |
 | `make lint` / `make typecheck` | Lint / TypeScript check |
-| `make e2e` | Playwright E2E suite (24 checks; boots the app automatically) |
+| `make e2e` | Playwright E2E suite (34 checks; boots the app automatically) |
 | `make status` | Quick "where do things stand" snapshot |
 
 CI runs lint, typecheck, unit tests, a production build, a boot smoke test and

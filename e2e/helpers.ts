@@ -11,7 +11,11 @@ export interface NoteE2EHooks {
   excalidraw: {
     setActiveTool: (tool: { type: string }) => void;
     getSceneElements: () => Array<{ type: string }>;
-    getAppState: () => { viewBackgroundColor: string };
+    getAppState: () => {
+      viewBackgroundColor: string;
+      gridModeEnabled: boolean;
+      zoom: { value: number };
+    };
   };
 }
 

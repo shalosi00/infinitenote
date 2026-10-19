@@ -16,6 +16,15 @@ describe("classifyFile — structured import kinds", () => {
     expect(classifyFile(mkFile("page.bin", "text/html"))).toBe("html");
   });
 
+  it("classifies OneNote .mht single-file pages ahead of .html (mhtml ends with html)", () => {
+    expect(classifyFile(mkFile("page.mht", ""))).toBe("mht");
+    expect(classifyFile(mkFile("page.mhtml", ""))).toBe("mht");
+    expect(classifyFile(mkFile("PAGE.MHT", ""))).toBe("mht");
+    // the MIME types OneNote/browsers may stamp on it
+    expect(classifyFile(mkFile("page.bin", "message/rfc822"))).toBe("mht");
+    expect(classifyFile(mkFile("page.bin", "application/x-mimearchive"))).toBe("mht");
+  });
+
   it("still classifies the original kinds", () => {
     expect(classifyFile(mkFile("scene.excalidraw", ""))).toBe("excalidraw");
     expect(classifyFile(mkFile("scene.excalidraw.json", ""))).toBe("excalidraw");
