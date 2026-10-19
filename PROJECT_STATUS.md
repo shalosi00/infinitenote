@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-10-19 |
-| **Current version** | v1.1.0 (release in progress) |
-| **Phase** | v1.1 complete on develop — releasing |
-| **Overall state** | 4 PRs merged for v1.1; 75 unit + 26 E2E green, CI green |
+| **Current version** | v1.1.0 (tagged, GitHub Release published) |
+| **Phase** | v1.1.0 shipped — v1.2 planning |
+| **Overall state** | v1.1.0 released; 75 unit + 26 E2E green, CI green |
 
 ## TL;DR
 
@@ -38,7 +38,7 @@ v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneN
 
 ## In flight
 
-- Nothing open. (CI must be green on `develop` and `main` at all times.)
+- Nothing open — v1.1.0 is live on `main`. (CI must stay green on both branches.)
 
 ## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -75,6 +75,9 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — v1.1.0 live**: release PR #10 merge-committed to main (a2ec743),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.1.0);
+  v1.1.0 milestone closed, v1.2.0 milestone opened.
 - **2026-10-19 — v1.1.0 release**: 4 PRs — duplicate page (#5), Playwright E2E
   required in CI (#6), OneNote import phase 1 (#7), scaffolding cleanup (#8).
   75 unit tests, 26 E2E checks, three required CI checks.
