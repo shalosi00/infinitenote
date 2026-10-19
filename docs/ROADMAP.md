@@ -24,7 +24,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [ ] OneNote import, phase 2: migration guide using a Microsoft Graph export script
 - [x] Duplicate page action (shipped to `develop` after v1.0.0; releases with v1.1.0)
 - [ ] Page templates (ruled/grid paper backgrounds)
-- [ ] Remove unused template scaffolding (`db.ts`, `prisma/`, `api/route.ts`)
+- [x] Remove unused template scaffolding (`db.ts`, `prisma/`, `api/route.ts`)
 
 ## v1.2 — Notebook power features
 

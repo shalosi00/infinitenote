@@ -14,7 +14,7 @@ How work moves from idea to release. Applies to humans and AI agents alike.
 
 | Check | What it does |
 |---|---|
-| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 49 unit tests, plus a secret-leak grep |
+| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 75 unit tests, plus a secret-leak grep |
 | `build-smoke` | `next build` production build + boots standalone server + HTTP 200 probe |
 | `e2e` | Playwright browser E2E against the production build (24 checks) |
 

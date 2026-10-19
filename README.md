@@ -58,7 +58,6 @@ Requires [bun](https://bun.sh) 1.3+:
 git clone https://github.com/shalosi00/infinitenote.git
 cd infinitenote
 bun install
-bun run db:generate
 bun run dev          # http://localhost:3000
 ```
 
