@@ -9,6 +9,7 @@ import { create } from "zustand";
 import * as db from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
+import type { PageBackground } from "./types";
 
 export type SaveIndicator = "idle" | "saving" | "saved" | "error";
 
@@ -45,6 +46,7 @@ interface AppStore {
   movePage: (id: string, dir: -1 | 1) => Promise<void>;
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
+  setPageBackground: (id: string, background: PageBackground) => Promise<void>;
 
   setSaveIndicator: (s: SaveIndicator) => void;
   setSearchOpen: (open: boolean) => void;
@@ -178,6 +180,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   renamePage: async (id, title) => {
     await db.renamePage(id, title);
+    await get().refresh();
+  },
+  setPageBackground: async (id, background) => {
+    await db.setPageBackground(id, background);
     await get().refresh();
   },
   movePage: async (id, dir) => {

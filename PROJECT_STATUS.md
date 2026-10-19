@@ -7,18 +7,22 @@
 | | |
 |---|---|
 | **Last updated** | 2026-10-19 |
-| **Current version** | v1.1.0 (tagged, GitHub Release published) |
-| **Phase** | v1.1.0 shipped — v1.2 planning |
-| **Overall state** | v1.1.0 released; 75 unit + 26 E2E green, CI green |
+| **Current version** | v1.1.0 tagged & released (v1.2.0 in development) |
+| **Phase** | v1.1 close-out on `feat/onenote-import-phase2` |
+| **Overall state** | v1.1.0 live on `main`; 97 unit + 34 E2E green locally; CI pending on the PR |
 
 ## TL;DR
 
 InfiniteNote is an open-source OneNote-style notebook for Linux and Android:
 Notebook → Section → Page hierarchy on an infinite canvas (Excalidraw), draw/write
 on anything, import images / text / Markdown / PDF printouts / .excalidraw scenes,
-export PNG / SVG / scenes / full backups, full-text search, soft-delete trash,
-dark mode, and a fully offline installable PWA. All data is local (IndexedDB).
-v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneNote import phase 1 (.docx + HTML) and drops the template scaffolding.
+Word documents, OneNote-exported HTML and OneNote `.mht` single-file pages
+(embedded images included), export PNG / SVG / scenes / full backups, full-text
+search, soft-delete trash, dark mode, per-page paper styles (plain / ruled /
+grid), and a fully offline installable PWA. All data is local (IndexedDB).
+v1.1 adds the duplicate-page action, Playwright E2E as a required CI check,
+OneNote import phase 1 (.docx + HTML) and phase 2 (.mht + embedded images +
+Graph export runbook), page paper styles, and drops the template scaffolding.
 
 ## What works today (verified by tests)
 
@@ -27,23 +31,28 @@ v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneN
 | Notebook/Section/Page CRUD, rename, colors, reorder, duplicate page | Working | 34 E2E checks + unit tests |
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
-| Imports: image, text, Markdown, PDF printout, Word/OneNote `.docx`, OneNote-exported HTML, .excalidraw | Working | 26 E2E checks with fixture files |
+| Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
+| Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw` | Working | 30 E2E checks with fixture files |
 | Exports: PNG, SVG, .excalidraw, notebook backup | Working | E2E serialization check |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
+| OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 75 unit tests, 26 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 97 unit tests, 34 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing open — v1.1.0 is live on `main`. (CI must stay green on both branches.)
+- `feat/onenote-import-phase2` — v1.1 close-out: OneNote `.mht` import with
+  embedded images, HTML `data:`-image import, Microsoft Graph export runbook,
+  page paper styles (plain/ruled/grid). 97 unit + 34 E2E green locally.
 
-## Next up — v1.1 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.2 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. OneNote import phase 2: `.mht` single-file pages, embedded images, Microsoft Graph export runbook.
-2. Page templates; print-friendly export.
+1. Tags / labels on pages with a tag filter view.
+2. Quick notes and a "today" smart page.
+3. Print-friendly page export (paginated PDF).
 
 ## Repo map (30 seconds)
 
@@ -56,10 +65,12 @@ v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneN
 | `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
 | `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
 | `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
+| `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
+| `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
-| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 24 checks, runs in CI (issue #3) |
+| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 34 checks, runs in CI (issue #3) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
 
@@ -68,13 +79,18 @@ v1.1 adds the duplicate-page action, Playwright E2E as a required CI check, OneN
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 75 unit tests
-make e2e                             # 26 E2E checks (Playwright; boots the app if needed)
+make test                            # 97 unit tests
+make e2e                             # 34 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-10-19 — v1.1 close-out PR**: OneNote import phase 2 — `.mht` single-file
+  pages with embedded images (placed between text blocks), HTML `data:`-image
+  import, Microsoft Graph export runbook + script; page paper styles
+  (plain/ruled/grid) with a viewport-synced ruled overlay. 97 unit tests
+  (22 new), 34 E2E checks (8 new).
 - **2026-10-19 — v1.1.0 live**: release PR #10 merge-committed to main (a2ec743),
   tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.1.0);
   v1.1.0 milestone closed, v1.2.0 milestone opened.

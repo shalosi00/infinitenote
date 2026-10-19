@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from "bun:test";
-import { extractHtmlBlocks } from "../html-import";
+import { extractHtmlBlocks, extractHtmlContent } from "../html-import";
 
 const FIXTURE = `${import.meta.dir}/fixtures/onenote-page.html`;
 
@@ -104,5 +104,67 @@ describe("extractHtmlBlocks — edge cases", () => {
       extractHtmlBlocks("<html><head><style>a{}</style></head><body></body></html>"),
     ).toEqual([]);
     expect(extractHtmlBlocks("")).toEqual([]);
+  });
+});
+
+describe("extractHtmlContent — embedded images", () => {
+  it("extracts data: URLs with declared dimensions", () => {
+    const html = `<p>before</p><img src="data:image/png;base64,AAAA" width="240" height="156">`;
+    const { blocks, images } = extractHtmlContent(html);
+    expect(blocks.map((b) => b.text)).toEqual(["before"]);
+    expect(images).toEqual([
+      { src: "data:image/png;base64,AAAA", width: 240, height: 156, blockIndex: 1 },
+    ]);
+  });
+
+  it("places an image inside pending text after that text's block", () => {
+    const html = `<p>caption<img src="data:image/gif;base64,BBBB">tail</p>`;
+    const { images } = extractHtmlContent(html);
+    expect(images[0].blockIndex).toBe(1); // after the paragraph it sits inside
+  });
+
+  it("counts blocks, not characters: image after a list", () => {
+    const html = `<ul><li>one</li><li>two</li></ul><img src="cid:cover.png">`;
+    const { blocks, images } = extractHtmlContent(html);
+    expect(blocks).toHaveLength(2);
+    expect(images[0]).toMatchObject({ src: "cid:cover.png", blockIndex: 2, width: null, height: null });
+  });
+
+  it("accepts single-quoted, unquoted and mixed attribute forms", () => {
+    const a = extractHtmlContent(`<img src='data:image/png;base64,A'>`).images;
+    const b = extractHtmlContent(`<img src=data:image/png;base64,B width=50>`).images;
+    const c = extractHtmlContent(`<IMG SRC="data:image/png;base64,C" HEIGHT="7">`).images;
+    expect(a[0].src).toBe("data:image/png;base64,A");
+    expect(b[0]).toMatchObject({ src: "data:image/png;base64,B", width: 50 });
+    expect(c[0]).toMatchObject({ src: "data:image/png;base64,C", height: 7 });
+  });
+
+  it("skips img tags without a usable src and ignores junk dimensions", () => {
+    const { images } = extractHtmlContent(
+      `<img alt="no src"><img src="x.png" width="-5" height="abc">`,
+    );
+    expect(images).toEqual([
+      { src: "x.png", width: null, height: null, blockIndex: 0 },
+    ]);
+  });
+
+  it("keeps document order across multiple images", () => {
+    const html = [
+      `<h1>t</h1>`,
+      `<img src="one.png">`,
+      `<p>a</p>`,
+      `<img src="two.png">`,
+      `<img src="three.png">`,
+      `<p>b</p>`,
+    ].join("");
+    const { images } = extractHtmlContent(html);
+    expect(images.map((i) => i.src)).toEqual(["one.png", "two.png", "three.png"]);
+    expect(images.map((i) => i.blockIndex)).toEqual([1, 2, 2]);
+  });
+
+  it("ignores images inside the head (style blocks stripped)", () => {
+    const html = `<head><style>a{background:url(x.png)}</style></head><body><p>ok</p></body>`;
+    const { images } = extractHtmlContent(html);
+    expect(images).toEqual([]);
   });
 });

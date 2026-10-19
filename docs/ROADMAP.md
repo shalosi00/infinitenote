@@ -21,9 +21,10 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [x] Port E2E suite to Playwright and run it in CI (issue #3)
 - [x] OneNote import, phase 1: `.docx` and OneNote-exported HTML import (issue #4)
-- [ ] OneNote import, phase 2: migration guide using a Microsoft Graph export script
+- [x] OneNote import, phase 2: `.mht` single-file pages with embedded images +
+  Microsoft Graph export runbook (issue #12)
 - [x] Duplicate page action (shipped to `develop` after v1.0.0; releases with v1.1.0)
-- [ ] Page templates (ruled/grid paper backgrounds)
+- [x] Page templates: plain / ruled / grid paper per page (issue #13)
 - [x] Remove unused template scaffolding (`db.ts`, `prisma/`, `api/route.ts`)
 
 ## v1.2 — Notebook power features

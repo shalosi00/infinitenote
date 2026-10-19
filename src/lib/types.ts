@@ -58,6 +58,14 @@ export interface Section {
   deletedAt: number | null;
 }
 
+/** Paper style of a page (OneNote-style ruled/grid backgrounds). */
+export type PageBackground = "plain" | "ruled" | "grid";
+
+export const PAGE_BACKGROUNDS: PageBackground[] = ["plain", "ruled", "grid"];
+
+export const isPageBackground = (v: unknown): v is PageBackground =>
+  typeof v === "string" && (PAGE_BACKGROUNDS as string[]).includes(v);
+
 export interface PageRow {
   id: string;
   sectionId: string;
@@ -66,6 +74,8 @@ export interface PageRow {
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;
+  /** paper style — plain by default (absent on pre-v1.2 rows) */
+  background?: PageBackground;
   /** serialized Excalidraw scene: { elements, files } — kept out of tree listings */
   content?: string | null;
 }
