@@ -83,6 +83,16 @@ export function viewBackgroundColor(page: Page): Promise<string> {
  */
 export async function resetToSeed(page: Page): Promise<void> {
   await page.goto(E2E_BASE);
+  // Wait for the app's initial load to FULLY settle before resetting: the
+  // sidebar tree only renders once load() resolved, which means any welcome
+  // seed has committed. Firing the reset earlier races an in-flight seed
+  // (several sequential IndexedDB transactions): the erase clears part of
+  // it, the remainder keeps committing, and the reloaded page then sees
+  // partial data and skips seeding entirely.
+  await page
+    .locator('[data-testid="page-row"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
   await page.waitForFunction(
     () => typeof window.__NOTE_RESET__ === "function",
     undefined,
