@@ -12,6 +12,7 @@ import {
   FileJson,
   FileUp,
   Image as ImageIcon,
+  LayoutTemplate,
   Menu,
   Moon,
   NotebookPen,
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
+import type { PageBackground } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
@@ -51,6 +53,7 @@ export default function NoteApp() {
     load,
     addNotebook,
     renamePage,
+    setPageBackground,
     restoreBackupArchive,
   } = useAppStore();
   const { resolvedTheme, setTheme } = useTheme();
@@ -218,7 +221,7 @@ export default function NoteApp() {
           type="file"
           multiple
           className="hidden"
-          accept="image/*,.pdf,.docx,.html,.htm,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
+          accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
           aria-label="Import files"
           onChange={(e) => {
             void handleImportFiles(e.target.files);
@@ -354,6 +357,41 @@ export default function NoteApp() {
                   </button>
                 )}
                 <div className="flex-1" />
+
+                {/* page paper style */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground"
+                      aria-label="Page background"
+                      data-testid="background-picker"
+                    >
+                      <LayoutTemplate className="h-4 w-4" />
+                      <span className="hidden sm:inline capitalize">
+                        {currentPage.background ?? "plain"}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" data-testid="paper-menu">
+                    <DropdownMenuLabel>Paper style</DropdownMenuLabel>
+                    {(["plain", "ruled", "grid"] as const).map((kind) => (
+                      <DropdownMenuItem
+                        key={kind}
+                        role="menuitemradio"
+                        aria-checked={(currentPage.background ?? "plain") === kind}
+                        data-testid={`background-${kind}`}
+                        className="gap-2 capitalize"
+                        onClick={() => void setPageBackground(currentPage.id, kind)}
+                      >
+                        <PaperSwatch kind={kind} />
+                        {kind}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <span
                   className="flex items-center gap-1.5 text-xs text-muted-foreground"
                   data-testid="save-indicator"
@@ -377,6 +415,7 @@ export default function NoteApp() {
                   pageId={currentPage.id}
                   title={currentPage.title}
                   theme={theme}
+                  background={(currentPage.background ?? "plain") as PageBackground}
                   onApiReady={handleApiReady}
                   onSaveIndicator={handleSaveIndicator}
                   onToast={showToast}
@@ -393,7 +432,7 @@ export default function NoteApp() {
                 <Upload className="mx-auto h-8 w-8 text-primary" />
                 <p className="mt-2 text-sm font-medium">Drop files to insert them</p>
                 <p className="text-xs text-muted-foreground">
-                  Images, PDF printouts, Word &amp; HTML pages, text, .excalidraw scenes
+                  Images, PDF printouts, Word &amp; HTML pages, OneNote .mht, text, .excalidraw scenes
                 </p>
               </div>
             </div>
@@ -405,6 +444,29 @@ export default function NoteApp() {
       <TrashDialog />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* paper style swatch                                                    */
+/* ------------------------------------------------------------------ */
+
+function PaperSwatch({ kind }: { kind: PageBackground }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block h-5 w-5 shrink-0 rounded-[3px] border border-current opacity-70"
+      style={{
+        backgroundImage:
+          kind === "ruled"
+            ? "repeating-linear-gradient(to bottom, transparent 0, transparent 3px, currentColor 3px, currentColor 4px)"
+            : kind === "grid"
+              ? "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)"
+              : "none",
+        backgroundSize: kind === "grid" ? "5px 5px, 5px 5px" : undefined,
+        backgroundPosition: kind === "grid" ? "-1px -1px, -1px -1px" : undefined,
+      }}
+    />
   );
 }
 

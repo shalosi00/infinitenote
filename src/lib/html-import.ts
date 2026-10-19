@@ -1,6 +1,7 @@
 /**
- * HTML → ImportedBlock[] extractor for machine-generated pages — OneNote's
- * "Save as" HTML export in particular, plus plain web articles.
+ * HTML → ImportedBlock[] / ImportedImage[] extractors for machine-generated
+ * pages — OneNote's "Save as" HTML export in particular, plus plain web
+ * articles.
  *
  * Pure string tokenizer — no DOMParser (unavailable in bun tests), no
  * dependencies. Handles: h1-h6, paragraphs, <br> line breaks, nested
@@ -29,9 +30,27 @@ interface CurrentBlock {
   tag: string;
 }
 
-export function extractHtmlBlocks(html: string): ImportedBlock[] {
+/** An <img> encountered while tokenizing, with its position in the block flow. */
+export interface ImportedImage {
+  /** Raw src attribute — data: URL, cid:, file:/// or relative path. */
+  src: string;
+  /** Width/height attributes when present and numeric (author intent). */
+  width: number | null;
+  height: number | null;
+  /** Number of text blocks emitted before this image appears. */
+  blockIndex: number;
+}
+
+export interface HtmlContent {
+  blocks: ImportedBlock[];
+  images: ImportedImage[];
+}
+
+/** Extract structured blocks AND embedded images from an HTML document. */
+export function extractHtmlContent(html: string): HtmlContent {
   const cleaned = stripIgnorable(html);
   const blocks: ImportedBlock[] = [];
+  const images: ImportedImage[] = [];
   const listStack: Array<{ ordered: boolean; counter: number }> = [];
 
   let buffer = "";
@@ -56,7 +75,7 @@ export function extractHtmlBlocks(html: string): ImportedBlock[] {
 
   const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/g;
   for (const token of cleaned.matchAll(tagRe)) {
-    const [full, tagName, , text] = token as unknown as [
+    const [full, tagName, attrs, text] = token as unknown as [
       string, string, string, string | undefined,
     ];
 
@@ -85,6 +104,11 @@ export function extractHtmlBlocks(html: string): ImportedBlock[] {
     // ---- opening tag ----
     if (name === "br") {
       buffer += "\n";
+    } else if (name === "img") {
+      const img = imgFromAttrs(attrs);
+      // pending text starts before this image → it counts as a prior block
+      const pending = normalizeBlockText(buffer) !== "";
+      if (img?.src) images.push({ ...img, blockIndex: blocks.length + (pending ? 1 : 0) });
     } else if (name === "ul" || name === "ol") {
       flush();
       listStack.push({ ordered: name === "ol", counter: 0 });
@@ -117,10 +141,39 @@ export function extractHtmlBlocks(html: string): ImportedBlock[] {
       flush();
       current = { kind: "paragraph", level: 0, marker: "", indent: 0, tag: name };
     }
-    // any other opening tag (span, b, i, div, img, …): inline — no-op
+    // any other opening tag (span, b, i, div, …): inline — no-op
   }
   flush();
-  return blocks;
+  return { blocks, images };
+}
+
+/** Text-only extraction (images ignored) — the classic v1.1 surface. */
+export function extractHtmlBlocks(html: string): ImportedBlock[] {
+  return extractHtmlContent(html).blocks;
+}
+
+/** Parse src/width/height out of an <img> attribute string. */
+function imgFromAttrs(attrs: string): { src: string; width: number | null; height: number | null } | null {
+  const src = attrValue(attrs, "src");
+  if (!src) return null;
+  return {
+    src,
+    width: positiveInt(attrValue(attrs, "width")),
+    height: positiveInt(attrValue(attrs, "height")),
+  };
+}
+
+/** Value of a named attribute, accepting "…", '…' and bare quoting. */
+function attrValue(attrs: string, name: string): string | null {
+  const re = new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
+  const m = re.exec(attrs);
+  return (m?.[1] ?? m?.[2] ?? m?.[3] ?? null) ?? null;
+}
+
+function positiveInt(v: string | null): number | null {
+  if (v === null) return null;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /** Remove everything that must never contribute text: head, script, style, comments. */

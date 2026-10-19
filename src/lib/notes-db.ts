@@ -258,6 +258,11 @@ export async function renamePage(id: string, title: string): Promise<void> {
   await db.pages.update(id, { title, updatedAt: now() });
 }
 
+/** Set the paper style of a page (plain / ruled / grid). */
+export async function setPageBackground(id: string, background: PageRow["background"]): Promise<void> {
+  await db.pages.update(id, { background, updatedAt: now() });
+}
+
 export async function movePage(id: string, dir: -1 | 1): Promise<void> {
   const page = await db.pages.get(id);
   if (!page) return;

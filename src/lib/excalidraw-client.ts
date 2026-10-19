@@ -31,8 +31,9 @@ import {
 } from "@excalidraw/excalidraw";
 import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import { extractDocxBlocks } from "./docx-import";
-import { extractHtmlBlocks } from "./html-import";
+import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, type ImportedBlock } from "./import-blocks";
+import { parseMht, resolveMhtResource } from "./mht-import";
 import type { ScenePayload } from "./types";
 
 const now = () => Date.now();
@@ -134,7 +135,7 @@ export async function importTextFiles(
 }
 
 /* ------------------------------------------------------------------ */
-/* structured imports (.docx / OneNote-exported HTML)                  */
+/* structured imports (.docx / OneNote-exported HTML / OneNote .mht)    */
 /* ------------------------------------------------------------------ */
 
 interface TextSkeleton {
@@ -145,6 +146,20 @@ interface TextSkeleton {
   fontSize: number;
   width: number;
   id: string;
+}
+
+interface ImageSkeleton {
+  type: "image";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fileId: FileId;
+}
+
+interface ImportTally {
+  blocks: number;
+  images: number;
 }
 
 /** Lay imported blocks out as stacked text elements; headings render larger. */
@@ -176,6 +191,16 @@ function blocksToSkeletons(
   return skeletons;
 }
 
+/** Height the next text element will advance the layout cursor by. */
+function blockAdvance(block: ImportedBlock): number {
+  const fontSize = block.kind === "heading" ? headingFontSize(block.level) : 20;
+  const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
+  const text = `${prefix}${block.text}`;
+  const charsPerLine = Math.max(16, Math.floor(720 / (fontSize * 0.52)));
+  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  return lines * fontSize * 1.35 + 14;
+}
+
 /** Append imported blocks to the canvas below existing content. */
 async function insertBlocks(
   api: ExcalidrawImperativeAPI,
@@ -190,6 +215,99 @@ async function insertBlocks(
     elements: [...api.getSceneElements(), ...(created as unknown as ExcalidrawElement[])],
   });
   return skeletons.length;
+}
+
+/** Where an imported image's binary payload comes from. */
+type ImageResolver = (src: string) => Promise<{ dataUrl: string; mimeType: string } | null>;
+
+/** Resolve data: image URLs inline (self-contained HTML pages). */
+const dataUrlResolver: ImageResolver = async (src) => {
+  const m = /^data:([^;,]+)[^,]*,/.exec(src);
+  if (!m || !m[1].startsWith("image/")) return null;
+  return { dataUrl: src, mimeType: m[1] };
+};
+
+/**
+ * Append blocks + embedded images to the canvas below existing content,
+ * interleaved in document order (image blockIndex semantics: the image goes
+ * after the nth text block). Unresolvable images are skipped silently — a
+ * missing resource must not abort an otherwise good import.
+ */
+async function insertHtmlContent(
+  api: ExcalidrawImperativeAPI,
+  content: HtmlContent,
+  resolve: ImageResolver,
+  insertAt?: { x: number; y: number },
+): Promise<ImportTally> {
+  const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
+  let y = anchor.y;
+  let images = 0;
+  const skeletons: Array<TextSkeleton | ImageSkeleton> = [];
+  const newFiles: NonNullable<ScenePayload["files"]> = {};
+  const pending = [...content.images].sort((a, b) => a.blockIndex - b.blockIndex);
+
+  const emitImagesUpTo = async (blockIndex: number): Promise<void> => {
+    while (pending.length && pending[0].blockIndex <= blockIndex) {
+      const img = pending.shift()!;
+      const resolved = await resolve(img.src);
+      if (!resolved) continue;
+      let w: number;
+      let h: number;
+      try {
+        const intrinsic = await imageSize(resolved.dataUrl);
+        w = img.width ?? intrinsic.width;
+        h = img.height ?? intrinsic.height;
+        // one declared dimension → keep the intrinsic aspect ratio
+        if (img.width && !img.height) h = Math.round(intrinsic.height * (img.width / intrinsic.width));
+        if (img.height && !img.width) w = Math.round(intrinsic.width * (img.height / intrinsic.height));
+      } catch {
+        continue; // undecodable payload — skip
+      }
+      const scale = Math.min(1, 1600 / Math.max(w, h)); // stay usable on canvas
+      w = Math.max(16, Math.round(w * scale));
+      h = Math.max(16, Math.round(h * scale));
+      const fileId = crypto.randomUUID() as FileId;
+      newFiles[fileId] = {
+        id: fileId,
+        mimeType: resolved.mimeType,
+        dataURL: resolved.dataUrl,
+        created: now(),
+      };
+      skeletons.push({ type: "image", x: anchor.x, y, width: w, height: h, fileId });
+      y += h + 24;
+      images += 1;
+    }
+  };
+
+  let index = 0;
+  for (const block of content.blocks) {
+    await emitImagesUpTo(index);
+    const fontSize = block.kind === "heading" ? headingFontSize(block.level) : 20;
+    const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
+    skeletons.push({
+      type: "text",
+      text: `${prefix}${block.text}`,
+      x: anchor.x + block.indent * 28,
+      y,
+      fontSize,
+      width: 720,
+      id: crypto.randomUUID(),
+    });
+    y += blockAdvance(block);
+    index += 1;
+  }
+  await emitImagesUpTo(Number.POSITIVE_INFINITY); // trailing images
+
+  if (skeletons.length) {
+    const created = convertToExcalidrawElements(skeletons, {
+      regenerateIds: false,
+    }) as unknown as Array<ExcalidrawElement & { type: string; fileId?: FileId }>;
+    // ensure images render immediately (not stuck in "pending")
+    const safe = created.map((e) => (e.type === "image" ? { ...e, status: "saved" } : e));
+    api.updateScene({ elements: [...api.getSceneElements(), ...(safe as ExcalidrawElement[])] });
+    api.addFiles(Object.values(newFiles) as BinaryFileData[]);
+  }
+  return { blocks: content.blocks.length, images };
 }
 
 /** Import a Word document (OneNote "Save as Word" export). */
@@ -207,9 +325,25 @@ export async function importHtmlFile(
   api: ExcalidrawImperativeAPI,
   file: File,
   insertAt?: { x: number; y: number },
-): Promise<number> {
-  const blocks = extractHtmlBlocks(await file.text());
-  return insertBlocks(api, blocks, insertAt);
+): Promise<ImportTally> {
+  const content = extractHtmlContent(await file.text());
+  return insertHtmlContent(api, content, dataUrlResolver, insertAt);
+}
+
+/** Import a OneNote .mht single-file web page (html + embedded images). */
+export async function importMhtFile(
+  api: ExcalidrawImperativeAPI,
+  file: File,
+  insertAt?: { x: number; y: number },
+): Promise<ImportTally> {
+  const parsed = parseMht(await file.text());
+  const content = extractHtmlContent(parsed.html);
+  const resources = parsed.resources;
+  const resolver: ImageResolver = async (src) => {
+    const hit = resolveMhtResource(src, resources);
+    return hit ? { dataUrl: hit.dataUrl, mimeType: hit.contentType } : null;
+  };
+  return insertHtmlContent(api, content, resolver, insertAt);
 }
 
 /* ------------------------------------------------------------------ */

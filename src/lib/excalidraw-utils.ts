@@ -11,7 +11,7 @@ import type { ScenePayload } from "./types";
 /** Imperative surface the canvas exposes to the rest of the app. */
 export interface CanvasApi {
   /** Route files by type: images, text/markdown, PDF (printout), .excalidraw,
-   *  Word documents, HTML pages. */
+   *  Word documents, HTML pages, OneNote .mht single-file pages. */
   importFiles: (files: File[]) => Promise<void>;
   exportPng: () => Promise<void>;
   exportSvg: () => Promise<void>;
@@ -32,6 +32,7 @@ export type FileImportKind =
   | "text"
   | "docx"
   | "html"
+  | "mht"
   | "unknown";
 
 /** Classify an importable file. Order matters: scene files before generic json. */
@@ -42,9 +43,18 @@ export function classifyFile(file: File): FileImportKind {
   if (file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(name)) {
     return "image";
   }
-  // Word documents (OneNote "Save as Word" export) and HTML pages
-  // (OneNote "Save as" HTML export) — both structured text imports.
+  // Word documents (OneNote "Save as Word" export), HTML pages
+  // (OneNote "Save as" HTML export) and .mht single-file pages
+  // (OneNote "Save as" .mht export) — all structured imports.
   if (name.endsWith(".docx")) return "docx";
+  // .mht/.mhtml MUST be checked before .html: ".mhtml" ends with ".html".
+  if (
+    /\.mht(?:ml)?$/i.test(name) ||
+    file.type === "message/rfc822" ||
+    file.type === "application/x-mimearchive"
+  ) {
+    return "mht";
+  }
   if (file.type.startsWith("text/html") || /\.html?$/i.test(name)) return "html";
   if (file.type.startsWith("text/") || /\.(txt|md|markdown|csv|json|log|ya?ml)$/i.test(name)) {
     return "text";
