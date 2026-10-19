@@ -70,11 +70,16 @@ export function viewBackgroundColor(page: Page): Promise<string> {
 /**
  * Hard-reset the app to the deterministic welcome seed (exactly 2 elements).
  *
- * `__NOTE_RESET__` erases IndexedDB and reloads; the app seeds itself on the
- * next page load. We must NOT issue our own navigation afterwards: a second
- * load can abort the seed mid-flight (it spans several IndexedDB
- * transactions), leaving partial data and skipping the seed on the next
- * boot. Instead we wait for the hook's own reload to settle.
+ * `__NOTE_RESET__` erases IndexedDB and reloads — the app seeds itself on
+ * the fresh load. Two pitfalls handled here:
+ * 1. Awaiting the hook's promise from `evaluate` races with the reload it
+ *    triggers ("execution context was destroyed") — so it is fired without
+ *    awaiting its result.
+ * 2. We must not navigate again ourselves: a second load can abort the
+ *    multi-transaction welcome seed mid-flight, leaving partial data.
+ * A pre-reset stamp on `window` tells the old and new documents apart while
+ * `waitForFunction` (which survives navigations) waits for the re-seeded
+ * scene on the reloaded page.
  */
 export async function resetToSeed(page: Page): Promise<void> {
   await page.goto(E2E_BASE);
@@ -83,10 +88,19 @@ export async function resetToSeed(page: Page): Promise<void> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.evaluate(() => window.__NOTE_RESET__?.());
-  await expect
-    .poll(() => elementCount(page), { timeout: 45_000, message: "welcome scene re-seeded after reset" })
-    .toBe(2);
+  await page.evaluate(() => {
+    (window as unknown as Record<string, unknown>).__PRE_RESET_STAMP__ = true;
+  });
+  await page.evaluate(() => {
+    void window.__NOTE_RESET__?.().catch(() => undefined);
+  });
+  await page.waitForFunction(
+    () =>
+      !(window as unknown as Record<string, unknown>).__PRE_RESET_STAMP__ &&
+      window.__NOTE_E2E__?.elementCount() === 2,
+    undefined,
+    { timeout: 45_000 },
+  );
 }
 
 /** Poll until the canvas settles at the expected element count. */
