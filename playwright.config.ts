@@ -18,7 +18,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
-  workers: 2,
+  workers: isCI ? 2 : 1, // local sandbox is memory-constrained; CI runners are not
   retries: isCI ? 1 : 0,
   forbidOnly: isCI,
   reporter: [
