@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-10-19 |
-| **Current version** | v1.1.0 tagged & released (v1.2.0 in development) |
-| **Phase** | v1.1 close-out on `feat/onenote-import-phase2` |
-| **Overall state** | v1.1.0 live on `main`; 97 unit + 34 E2E green locally; CI pending on the PR |
+| **Current version** | v1.2.0 (release in progress) |
+| **Phase** | v1.2 complete on develop — releasing |
+| **Overall state** | OneNote phase 2 merged (#14); 97 unit + 34 E2E green, CI green |
 
 ## TL;DR
 
@@ -20,9 +20,10 @@ Word documents, OneNote-exported HTML and OneNote `.mht` single-file pages
 (embedded images included), export PNG / SVG / scenes / full backups, full-text
 search, soft-delete trash, dark mode, per-page paper styles (plain / ruled /
 grid), and a fully offline installable PWA. All data is local (IndexedDB).
-v1.1 adds the duplicate-page action, Playwright E2E as a required CI check,
-OneNote import phase 1 (.docx + HTML) and phase 2 (.mht + embedded images +
-Graph export runbook), page paper styles, and drops the template scaffolding.
+v1.1 added the duplicate-page action, Playwright E2E as a required CI check and
+OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
+single-file pages with embedded images + Graph export runbook) and page paper
+styles (plain/ruled/grid).
 
 ## What works today (verified by tests)
 
@@ -44,9 +45,8 @@ Graph export runbook), page paper styles, and drops the template scaffolding.
 
 ## In flight
 
-- `feat/onenote-import-phase2` — v1.1 close-out: OneNote `.mht` import with
-  embedded images, HTML `data:`-image import, Microsoft Graph export runbook,
-  page paper styles (plain/ruled/grid). 97 unit + 34 E2E green locally.
+- Nothing open — v1.2.0 release in flight (bump merged, release PR next).
+  (CI must stay green on `develop` and `main` at all times.)
 
 ## Next up — v1.2 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -86,6 +86,8 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — v1.2.0 release**: OneNote import phase 2 merged via PR #14
+  (all three required CI checks green); version bumped to 1.2.0.
 - **2026-10-19 — v1.1 close-out PR**: OneNote import phase 2 — `.mht` single-file
   pages with embedded images (placed between text blocks), HTML `data:`-image
   import, Microsoft Graph export runbook + script; page paper styles
