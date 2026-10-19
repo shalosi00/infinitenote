@@ -41,12 +41,13 @@ test.describe.serial("theme and mobile layout", () => {
     await expect(drawer).toBeVisible();
     await page.screenshot({ path: "e2e-artifacts/e2e-mobile.png" });
 
-    // "Brainstorm" lives in the collapsed "Ideas" section — expand it first
+    // "Brainstorm" lives in the collapsed "Ideas" section — expand it first.
+    // NOTE: the page-row click must not use filter({ has: <drawer-scoped
+    // locator> }) — Playwright evaluates the inner chain from the candidate
+    // element, where the drawer root does not exist. The drawer contains
+    // exactly one "Brainstorm" button (the kebab has a different name).
     await drawer.getByRole("button", { name: "Ideas", exact: true }).click();
-    const row = drawer.locator('[data-testid="page-row"]').filter({
-      has: drawer.getByRole("button", { name: "Brainstorm", exact: true }),
-    });
-    await row.getByRole("button", { name: "Brainstorm", exact: true }).click();
+    await drawer.getByRole("button", { name: "Brainstorm", exact: true }).click();
     await expectCount(page, 0); // Brainstorm page is empty
 
     await page.setViewportSize({ width: 1280, height: 720 });

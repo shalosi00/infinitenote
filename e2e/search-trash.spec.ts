@@ -51,8 +51,11 @@ test.describe.serial("search (Ctrl+K) and trash", () => {
   test("trash lists and restores a deleted page", async () => {
     await page.getByRole("button", { name: "Actions for page Page 2" }).click();
     await page.getByRole("menuitem", { name: "Move to trash" }).click();
-    // Start here, Brainstorm and Page 1 remain
-    await expect(page.locator('[data-testid="page-row"]')).toHaveCount(3);
+    // the deleted page must no longer be navigable from the sidebar
+    // (collapsed sections render no page rows, so a row count would be wrong)
+    await expect(
+      page.getByTestId("sidebar").getByRole("button", { name: "Page 2", exact: true }),
+    ).toHaveCount(0);
 
     await page.getByRole("button", { name: "Trash" }).click();
     await expect(page.getByRole("dialog")).toContainText("Page 2 (page)");
