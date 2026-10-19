@@ -116,6 +116,46 @@ describe("sections and pages", () => {
       .map((p) => p.title);
     expect(names).toEqual(["C", "A", "B"]);
   });
+
+  it("duplicates a page: fresh id, (copy) suffix, last order, content preserved", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    await notes.createPage(sec.id, "First");
+    const src = await notes.createPage(
+      sec.id,
+      "Notes",
+      JSON.stringify({ elements: [{ type: "text", text: "hello" }], files: {} })
+    );
+
+    const copy = await notes.duplicatePage(src.id);
+
+    expect(copy).not.toBeNull();
+    expect(copy!.id).not.toBe(src.id);
+    expect(copy!.sectionId).toBe(sec.id);
+    expect(copy!.title).toBe("Notes (copy)");
+
+    const pages = (await notes.listPages()).filter((p) => p.sectionId === sec.id);
+    expect(pages).toHaveLength(3);
+    expect(pages.sort((a, b) => a.order - b.order).map((p) => p.title)).toEqual([
+      "First",
+      "Notes",
+      "Notes (copy)",
+    ]);
+
+    const content = await notes.getPageContent(copy!.id);
+    expect(content?.elements).toEqual([{ type: "text", text: "hello" }]);
+    // the original keeps its own id and content untouched
+    expect((await notes.getPageContent(src.id))?.elements).toEqual([{ type: "text", text: "hello" }]);
+  });
+
+  it("duplicatePage returns null for missing or trashed sources", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const doomed = await notes.createPage(sec.id, "Doomed");
+    await notes.trashPage(doomed.id);
+    expect(await notes.duplicatePage(doomed.id)).toBeNull();
+    expect(await notes.duplicatePage("no-such-id")).toBeNull();
+  });
 });
 
 describe("trash", () => {

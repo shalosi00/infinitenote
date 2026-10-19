@@ -22,7 +22,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [ ] Port E2E suite to Playwright and run it in CI (issue #3)
 - [ ] OneNote import, phase 1: `.docx` and OneNote-exported HTML import (issue #4)
 - [ ] OneNote import, phase 2: migration guide using a Microsoft Graph export script
-- [ ] Duplicate page action
+- [x] Duplicate page action (shipped to `develop` after v1.0.0; releases with v1.1.0)
 - [ ] Page templates (ruled/grid paper backgrounds)
 - [ ] Remove unused template scaffolding (`db.ts`, `prisma/`, `api/route.ts`)
 

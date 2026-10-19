@@ -275,6 +275,31 @@ export async function movePage(id: string, dir: -1 | 1): Promise<void> {
   });
 }
 
+/**
+ * Duplicate a page inside its section: fresh row id, title suffixed " (copy)",
+ * scene content copied as-is (scenes are self-contained per page — files live
+ * inside the content JSON), order placed last among siblings. Returns the new
+ * page meta, or null when the source page is missing or trashed.
+ */
+export async function duplicatePage(id: string): Promise<PageMeta | null> {
+  const page = await db.pages.get(id);
+  if (!page || page.deletedAt !== null) return null;
+  const siblings = await db.pages.where("sectionId").equals(page.sectionId).toArray();
+  const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
+  const copy: PageRow = {
+    ...page,
+    id: newId(),
+    title: `${page.title} (copy)`,
+    order: maxOrder + 1,
+    createdAt: now(),
+    updatedAt: now(),
+    deletedAt: null,
+  };
+  await db.pages.add(copy);
+  const { content: _c, ...meta } = copy;
+  return meta;
+}
+
 export async function trashPage(id: string): Promise<void> {
   await db.pages.update(id, { deletedAt: now(), updatedAt: now() });
 }

@@ -43,6 +43,7 @@ interface AppStore {
   addPage: (sectionId: string, title?: string) => Promise<void>;
   renamePage: (id: string, title: string) => Promise<void>;
   movePage: (id: string, dir: -1 | 1) => Promise<void>;
+  duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
 
   setSaveIndicator: (s: SaveIndicator) => void;
@@ -182,6 +183,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   movePage: async (id, dir) => {
     await db.movePage(id, dir);
     await get().refresh();
+  },
+  duplicatePage: async (id) => {
+    const copy = await db.duplicatePage(id);
+    if (!copy) return;
+    await get().refresh();
+    const sec = get().sections.find((s) => s.id === copy.sectionId);
+    set((s) => ({
+      selection: {
+        notebookId: sec?.notebookId ?? s.selection?.notebookId ?? "",
+        sectionId: copy.sectionId,
+        pageId: copy.id,
+      },
+      expanded: new Set([...s.expanded, copy.sectionId]),
+    }));
   },
   deletePage: async (id) => {
     const tree = {
