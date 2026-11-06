@@ -32,6 +32,10 @@ dev.log
 /e2e-report/
 /test-results/
 
+# tauri static export (desktop build output)
+/out/
+
+
 # sandbox scaffolding (workspace-only, not part of the app)
 /examples/
 /tests/

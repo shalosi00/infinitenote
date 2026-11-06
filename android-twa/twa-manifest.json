@@ -1,0 +1,40 @@
+{
+  "appId": "com.infinitenote.app",
+  "appName": "InfiniteNote",
+  "appShortName": "InfiniteNote",
+  "host": "https://shalosi00.github.io",
+  "startUrl": "/infinitenote/",
+  "themeColor": "#7c3aed",
+  "backgroundColor": "#ffffff",
+  "display": "standalone",
+  "orientation": "any",
+  "themeColorDark": "#7c3aed",
+  "backgroundColorDark": "#ffffff",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "iconUrl": "https://shalosi00.github.io/infinitenote/icons/icon-512.png",
+  "maskableIconUrl": "https://shalosi00.github.io/infinitenote/icons/maskable-512.png",
+  "monochromeIconUrl": null,
+  "shortcuts": [],
+  "signingKey": {
+    "path": "../android-twa/upload-keystore.jks",
+    "alias": "infinitenote"
+  },
+  "packageId": "com.infinitenote.app",
+  "appVersionName": "1.6.0",
+  "appVersionCode": 160,
+  "splashScreen": {
+    "backgroundColor": "#ffffff",
+    "backgroundColorDark": "#ffffff"
+  },
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    }
+  },
+  "appVersion": "1.6.0",
+  "enableNotifications": false
+}

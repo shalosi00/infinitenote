@@ -1,0 +1,81 @@
+name: Desktop
+
+# Builds the Tauri desktop shell. NOT a required PR check: this only runs on
+# main (and v* tags) because a full Rust/Tauri compile takes ~10 minutes and
+# needs the webkit2gtk system libraries.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux build (deb / rpm / AppImage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Tauri v2 prerequisites for Debian/Ubuntu
+      # (https://tauri.app/start/prerequisites/).
+      - name: Install webkit2gtk build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build web bundle (static export)
+        run: bun run build:desktop
+
+      - name: Build desktop bundles
+        run: bun run tauri build
+
+      - name: Upload build artifacts (retention copy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitenote-linux-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 14
+
+      - name: Attach artifacts to the tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          fail_on_unmatched_files: false

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "InfiniteNote",
+  "version": "1.6.0",
+  "identifier": "com.infinitenote.app",
+  "build": {
+    "beforeDevCommand": "bun run dev:e2e",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "bun run build:desktop",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "InfiniteNote",
+        "width": 1280,
+        "height": 832,
+        "minWidth": 360,
+        "minHeight": 480,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "copyright": "MIT License",
+    "shortDescription": "Local-first OneNote-style notebook",
+    "longDescription": "InfiniteNote is an open-source OneNote-style notebook for Linux and Android: a Notebook → Section → Page hierarchy on an infinite canvas. Draw and type on anything, import images, text, Markdown, PDF printouts, Word documents and OneNote exports, and keep every note local (IndexedDB) with an offline installable PWA.",
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  }
+}
