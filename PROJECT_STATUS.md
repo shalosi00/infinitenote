@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-06 |
-| **Current version** | v1.2.0 (tagged, GitHub Release published) |
-| **Phase** | v1.3 in progress on `feat/pdf-export` |
-| **Overall state** | v1.3: tags (#21) + quick notes (#22) merged; PDF export in flight |
+| **Current version** | v1.3.0 (tagged, GitHub Release published) |
+| **Phase** | v1.3 shipped — planning v1.4 |
+| **Overall state** | v1.3.0 released; 144 unit + 45 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -51,14 +51,13 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- `feat/pdf-export` — print-friendly paginated PDF export (issue #20).
-  144 unit + 45 E2E green locally; CI pending on the PR.
+- Nothing — v1.3.0 is out; pick the next roadmap item into a fresh branch.
 
-## Next up — v1.3 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.4 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. ~~Tags / labels on pages with a tag filter view.~~ — merged via PR #21
-2. ~~Quick notes and a "today" smart page.~~ — merged via PR #22
-3. ~~Print-friendly page export (paginated PDF).~~ — this PR (issue #20)
+1. Multi-select in the sidebar (bulk move/delete)
+2. Keyboard shortcut cheatsheet in-app
+3. Sync & collaboration research (file-based sync, CRDT study)
 
 ## Repo map (30 seconds)
 
@@ -96,6 +95,9 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-06 — v1.3.0 live**: release PR #25 merge-committed to main (f3e154d),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.3.0);
+  v1.3.0 milestone closed, v1.4.0 milestone opened. Issues #18/#19/#20 closed.
 - **2026-11-06 — paginated PDF export (issue #20)** — "Export → PDF — print
   (A4)" renders the scene onto fixed A4 portrait/landscape sheets: content is
   scaled to the printable width and sliced into page bands; images and shapes
