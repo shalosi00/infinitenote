@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-06 |
-| **Current version** | v1.3.0 (tagged, GitHub Release published) |
-| **Phase** | v1.4 in progress on `docs/sync-research` |
-| **Overall state** | v1.4: multi-select (#30) + cheatsheet (#31) merged; sync research (issue #29) in flight |
+| **Current version** | v1.4.0 (tagged, GitHub Release published) |
+| **Phase** | v1.4 shipped — planning v1.5 |
+| **Overall state** | v1.4.0 released; 181 unit + 52 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -54,14 +54,15 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- `docs/sync-research` — sync & collaboration research write-up
-  (issue #29). Docs-only PR; no runtime changes.
+- Nothing — v1.4.0 is out; pick the next roadmap item into a fresh branch.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. ~~Multi-select in the sidebar (bulk move/delete).~~ — this PR (issue #27)
-2. ~~Keyboard shortcut cheatsheet in-app.~~ — this PR (issue #28)
-3. ~~Sync & collaboration research write-up.~~ — this PR (issue #29)
+All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+
+1. File-based sync, phase 1: sync-folder export/import with page-granular merge and conflict copies (docs/sync-research.md §4)
+2. Tauri wrapper for a native Linux desktop launcher/installer
+3. Android Trusted Web Activity build for direct APK distribution
 
 ## Repo map (30 seconds)
 
@@ -99,6 +100,9 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-06 — v1.4.0 live**: release PR #34 merge-committed to main (cf99ae4),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.4.0);
+  v1.4.0 milestone closed, v1.5.0 milestone opened. Issues #27/#28/#29 closed.
 - **2026-11-06 — sync & collaboration research (issue #29)** —
   docs/sync-research.md: why snapshot/LWW sync cannot work for scenes,
   Yjs-vs-Automerge survey (recommendation: Yjs for the no-WASM,
