@@ -62,7 +62,9 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- Nothing — v1.6.0 is out; pick the next roadmap item into a fresh branch.
+- v1.7.0 / issue #54 — UI i18n with next-intl (English + 简体中文) on branch
+  `feat/i18n`: catalogs, client-side locale provider + persisted switcher,
+  all app chrome rewired, catalog-parity unit tests + E2E locale spec.
 
 ## Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 

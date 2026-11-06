@@ -37,7 +37,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Multi-select in the sidebar (bulk move/delete) (issue #27) — shipped in v1.4.0
 - [x] Keyboard shortcut cheatsheet in-app (issue #28) — shipped in v1.4.0
 
-## v1.3 — Sync & collaboration (research)
+## Sync & collaboration — research (v1.3–v1.5 planning)
 
 - [x] File-based sync option (export/import with conflict-free merge via CRDT study) — researched in [docs/sync-research.md](sync-research.md); phased plan: page-granular merge with conflict copies (v1.5) → Yjs merge core (v2.0)
 - [x] Optional end-to-end encrypted sync backend (self-hostable, opt-in) — design outline in [docs/sync-research.md](sync-research.md) §5; implementation post-2.0
@@ -53,23 +53,22 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## v1.6 — Distribution (shipped in v1.6.0)
 
-- [x] Tauri wrapper for a native Linux desktop launcher/installer (issue #44) —
-      `src-tauri/` shell, static-export desktop build (`bun run build:desktop`),
-      deb/rpm/AppImage artifacts built by the `Desktop` workflow on `v*` tags
-- [x] Android Trusted Web Activity build for direct APK distribution (issue #45) —
-      `android-twa/` scaffold + tested assetlinks.json generator, runbook in
-      docs/android-twa.md
-- [x] Publish to Flathub (Linux) once the Tauri shell lands (issue #46) —
-      AppStream metainfo + flatpak-builder manifest + checksum-pinning tool,
-      runbook in docs/flathub.md
+- [x] Tauri 2 desktop shell — static-export build path, `src-tauri/` config
+      + icons, Linux artifact workflow (issue #44)
+- [x] Android TWA project scaffold + tested assetlinks.json generator
+      (issue #45)
+- [x] Flatpak packaging — AppStream metainfo, flatpak-builder manifest
+      (extra-data AppImage), Flathub runbook (issue #46)
 
-## v1.7 — Localization & themes (planned)
+## v1.7 — Internationalization & polish (current)
 
-- [ ] i18n with next-intl (English + Simplified Chinese UI strings)
-- [ ] Themes gallery beyond dark/light
-- [ ] F-Droid packaging (reproducible build recipe from the Tauri source)
+- [ ] i18n with next-intl — English + 简体中文 UI, persisted locale switch
+      (issue #54)
+- [ ] Themes gallery beyond dark/light (issue #55)
+- [ ] F-Droid build recipe + runbook from the Tauri source (issue #56)
 
 ## Backlog (unscheduled)
 
 - Drawing shape library beyond Excalidraw defaults, handwriting recognition
-  (research), Yjs CRDT merge core + optional E2EE server (post-2.0).
+  (research), localized first-run seed content + generated page/notebook names
+  (needs a stable quick-notes marker, Dexie v3).
