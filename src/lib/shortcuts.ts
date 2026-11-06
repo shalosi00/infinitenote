@@ -8,59 +8,66 @@
  *
  * `keys` uses the literal token "Ctrl/Cmd" where the binding is Ctrl on
  * Linux/Windows and Cmd (⌘) on macOS; displayKeys() renders per platform.
+ *
+ * Group and entry labels are NOT stored here — only stable ids. The text
+ * lives in the message catalogs (messages/{en,zh-CN}.json under
+ * shortcuts.groups.* / shortcuts.entries.*) so the cheatsheet localizes
+ * (issue #54); the catalog-parity unit tests pin the id ↔ message mapping.
  */
 
 export interface ShortcutEntry {
   keys: string;
-  description: string;
+  /** Catalog key under shortcuts.entries.* */
+  id: string;
 }
 
 export interface ShortcutGroup {
-  title: string;
+  /** Catalog key under shortcuts.groups.* */
+  id: string;
   entries: ShortcutEntry[];
 }
 
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    title: "General",
+    id: "general",
     entries: [
-      { keys: "Ctrl/Cmd+K", description: "Search all pages" },
-      { keys: "Ctrl/Cmd+Alt+N", description: "New quick note (Quick Notes notebook)" },
-      { keys: "?", description: "Show this shortcuts cheatsheet" },
-      { keys: "Esc", description: "Close dialog / cancel editing" },
+      { keys: "Ctrl/Cmd+K", id: "search" },
+      { keys: "Ctrl/Cmd+Alt+N", id: "quickNote" },
+      { keys: "?", id: "cheatsheet" },
+      { keys: "Esc", id: "closeDialog" },
     ],
   },
   {
-    title: "Organizing",
+    id: "organizing",
     entries: [
-      { keys: "Double-click", description: "Rename a notebook, section or page in the sidebar" },
-      { keys: "Enter", description: "Commit a rename" },
+      { keys: "Double-click", id: "rename" },
+      { keys: "Enter", id: "commitRename" },
     ],
   },
   {
-    title: "Canvas tools",
+    id: "canvasTools",
     entries: [
-      { keys: "V / 1", description: "Select" },
-      { keys: "H", description: "Hand (pan the canvas)" },
-      { keys: "R / 2", description: "Rectangle" },
-      { keys: "D / 3", description: "Diamond" },
-      { keys: "O / 4", description: "Ellipse" },
-      { keys: "A / 5", description: "Arrow" },
-      { keys: "L / 6", description: "Line" },
-      { keys: "P / 7", description: "Draw (pen / highlighter shapes)" },
-      { keys: "T / 8", description: "Text" },
-      { keys: "E", description: "Eraser" },
-      { keys: "K", description: "Laser pointer" },
+      { keys: "V / 1", id: "select" },
+      { keys: "H", id: "hand" },
+      { keys: "R / 2", id: "rectangle" },
+      { keys: "D / 3", id: "diamond" },
+      { keys: "O / 4", id: "ellipse" },
+      { keys: "A / 5", id: "arrow" },
+      { keys: "L / 6", id: "line" },
+      { keys: "P / 7", id: "draw" },
+      { keys: "T / 8", id: "text" },
+      { keys: "E", id: "eraser" },
+      { keys: "K", id: "laser" },
     ],
   },
   {
-    title: "Canvas editing",
+    id: "canvasEditing",
     entries: [
-      { keys: "Ctrl/Cmd+Z", description: "Undo" },
-      { keys: "Ctrl/Cmd+Shift+Z", description: "Redo" },
-      { keys: "Ctrl/Cmd+A", description: "Select everything on the page" },
-      { keys: "Del / Backspace", description: "Delete the selected elements" },
-      { keys: "Hold Space", description: "Pan the canvas while held" },
+      { keys: "Ctrl/Cmd+Z", id: "undo" },
+      { keys: "Ctrl/Cmd+Shift+Z", id: "redo" },
+      { keys: "Ctrl/Cmd+A", id: "selectAll" },
+      { keys: "Del / Backspace", id: "deleteElements" },
+      { keys: "Hold Space", id: "panHeld" },
     ],
   },
 ];

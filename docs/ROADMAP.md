@@ -62,8 +62,9 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## v1.7 — Internationalization & polish (current)
 
-- [ ] i18n with next-intl — English + 简体中文 UI, persisted locale switch
-      (issue #54)
+- [x] i18n with next-intl — English + 简体中文 UI, persisted locale switch
+      (issue #54) — full chrome catalogs with ICU plurals, sidebar Language
+      toggle, catalog-parity unit tests, 5 E2E locale checks
 - [ ] Themes gallery beyond dark/light (issue #55)
 - [ ] F-Droid build recipe + runbook from the Tauri source (issue #56)
 

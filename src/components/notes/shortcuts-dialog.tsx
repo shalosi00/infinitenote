@@ -15,12 +15,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslations } from "next-intl";
 import { useAppStore } from "@/lib/store";
 import { SHORTCUT_GROUPS, displayKeys, isApplePlatform } from "@/lib/shortcuts";
 
 export function ShortcutsDialog() {
   const open = useAppStore((s) => s.shortcutsOpen);
   const setOpen = useAppStore((s) => s.setShortcutsOpen);
+  const t = useTranslations("shortcuts");
   // resolved once lazily on first render — userAgent never changes, and the
   // dialog content only mounts on client interaction, so no SSR mismatch
   const [apple] = useState(() =>
@@ -32,23 +34,23 @@ export function ShortcutsDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Keyboard className="h-4 w-4" /> Keyboard shortcuts
+            <Keyboard className="h-4 w-4" /> {t("title")}
           </DialogTitle>
           <DialogDescription>
-            Everything you can do without touching the mouse.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
           <div className="flex flex-col gap-4 pr-3" data-testid="shortcuts-dialog">
             {SHORTCUT_GROUPS.map((group) => (
-              <section key={group.title}>
+              <section key={group.id}>
                 <h3 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {group.title}
+                  {t(`groups.${group.id}`)}
                 </h3>
                 <dl className="flex flex-col gap-0.5">
                   {group.entries.map((entry) => (
                     <div
-                      key={entry.keys + entry.description}
+                      key={entry.keys + entry.id}
                       className="flex min-h-8 items-center gap-3 rounded-md px-1 py-0.5"
                     >
                       <dt className="flex w-36 shrink-0 flex-wrap items-center gap-1">
@@ -64,7 +66,7 @@ export function ShortcutsDialog() {
                           ))}
                       </dt>
                       <dd className="min-w-0 flex-1 text-sm text-muted-foreground">
-                        {entry.description}
+                        {t(`entries.${entry.id}`)}
                       </dd>
                     </div>
                   ))}
