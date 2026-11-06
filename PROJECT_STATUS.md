@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-07 |
-| **Current version** | v1.5.0 (tagged, GitHub Release published) |
-| **Phase** | v1.6 feature-complete — all three distribution items landed; release next |
-| **Overall state** | v1.5.0 released; v1.6.0 pipeline running — see In flight |
+| **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) |
+| **Phase** | v1.6 shipped — planning v1.7 |
+| **Overall state** | v1.6.0 released; 266 unit + 56 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -21,7 +21,10 @@ Word documents, OneNote-exported HTML and OneNote `.mht` single-file pages
 search, soft-delete trash, dark mode, per-page paper styles (plain / ruled /
 grid), page tags with a tag filter view, and a fully offline installable PWA.
 All data is local (IndexedDB). v1.5 adds file-based sync phase 1: a sync folder
-(or ZIP) with page-granular merge and conflict copies.
+(or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
+a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
+Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
+Flatpak/Flathub packaging recipe.
 v1.1 added the duplicate-page action, Playwright E2E as a required CI check and
 OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
 single-file pages with embedded images + Graph export runbook) and page paper
@@ -59,17 +62,15 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- v1.6.0 release: all three distribution items (Tauri shell #44, Android TWA #45, Flatpak #46) are merged on `develop`; version bump → release PR → tag/artifacts → docs are next.
+- Nothing — v1.6.0 is out; pick the next roadmap item into a fresh branch.
 
-## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+All three v1.6 distribution items shipped. Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
 
-All v1.5 items shipped. Next up — v1.6 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
-
-1. Tauri wrapper for a native Linux desktop launcher/installer
-2. Android Trusted Web Activity build for direct APK distribution
-3. Publish to Flathub once the Tauri shell lands
+1. i18n with next-intl (English + Simplified Chinese UI strings)
+2. Themes gallery beyond dark/light
+3. F-Droid packaging (reproducible build recipe from the Tauri source)
 
 ## Repo map (30 seconds)
 

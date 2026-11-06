@@ -51,13 +51,25 @@ milestones/issues. This file is the plan; the status file is the reality.
       "Sync now", foreground re-scan, change summaries (issue #37)
 - [ ] Yjs CRDT merge core + optional E2EE server (v2.0+ — docs/sync-research.md §8)
 
-## v1.4 — Distribution
+## v1.6 — Distribution (shipped in v1.6.0)
 
-- [ ] Tauri wrapper for a native Linux desktop launcher/installer
-- [ ] Android Trusted Web Activity build for direct APK distribution
-- [ ] Publish to Flathub (Linux) once the Tauri shell lands
+- [x] Tauri wrapper for a native Linux desktop launcher/installer (issue #44) —
+      `src-tauri/` shell, static-export desktop build (`bun run build:desktop`),
+      deb/rpm/AppImage artifacts built by the `Desktop` workflow on `v*` tags
+- [x] Android Trusted Web Activity build for direct APK distribution (issue #45) —
+      `android-twa/` scaffold + tested assetlinks.json generator, runbook in
+      docs/android-twa.md
+- [x] Publish to Flathub (Linux) once the Tauri shell lands (issue #46) —
+      AppStream metainfo + flatpak-builder manifest + checksum-pinning tool,
+      runbook in docs/flathub.md
+
+## v1.7 — Localization & themes (planned)
+
+- [ ] i18n with next-intl (English + Simplified Chinese UI strings)
+- [ ] Themes gallery beyond dark/light
+- [ ] F-Droid packaging (reproducible build recipe from the Tauri source)
 
 ## Backlog (unscheduled)
 
-- i18n (next-intl), themes gallery, drawing shape library beyond Excalidraw defaults,
-  handwriting recognition (research), F-Droid packaging.
+- Drawing shape library beyond Excalidraw defaults, handwriting recognition
+  (research), Yjs CRDT merge core + optional E2EE server (post-2.0).
