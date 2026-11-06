@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-06 |
+| **Last updated** | 2026-11-07 |
 | **Current version** | v1.4.0 (tagged, GitHub Release published) |
-| **Phase** | v1.4 shipped — planning v1.5 |
-| **Overall state** | v1.4.0 released; 181 unit + 52 E2E green; 0 open issues |
+| **Phase** | v1.5 in progress on `feat/sync-engine` |
+| **Overall state** | v1.5: sync engine (issue #36) in flight — 223 unit tests green |
 
 ## TL;DR
 
@@ -50,17 +50,21 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 181 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 223 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing — v1.4.0 is out; pick the next roadmap item into a fresh branch.
+- `feat/sync-engine` — file-based sync phase 1, engine half (issue #36):
+  sync-folder format (`manifest.json` + `pages/<id>.json` + `trash.jsonl`),
+  three-way page-granular merge with LWW + dated conflict copies, purge
+  tombstones (Dexie v2), `runSync` orchestration. Pure library + tests;
+  user-facing adapters/UI follow in issue #37.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
 
-1. File-based sync, phase 1: sync-folder export/import with page-granular merge and conflict copies (docs/sync-research.md §4)
+1. ~~File-based sync, phase 1: sync-folder export/import with page-granular merge and conflict copies~~ — engine in flight (issue #36); adapters + UI next (issue #37) (docs/sync-research.md §4)
 2. Tauri wrapper for a native Linux desktop launcher/installer
 3. Android Trusted Web Activity build for direct APK distribution
 
@@ -80,6 +84,7 @@ All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md]
 | `src/lib/pdf-layout.ts` | Print pagination math: page bands, box banding, text line flow |
 | `src/lib/pdf-export.ts` | jsPDF renderer: A4 sheets, vector text, clipped slices, paper + footer |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
+| `src/lib/sync/` | File-based sync phase 1: folder format, three-way merge engine (LWW + conflict copies), Dexie apply/runSync |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
@@ -93,7 +98,7 @@ All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md]
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 181 unit tests
+make test                            # 223 unit tests
 make e2e                             # 52 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```

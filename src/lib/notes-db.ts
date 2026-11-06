@@ -8,15 +8,35 @@
  * - Page content (the Excalidraw scene) lives on the page row; tree queries
  *   use `.toArray()` then filter in memory — a personal notes app has
  *   hundreds of rows, not millions, so scans are fine and keep code simple.
+ * - v2 (sync, v1.5): `tombstones` remembers purges so a stale sync folder
+ *   can never resurrect a purged row; `syncMeta` holds the last-synced
+ *   manifest. Both are additive stores — no data migration needed.
  */
 import Dexie, { type Table } from "dexie";
 import { byOrder } from "./types";
 import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
 
+/** Purge tombstone — `purged: true` entries of the sync trash log. */
+export interface TombstoneRow {
+  /** id of the purged row (same table key space as the row tables) */
+  id: string;
+  kind: "notebook" | "section" | "page";
+  at: number;
+  title?: string;
+}
+
+/** Small key-value store for sync state (e.g. the last-synced manifest). */
+export interface SyncMetaRow {
+  key: string;
+  value: unknown;
+}
+
 export class InfiniteNoteDB extends Dexie {
   notebooks!: Table<Notebook, string>;
   sections!: Table<Section, string>;
   pages!: Table<PageRow, string>;
+  tombstones!: Table<TombstoneRow, string>;
+  syncMeta!: Table<SyncMetaRow, string>;
 
   constructor() {
     super("infinitenote");
@@ -24,6 +44,13 @@ export class InfiniteNoteDB extends Dexie {
       notebooks: "id, order, deletedAt",
       sections: "id, notebookId, order, deletedAt",
       pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+    });
+    this.version(2).stores({
+      notebooks: "id, order, deletedAt",
+      sections: "id, notebookId, order, deletedAt",
+      pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+      tombstones: "id",
+      syncMeta: "key",
     });
   }
 }
@@ -136,14 +163,26 @@ export async function restoreNotebook(id: string): Promise<void> {
 }
 
 export async function purgeNotebook(id: string): Promise<void> {
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones], async () => {
+    const nb = await db.notebooks.get(id);
+    if (nb) await db.tombstones.put({ id: nb.id, kind: "notebook", at: now(), title: nb.name });
     const sections = await db.sections.where("notebookId").equals(id).toArray();
     for (const s of sections) {
-      await db.pages.where("sectionId").equals(s.id).delete();
-      await db.sections.delete(s.id);
+      await purgeRowsOfSection(s);
     }
     await db.notebooks.delete(id);
   });
+}
+
+/** Tombstone + hard-delete a section and all of its pages (shared by purge paths). */
+async function purgeRowsOfSection(s: Section): Promise<void> {
+  await db.tombstones.put({ id: s.id, kind: "section", at: now(), title: s.name });
+  const pages = await db.pages.where("sectionId").equals(s.id).toArray();
+  for (const p of pages) {
+    await db.tombstones.put({ id: p.id, kind: "page", at: now(), title: p.title });
+  }
+  await db.pages.where("sectionId").equals(s.id).delete();
+  await db.sections.delete(s.id);
 }
 
 /* ------------------------------------------------------------------ */
@@ -218,9 +257,9 @@ export async function restoreSection(id: string): Promise<void> {
 }
 
 export async function purgeSection(id: string): Promise<void> {
-  await db.transaction("rw", [db.sections, db.pages], async () => {
-    await db.pages.where("sectionId").equals(id).delete();
-    await db.sections.delete(id);
+  await db.transaction("rw", [db.sections, db.pages, db.tombstones], async () => {
+    const sec = await db.sections.get(id);
+    if (sec) await purgeRowsOfSection(sec);
   });
 }
 
@@ -455,7 +494,13 @@ export async function restorePage(id: string): Promise<void> {
 }
 
 export async function purgePage(id: string): Promise<void> {
-  await db.pages.delete(id);
+  await db.transaction("rw", [db.pages, db.tombstones], async () => {
+    const page = await db.pages.get(id);
+    if (page) {
+      await db.tombstones.put({ id: page.id, kind: "page", at: now(), title: page.title });
+      await db.pages.delete(id);
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -506,11 +551,18 @@ export async function listTrash(): Promise<TrashSnapshot> {
 /* destructive reset (settings)                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Hard reset (settings + E2E seed). Also drops tombstones and sync state so
+ * the device is a clean slate: a stale sync folder can be re-imported fresh
+ * instead of being blocked by tombstones for rows the user just erased.
+ */
 export async function eraseAllData(): Promise<void> {
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.syncMeta], async () => {
     await db.notebooks.clear();
     await db.sections.clear();
     await db.pages.clear();
+    await db.tombstones.clear();
+    await db.syncMeta.clear();
   });
 }
 
@@ -545,6 +597,31 @@ export async function buildBackup(): Promise<string> {
       })),
   };
   return JSON.stringify(backup, null, 2);
+}
+
+/* ------------------------------------------------------------------ */
+/* sync state (v1.5 file-based sync, phase 1)                           */
+/* ------------------------------------------------------------------ */
+
+/** All purge tombstones recorded on this device (for trash.jsonl export). */
+export async function listPurgeTombstones(): Promise<TombstoneRow[]> {
+  return db.tombstones.toArray();
+}
+
+export const LAST_SYNC_KEY = "lastSyncManifest";
+
+/** The manifest as of this device's last successful sync (null = never). */
+export async function readLastSyncManifest(): Promise<unknown> {
+  const row = await db.syncMeta.get(LAST_SYNC_KEY);
+  return row?.value ?? null;
+}
+
+export async function writeLastSyncManifest(manifest: unknown): Promise<void> {
+  await db.syncMeta.put({ key: LAST_SYNC_KEY, value: manifest });
+}
+
+export async function clearSyncState(): Promise<void> {
+  await db.syncMeta.clear();
 }
 
 /**
