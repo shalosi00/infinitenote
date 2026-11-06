@@ -34,7 +34,7 @@ milestones/issues. This file is the plan; the status file is the reality.
   + Ctrl/Cmd+Alt+N, pinned Today daily page
 - [x] Print-friendly page export (paginated PDF) (issue #20) — A4
   portrait/landscape, vector text, sliced images, paper-aware
-- [ ] Multi-select in the sidebar (bulk move/delete)
+- [x] Multi-select in the sidebar (bulk move/delete) (issue #27) — shipped in v1.4.0
 - [ ] Keyboard shortcut cheatsheet in-app
 
 ## v1.3 — Sync & collaboration (research)
