@@ -23,6 +23,14 @@ export interface CanvasApi {
   focusContent: () => void;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
+  /** True while the canvas holds un-saved edits (autosave debounce pending). */
+  hasPendingEdits: () => boolean;
+  /**
+   * Drop pending edits WITHOUT saving them — used after a sync replaced the
+   * open page's content in the DB: the remounting canvas must not flush its
+   * now-stale stash over the freshly merged scene.
+   */
+  discardPendingEdits: () => void;
 }
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
