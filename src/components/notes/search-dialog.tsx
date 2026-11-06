@@ -16,10 +16,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useAppStore } from "@/lib/store";
+import { useTranslations } from "next-intl";
 import { buildSearchIndex, searchIndex } from "@/lib/search";
 import { db } from "@/lib/notes-db";
 
 export function SearchDialog() {
+  const t = useTranslations("search");
   const open = useAppStore((s) => s.searchOpen);
   const setOpen = useAppStore((s) => s.setSearchOpen);
   const notebooks = useAppStore((s) => s.notebooks);
@@ -54,14 +56,14 @@ export function SearchDialog() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput
-        placeholder="Search all pages…"
+        placeholder={t("placeholder")}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{t("noResults")}</CommandEmpty>
         {results.length > 0 && (
-          <CommandGroup heading={`${results.length} page${results.length > 1 ? "s" : ""}`}>
+          <CommandGroup heading={t("results", { count: results.length })}>
             {results.map((hit) => (
               <CommandItem
                 key={hit.pageId}
