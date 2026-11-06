@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the InfiniteNote main window. core:default grants the standard event/window/webview APIs to the local bundle.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

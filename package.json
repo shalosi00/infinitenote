@@ -6,6 +6,8 @@
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "dev:e2e": "next dev -p 3000",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build:desktop": "NEXT_OUTPUT_MODE=export next build",
+    "tauri": "bunx @tauri-apps/cli@^2",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "test": "bun test src/lib/__tests__",
