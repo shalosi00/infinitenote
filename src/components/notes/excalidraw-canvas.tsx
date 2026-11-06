@@ -104,6 +104,21 @@ export default function ExcalidrawCanvas({
     await doSave();
   }, [doSave]);
 
+  /** Pending edits = un-flushed stash or a running autosave debounce. */
+  const hasPendingEdits = useCallback(
+    (): boolean => saveTimer.current !== null || latestScene.current !== null,
+    []
+  );
+
+  /** Drop pending edits without saving (post-sync reload — DB is newer). */
+  const discardPendingEdits = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    latestScene.current = null;
+  }, []);
+
   /**
    * Keep the ruled-paper overlay locked to the canvas viewport: Excalidraw's
    * transform is screen = (world + scroll - viewport/2) × zoom, so a world-0
@@ -222,6 +237,8 @@ export default function ExcalidrawCanvas({
         exportPdf: (orientation) => exportPagePdf(api, title, orientation, background),
         focusContent: () => api.scrollToContent(),
         flushSave,
+        hasPendingEdits,
+        discardPendingEdits,
       };
       onApiReady(apiSurface);
 
@@ -239,7 +256,7 @@ export default function ExcalidrawCanvas({
         };
       }
     },
-    [title, onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer]
+    [title, onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer, hasPendingEdits, discardPendingEdits]
   );
 
   /* ----------------------------- lifecycle ----------------------------- */
