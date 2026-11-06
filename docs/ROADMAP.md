@@ -32,7 +32,8 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Tags / labels on pages with tag filter view (issue #18)
 - [x] Quick notes and a "today" smart page (issue #19) — "Quick note" button
   + Ctrl/Cmd+Alt+N, pinned Today daily page
-- [ ] Print-friendly page export (paginated PDF) (issue #20)
+- [x] Print-friendly page export (paginated PDF) (issue #20) — A4
+  portrait/landscape, vector text, sliced images, paper-aware
 - [ ] Multi-select in the sidebar (bulk move/delete)
 - [ ] Keyboard shortcut cheatsheet in-app
 

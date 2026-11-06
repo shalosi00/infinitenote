@@ -34,6 +34,7 @@ import {
   exportSceneFile,
   appendScene,
 } from "@/lib/excalidraw-client";
+import { exportPagePdf } from "@/lib/pdf-export";
 
 // Self-host canvas fonts/assets so the app works fully offline.
 if (typeof window !== "undefined") {
@@ -218,6 +219,7 @@ export default function ExcalidrawCanvas({
         exportPng: () => exportPng(api, title),
         exportSvg: () => exportSvg(api, title),
         exportSceneFile: () => exportSceneFile(api, title),
+        exportPdf: (orientation) => exportPagePdf(api, title, orientation, background),
         focusContent: () => api.scrollToContent(),
         flushSave,
       };
