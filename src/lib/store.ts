@@ -29,6 +29,7 @@ interface AppStore {
   saveIndicator: SaveIndicator;
   searchOpen: boolean;
   trashOpen: boolean;
+  shortcutsOpen: boolean;
 
   load: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -71,6 +72,7 @@ interface AppStore {
   setSaveIndicator: (s: SaveIndicator) => void;
   setSearchOpen: (open: boolean) => void;
   setTrashOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
 
   // trash actions (result in refresh)
   restoreFromTrash: (kind: "notebook" | "section" | "page", id: string) => Promise<void>;
@@ -95,6 +97,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   saveIndicator: "idle",
   searchOpen: false,
   trashOpen: false,
+  shortcutsOpen: false,
   tagFilter: null,
   canvasFocus: 0,
 
@@ -356,6 +359,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setSaveIndicator: (si) => set({ saveIndicator: si }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setTrashOpen: (open) => set({ trashOpen: open }),
+  setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
 
   restoreFromTrash: async (kind, id) => {
     if (kind === "notebook") await db.restoreNotebook(id);

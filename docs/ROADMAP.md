@@ -35,7 +35,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Print-friendly page export (paginated PDF) (issue #20) — A4
   portrait/landscape, vector text, sliced images, paper-aware
 - [x] Multi-select in the sidebar (bulk move/delete) (issue #27) — shipped in v1.4.0
-- [ ] Keyboard shortcut cheatsheet in-app
+- [x] Keyboard shortcut cheatsheet in-app (issue #28) — shipped in v1.4.0
 
 ## v1.3 — Sync & collaboration (research)
 

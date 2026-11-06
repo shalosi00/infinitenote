@@ -20,6 +20,7 @@ import {
   FolderClosed,
   FolderInput,
   FolderOpen,
+  Keyboard,
   ListChecks,
   MoreHorizontal,
   Palette,
@@ -293,7 +294,19 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       )}
 
       <Separator />
-      <div className="p-2">
+      <div className="flex flex-col gap-0.5 p-2">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          size="sm"
+          data-testid="shortcuts-button"
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+          onClick={() => useAppStore.getState().setShortcutsOpen(true)}
+        >
+          <Keyboard className="h-4 w-4" />
+          Shortcuts
+        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground"
