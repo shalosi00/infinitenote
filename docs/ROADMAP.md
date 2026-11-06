@@ -43,6 +43,14 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Optional end-to-end encrypted sync backend (self-hostable, opt-in) — design outline in [docs/sync-research.md](sync-research.md) §5; implementation post-2.0
 - [x] Shared notebooks (research; depends on sync model) — scoped in [docs/sync-research.md](sync-research.md) §7; blocked on the sync server phase
 
+## v1.5 — File-based sync, phase 1 (shipped in v1.5.0)
+
+- [x] Sync engine: sync-folder format, three-way merge with conflict copies,
+      purge tombstones, Dexie v2 (issue #36)
+- [x] Sync UI: connect folder (File System Access) or merge via ZIP,
+      "Sync now", foreground re-scan, change summaries (issue #37)
+- [ ] Yjs CRDT merge core + optional E2EE server (v2.0+ — docs/sync-research.md §8)
+
 ## v1.4 — Distribution
 
 - [ ] Tauri wrapper for a native Linux desktop launcher/installer
