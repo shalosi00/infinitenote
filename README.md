@@ -39,6 +39,8 @@ data. No account, no cloud, no lock-in.
   a dated page into an auto-created *Quick Notes* notebook; the pinned **Today**
   entry opens (or creates) today's daily page and reuses it all day.
 - **Dark mode** and responsive layout with a mobile drawer.
+- **Bilingual UI** — English and 简体中文, switchable in the sidebar and remembered
+  per device (more locales welcome: add a catalog in `messages/`).
 - **Local-first** — data lives in your browser's IndexedDB; works fully offline.
 - **Installable PWA** — one tap / one click to install on Linux and Android.
 
