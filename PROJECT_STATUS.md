@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-07 |
-| **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) |
-| **Phase** | v1.6 shipped — planning v1.7 |
-| **Overall state** | v1.6.0 released; 266 unit + 56 E2E green; 0 open issues |
+| **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) — v1.7.0 in progress on `develop` |
+| **Phase** | v1.7 in progress — i18n (#54) + themes gallery (#55) merged; F-Droid (#56) next |
+| **Overall state** | 305 unit + 65 E2E green; 1 open issue (#56) |
 
 ## TL;DR
 
@@ -24,7 +24,9 @@ All data is local (IndexedDB). The UI is bilingual (English / 简体中文, swit
 (or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
 a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
 Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
-Flatpak/Flathub packaging recipe.
+Flatpak/Flathub packaging recipe. v1.7 so far adds UI internationalization
+(English + 简体中文) and a themes gallery: six accent themes layered over
+light/dark via a sidebar gallery with live swatches.
 v1.1 added the duplicate-page action, Playwright E2E as a required CI check and
 OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
 single-file pages with embedded images + Graph export runbook) and page paper
@@ -46,6 +48,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
+| Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
@@ -59,20 +62,18 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 
-**Totals: 286 unit tests, 61 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 305 unit tests, 65 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing — i18n (#54) is on `feat/i18n` awaiting PR/CI; next: themes
-  gallery (#55) and the F-Droid recipe (#56) for v1.7.0.
+- Nothing — themes gallery (#55) merged; next: the F-Droid build recipe
+  (#56), then the v1.7.0 release flow.
 
 ## Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-All three v1.6 distribution items shipped. Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+i18n (#54) and the themes gallery (#55) shipped. Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
 
-1. i18n with next-intl (English + Simplified Chinese UI strings)
-2. Themes gallery beyond dark/light
-3. F-Droid packaging (reproducible build recipe from the Tauri source)
+1. F-Droid packaging (reproducible build recipe from the Tauri source)
 
 ## Repo map (30 seconds)
 

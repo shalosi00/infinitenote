@@ -202,5 +202,18 @@
     "title": "未打开页面",
     "body": "创建笔记本、添加分区和页面，然后在无限画布上开始绘制。",
     "create": "创建笔记本"
+  },
+  "themes": {
+    "open": "主题",
+    "openTitle": "选择你的主题",
+    "galleryTitle": "主题",
+    "description": "强调色主题，可与浅色/深色模式叠加使用。",
+    "active": "当前使用",
+    "themeDefault": "紫罗兰（默认）",
+    "themeOcean": "海洋",
+    "themeForest": "森林",
+    "themeSunset": "日落",
+    "themeRose": "玫瑰",
+    "themeSlate": "石墨"
   }
 }
