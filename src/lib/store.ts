@@ -47,6 +47,9 @@ interface AppStore {
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   setPageBackground: (id: string, background: PageBackground) => Promise<void>;
+  setPageTags: (id: string, tags: string[]) => Promise<void>;
+  tagFilter: string | null;
+  setTagFilter: (tag: string | null) => void;
 
   setSaveIndicator: (s: SaveIndicator) => void;
   setSearchOpen: (open: boolean) => void;
@@ -75,6 +78,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   saveIndicator: "idle",
   searchOpen: false,
   trashOpen: false,
+  tagFilter: null,
 
   load: () => {
     if (!initialLoadPromise) {
@@ -186,6 +190,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     await db.setPageBackground(id, background);
     await get().refresh();
   },
+  setPageTags: async (id, tags) => {
+    await db.setPageTags(id, tags);
+    await get().refresh();
+  },
+  setTagFilter: (tag) => set({ tagFilter: tag }),
   movePage: async (id, dir) => {
     await db.movePage(id, dir);
     await get().refresh();

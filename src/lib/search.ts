@@ -53,7 +53,7 @@ export function buildSearchIndex(
       notebookId: nb?.id ?? "",
       title: page.title,
       pagePath: [nb?.name ?? "…", sec?.name ?? "…"].join(" / "),
-      haystack: [page.title, ...contents],
+      haystack: [page.title, ...(page.tags ?? []), ...contents],
       contents,
     };
   });

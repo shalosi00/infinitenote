@@ -7,7 +7,7 @@
 [![CI](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-97%20unit%20%2B%2034%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-111%20unit%20%2B%2038%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 </div>
 
@@ -29,6 +29,7 @@ data. No account, no cloud, no lock-in.
 - **Search** — instant full-text search across every page (`Ctrl+K`).
 - **Trash** — OneNote-style soft delete with restore and purge.
 - **Paper styles** — plain, ruled and grid paper per page.
+- **Tags** — label pages, filter the sidebar by tag, find them via search.
 - **Dark mode** and responsive layout with a mobile drawer.
 - **Local-first** — data lives in your browser's IndexedDB; works fully offline.
 - **Installable PWA** — one tap / one click to install on Linux and Android.

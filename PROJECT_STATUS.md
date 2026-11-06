@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-10-19 |
 | **Current version** | v1.2.0 (tagged, GitHub Release published) |
-| **Phase** | v1.2.0 shipped — v1.3 planning |
-| **Overall state** | v1.2.0 released; 97 unit + 34 E2E green, CI green |
+| **Phase** | v1.3 in progress on `feat/page-tags` |
+| **Overall state** | v1.3 started: tags PR open; 111 unit + 38 E2E green locally |
 
 ## TL;DR
 
@@ -36,16 +36,18 @@ styles (plain/ruled/grid).
 | Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw` | Working | 30 E2E checks with fixture files |
 | Exports: PNG, SVG, .excalidraw, notebook backup | Working | E2E serialization check |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
+| Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 97 unit tests, 34 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 111 unit tests, 38 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing open — v1.2.0 is live on `main`. (CI must stay green on both branches.)
+- `feat/page-tags` — tags/labels on pages with a sidebar tag filter view (issue #18).
+  109 unit + 38 E2E green locally; CI pending on the PR.
 
 ## Next up — v1.2 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -64,6 +66,7 @@ styles (plain/ruled/grid).
 | `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
 | `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
 | `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
+| `src/lib/tags.ts` | Page tags: normalization, dedupe, collect + filter helpers |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
@@ -85,6 +88,11 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-10-19 — v1.3 starts: page tags (issue #18)** — tag picker in the page
+  header (chips + quick-add), tag chips on sidebar page rows, a cross-notebook
+  tag filter view, search matches tags; backup/restore now also preserves
+  paper style (pre-existing gap found while wiring tags through). 111 unit
+  tests (+14), 38 E2E checks (+4).
 - **2026-10-19 — v1.2.0 live**: release PR #16 merge-committed to main (aae09ed),
   tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.2.0);
   v1.2.0 milestone closed, v1.3.0 milestone opened.

@@ -263,6 +263,11 @@ export async function setPageBackground(id: string, background: PageRow["backgro
   await db.pages.update(id, { background, updatedAt: now() });
 }
 
+/** Replace a page's tag list (caller normalizes via lib/tags). */
+export async function setPageTags(id: string, tags: string[]): Promise<void> {
+  await db.pages.update(id, { tags, updatedAt: now() });
+}
+
 export async function movePage(id: string, dir: -1 | 1): Promise<void> {
   const page = await db.pages.get(id);
   if (!page) return;
@@ -429,7 +434,12 @@ export async function restoreBackup(json: string): Promise<number> {
       color?: Notebook["color"];
       sections?: Array<{
         name?: string;
-        pages?: Array<{ title?: string; content?: string | null }>;
+        pages?: Array<{
+        title?: string;
+        content?: string | null;
+        background?: PageRow["background"];
+        tags?: string[];
+      }>;
       }>;
     }>;
   };
@@ -479,6 +489,8 @@ export async function restoreBackup(json: string): Promise<number> {
             updatedAt: ts,
             deletedAt: null,
             content: page.content ?? null,
+            background: page.background,
+            tags: page.tags?.length ? page.tags : undefined,
           });
         }
       }
