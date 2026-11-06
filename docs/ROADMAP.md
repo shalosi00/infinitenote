@@ -17,7 +17,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] 47 unit tests + 34 E2E checks, lint/typecheck clean
 - [x] CI pipeline, branch protection, release flow (v1.0.0 tag + GitHub Release)
 
-## v1.1 — Quality & continuity (next)
+## v1.1 — Quality & continuity (shipped in v1.1.0)
 
 - [x] Port E2E suite to Playwright and run it in CI (issue #3)
 - [x] OneNote import, phase 1: `.docx` and OneNote-exported HTML import (issue #4)
@@ -27,11 +27,13 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Page templates: plain / ruled / grid paper per page (issue #13)
 - [x] Remove unused template scaffolding (`db.ts`, `prisma/`, `api/route.ts`)
 
-## v1.2 — Notebook power features
+## v1.3 — Notebook power features
 
-- [ ] Tags / labels on pages with tag filter view
-- [ ] Quick notes and a "today" smart page
-- [ ] Print-friendly page export (paginated PDF)
+- [x] Tags / labels on pages with tag filter view (issue #18)
+- [x] Quick notes and a "today" smart page (issue #19) — "Quick note" button
+  + Ctrl/Cmd+Alt+N, pinned Today daily page
+- [x] Print-friendly page export (paginated PDF) (issue #20) — A4
+  portrait/landscape, vector text, sliced images, paper-aware
 - [ ] Multi-select in the sidebar (bulk move/delete)
 - [ ] Keyboard shortcut cheatsheet in-app
 

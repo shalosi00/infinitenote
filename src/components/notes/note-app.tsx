@@ -4,7 +4,7 @@
  * InfiniteNote — top-level application shell.
  * Layout: header + (sidebar | canvas). Mobile: sidebar becomes a drawer.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Download,
@@ -18,9 +18,12 @@ import {
   NotebookPen,
   PackageOpen,
   PenLine,
+  Printer,
   Search,
   Sun,
+  Tags,
   Upload,
+  X,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,12 +36,17 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppStore } from "@/lib/store";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
-import type { PageBackground } from "@/lib/types";
+import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
+import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
@@ -54,6 +62,7 @@ export default function NoteApp() {
     addNotebook,
     renamePage,
     setPageBackground,
+    setPageTags,
     restoreBackupArchive,
   } = useAppStore();
   const { resolvedTheme, setTheme } = useTheme();
@@ -67,6 +76,9 @@ export default function NoteApp() {
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
   );
+
+  const pages = useAppStore((s) => s.pages);
+  const allTags = useMemo(() => collectTags(pages), [pages]);
 
   useEffect(() => {
     void load();
@@ -84,17 +96,54 @@ export default function NoteApp() {
     };
   }, []);
 
-  // global shortcut: Ctrl/Cmd+K opens search
+  // global shortcuts: Ctrl/Cmd+K opens search, Ctrl/Cmd+Alt+N starts a quick note.
+  // Capture phase: the Excalidraw container consumes keydowns while focused,
+  // so bubble-phase window listeners never see shortcuts mid-drawing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         useAppStore.getState().setSearchOpen(true);
       }
+      // OneNote's quick capture is Win+Alt+N — the web equivalent is Ctrl/Cmd+Alt+N.
+      // Must not fire while typing in an input/textarea (some IMEs use it).
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      if (mod && e.altKey && e.key.toLowerCase() === "n" && !typing) {
+        e.preventDefault();
+        void useAppStore.getState().createQuickNote();
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, []);
+
+  // quick capture focus: when the store bumps canvasFocus (quick note / Today),
+  // move keyboard focus onto the freshly mounted canvas container so typing and
+  // shortcuts work immediately. The shell never remounts, so the ref reliably
+  // remembers what was already applied across page switches.
+  const canvasFocus = useAppStore((s) => s.canvasFocus);
+  const appliedFocus = useRef(0);
+  useEffect(() => {
+    if (canvasFocus === appliedFocus.current) return;
+    appliedFocus.current = canvasFocus;
+    // give the new page's canvas a beat to mount before grabbing the element
+    const timer = setTimeout(() => {
+      const started = Date.now();
+      const tryFocus = () => {
+        const el = document.querySelector<HTMLElement>(".excalidraw");
+        if (el) {
+          el.focus();
+          return;
+        }
+        if (Date.now() - started < 2_000) setTimeout(tryFocus, 50);
+      };
+      tryFocus();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [canvasFocus]);
 
   const handleApiReady = useCallback((api: CanvasApi) => {
     canvasApi.current = api;
@@ -137,7 +186,7 @@ export default function NoteApp() {
 
   /* ------------------------------ export ------------------------------- */
 
-  const handleExport = async (kind: "png" | "svg" | "scene" | "backup") => {
+  const handleExport = async (kind: "png" | "svg" | "scene" | "pdf-portrait" | "pdf-landscape" | "backup") => {
     if (kind === "backup") {
       const json = await db.buildBackup();
       const blob = new Blob([json], { type: "application/json" });
@@ -153,9 +202,16 @@ export default function NoteApp() {
       toast.error("Open a page first, then export.");
       return;
     }
-    if (kind === "png") await canvasApi.current.exportPng();
-    if (kind === "svg") await canvasApi.current.exportSvg();
-    if (kind === "scene") await canvasApi.current.exportSceneFile();
+    try {
+      if (kind === "png") await canvasApi.current.exportPng();
+      if (kind === "svg") await canvasApi.current.exportSvg();
+      if (kind === "scene") await canvasApi.current.exportSceneFile();
+      if (kind === "pdf-portrait") await canvasApi.current.exportPdf("portrait");
+      if (kind === "pdf-landscape") await canvasApi.current.exportPdf("landscape");
+    } catch (err) {
+      // empty page etc. — surface instead of failing silently
+      toast.error(err instanceof Error ? err.message : "Export failed.");
+    }
   };
 
   /* --------------------------- drag & drop ----------------------------- */
@@ -278,6 +334,25 @@ export default function NoteApp() {
             <DropdownMenuItem onClick={() => void handleExport("svg")}>
               <FileUp /> SVG vector
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
+                <Printer /> PDF — print (A4)
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                <DropdownMenuItem
+                  data-testid="export-pdf-portrait"
+                  onClick={() => void handleExport("pdf-portrait")}
+                >
+                  <Printer /> A4 portrait
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="export-pdf-landscape"
+                  onClick={() => void handleExport("pdf-landscape")}
+                >
+                  <Printer /> A4 landscape
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Everything</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("backup")}>
@@ -357,6 +432,13 @@ export default function NoteApp() {
                   </button>
                 )}
                 <div className="flex-1" />
+
+                {/* page tags */}
+                <TagPicker
+                  page={currentPage}
+                  allTags={allTags}
+                  onSetTags={(tags) => void setPageTags(currentPage.id, tags)}
+                />
 
                 {/* page paper style */}
                 <DropdownMenu>
@@ -444,6 +526,111 @@ export default function NoteApp() {
       <TrashDialog />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* tag picker (page header)                                              */
+/* ------------------------------------------------------------------ */
+
+function TagPicker({
+  page,
+  allTags,
+  onSetTags,
+}: {
+  page: PageMeta;
+  allTags: TagCount[];
+  onSetTags: (tags: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const tags = page.tags ?? [];
+
+  const commit = (raw: string) => {
+    const next = addTag(tags, raw);
+    if (next !== tags) onSetTags(next);
+    setDraft("");
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-muted-foreground"
+          aria-label="Page tags"
+          data-testid="tag-picker"
+        >
+          <Tags className="h-4 w-4" />
+          {tags.length > 0 && <span data-testid="tag-count">{tags.length}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-3" data-testid="tag-menu">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Page tags
+        </p>
+        {tags.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No tags yet — add one below.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5" data-testid="tag-chips">
+            {tags.map((t) => (
+              <span
+                key={t}
+                data-testid={`tag-chip-${t}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+              >
+                {t}
+                <button
+                  type="button"
+                  aria-label={`Remove tag ${t}`}
+                  data-testid={`tag-chip-remove-${t}`}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onSetTags(removeTag(tags, t))}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && draft.trim()) {
+              e.preventDefault();
+              commit(draft);
+            }
+          }}
+          placeholder="Add tag + Enter"
+          className="mt-2 h-8 text-sm"
+          aria-label="Add tag"
+          data-testid="tag-input"
+        />
+        {allTags.length > 0 && (
+          <>
+            <Separator className="my-2" />
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Existing tags
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.slice(0, 8).map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  type="button"
+                  data-testid={`tag-quick-add-${tag}`}
+                  className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
+                  title={`Add "${tag}" (used by ${count} page${count === 1 ? "" : "s"})`}
+                  onClick={() => commit(tag)}
+                >
+                  + {tag}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 

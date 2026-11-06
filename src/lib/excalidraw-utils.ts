@@ -17,6 +17,8 @@ export interface CanvasApi {
   exportSvg: () => Promise<void>;
   /** Download the current page as a .excalidraw scene file. */
   exportSceneFile: () => Promise<void>;
+  /** Print-friendly paginated A4 PDF (issue #20). */
+  exportPdf: (orientation: "portrait" | "landscape") => Promise<void>;
   /** Zoom viewport to fit existing content. */
   focusContent: () => void;
   /** Flush a pending debounced save immediately (used on page switch). */

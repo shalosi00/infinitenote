@@ -8,6 +8,12 @@
 import { create } from "zustand";
 import * as db from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
+import {
+  QUICK_NOTES_NOTEBOOK_NAME,
+  QUICK_NOTES_SECTION_NAME,
+  quickNoteTitle,
+  todayKey,
+} from "./quick-notes";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
 
@@ -47,6 +53,16 @@ interface AppStore {
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   setPageBackground: (id: string, background: PageBackground) => Promise<void>;
+  setPageTags: (id: string, tags: string[]) => Promise<void>;
+  tagFilter: string | null;
+  setTagFilter: (tag: string | null) => void;
+
+  /** OneNote-style quick capture (issue #19). */
+  createQuickNote: () => Promise<void>;
+  openTodayPage: () => Promise<void>;
+  /** Monotonic counter — the canvas focuses itself whenever it changes. */
+  canvasFocus: number;
+  requestCanvasFocus: () => void;
 
   setSaveIndicator: (s: SaveIndicator) => void;
   setSearchOpen: (open: boolean) => void;
@@ -75,6 +91,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   saveIndicator: "idle",
   searchOpen: false,
   trashOpen: false,
+  tagFilter: null,
+  canvasFocus: 0,
 
   load: () => {
     if (!initialLoadPromise) {
@@ -186,6 +204,62 @@ export const useAppStore = create<AppStore>((set, get) => ({
     await db.setPageBackground(id, background);
     await get().refresh();
   },
+  setPageTags: async (id, tags) => {
+    await db.setPageTags(id, tags);
+    await get().refresh();
+  },
+  setTagFilter: (tag) => set({ tagFilter: tag }),
+
+  /**
+   * Quick capture (issue #19): append a fresh page to the Quick Notes
+   * section (bootstrapped on first use), title stamped with today's date,
+   * then select it so the user lands on a ready-to-type canvas.
+   */
+  createQuickNote: async () => {
+    const home = await db.ensureQuickNotesHome(
+      QUICK_NOTES_NOTEBOOK_NAME,
+      QUICK_NOTES_SECTION_NAME
+    );
+    const page = await db.createPage(home.section.id, quickNoteTitle());
+    await get().refresh();
+    set((s) => ({
+      selection: {
+        notebookId: home.notebook.id,
+        sectionId: home.section.id,
+        pageId: page.id,
+      },
+      expanded: new Set([...s.expanded, home.notebook.id, home.section.id]),
+      canvasFocus: s.canvasFocus + 1,
+    }));
+  },
+
+  /**
+   * Today smart page (issue #19): open the daily page titled with today's
+   * local date key, creating it in Quick Notes when missing. Re-clicking
+   * (or reloading) always reuses the same page for the day.
+   */
+  openTodayPage: async () => {
+    const home = await db.ensureQuickNotesHome(
+      QUICK_NOTES_NOTEBOOK_NAME,
+      QUICK_NOTES_SECTION_NAME
+    );
+    const key = todayKey();
+    const existing = await db.findPageByTitle(home.section.id, key);
+    const page = existing ?? (await db.createPage(home.section.id, key));
+    await get().refresh();
+    set((s) => ({
+      selection: {
+        notebookId: home.notebook.id,
+        sectionId: home.section.id,
+        pageId: page.id,
+      },
+      expanded: new Set([...s.expanded, home.notebook.id, home.section.id]),
+      canvasFocus: s.canvasFocus + 1,
+    }));
+  },
+
+  requestCanvasFocus: () => set((s) => ({ canvasFocus: s.canvasFocus + 1 })),
+
   movePage: async (id, dir) => {
     await db.movePage(id, dir);
     await get().refresh();
