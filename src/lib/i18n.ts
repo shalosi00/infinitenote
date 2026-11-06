@@ -34,14 +34,19 @@ export function normalizeLocale(tag: string): Locale {
 }
 
 /**
- * Pick the initial locale from the browser's language list. The first entry
- * that maps to a shipped locale wins (navigator.languages order is the
- * user's preference order); empty/absent lists fall back to English.
+ * Pick the initial locale from the browser's language list (preference
+ * order). The first language that maps to a shipped locale wins; languages
+ * that resolve to neither (e.g. French) are skipped so a later English or
+ * Chinese preference still counts. Empty/absent lists fall back to English.
  */
 export function detectLocale(languages: readonly (string | undefined)[]): Locale {
   for (const lang of languages) {
     if (typeof lang !== "string" || lang.trim() === "") continue;
-    return normalizeLocale(lang);
+    const normalized = normalizeLocale(lang);
+    // normalizeLocale falls back to English — only stop when the language
+    // genuinely maps to a shipped locale (en* or zh*)
+    const t = lang.trim().toLowerCase();
+    if (t === "en" || t.startsWith("en-") || t.startsWith("zh")) return normalized;
   }
   return DEFAULT_LOCALE;
 }
