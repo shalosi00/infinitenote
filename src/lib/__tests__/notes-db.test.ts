@@ -363,3 +363,94 @@ describe("findPageByTitle", () => {
     expect(await notes.findPageByTitle(sec.id, "daily")).toBeNull();
   });
 });
+
+describe("bulk page operations (issue #27)", () => {
+  async function seed() {
+    const nbA = await notes.createNotebook("Alpha", "violet");
+    const nbB = await notes.createNotebook("Beta", "teal");
+    const sA1 = await notes.createSection(nbA.id, "A1");
+    const sA2 = await notes.createSection(nbA.id, "A2");
+    const sB1 = await notes.createSection(nbB.id, "B1");
+    return { nbA, nbB, sA1, sA2, sB1 };
+  }
+
+  it("movePagesToSection appends the batch after existing pages, relative order kept", async () => {
+    const { sA1, sA2, sB1 } = await seed();
+    const keep = await notes.createPage(sA2.id, "Keep");
+    const p1 = await notes.createPage(sA1.id, "One");
+    const p2 = await notes.createPage(sA1.id, "Two");
+    const p3 = await notes.createPage(sB1.id, "Three");
+
+    const moved = await notes.movePagesToSection([p3.id, p1.id, p2.id], sA2.id);
+
+    expect(moved).toBe(3);
+    const titles = (await notes.listPages())
+      .filter((p) => p.sectionId === sA2.id)
+      .sort((a, b) => a.order - b.order)
+      .map((p) => p.title);
+    expect(titles).toEqual(["Keep", "One", "Two", "Three"]);
+  });
+
+  it("movePagesToSection skips pages already in the target, trashed pages and unknown ids", async () => {
+    const { sA1, sA2 } = await seed();
+    const p1 = await notes.createPage(sA1.id, "One");
+    const p2 = await notes.createPage(sA1.id, "Two");
+    const p3 = await notes.createPage(sA2.id, "Already here");
+    await notes.trashPage(p2.id);
+
+    const moved = await notes.movePagesToSection([p1.id, p2.id, p3.id, "missing"], sA2.id);
+
+    expect(moved).toBe(1);
+    const pages = await notes.listPages();
+    expect(pages.find((p) => p.id === p1.id)?.sectionId).toBe(sA2.id);
+    // trashed p2 untouched (still soft-deleted, still in sA1 on the row)
+    const trash = await notes.listTrash();
+    expect(trash.pages.find((p) => p.id === p2.id)?.sectionId).toBe(sA1.id);
+  });
+
+  it("movePagesToSection returns 0 for a missing or trashed target section", async () => {
+    const { sA1, sB1 } = await seed();
+    const p1 = await notes.createPage(sA1.id, "One");
+    await notes.trashSection(sB1.id);
+
+    expect(await notes.movePagesToSection([p1.id], sB1.id)).toBe(0);
+    expect(await notes.movePagesToSection([p1.id], "nope")).toBe(0);
+    expect((await notes.listPages()).find((p) => p.id === p1.id)?.sectionId).toBe(sA1.id);
+  });
+
+  it("movePagesToSection dedupes repeated ids", async () => {
+    const { sA1, sA2 } = await seed();
+    const p1 = await notes.createPage(sA1.id, "One");
+    const moved = await notes.movePagesToSection([p1.id, p1.id], sA2.id);
+    expect(moved).toBe(1);
+  });
+
+  it("trashPages soft-deletes the batch with one shared timestamp", async () => {
+    const { sA1 } = await seed();
+    const p1 = await notes.createPage(sA1.id, "One");
+    const p2 = await notes.createPage(sA1.id, "Two");
+
+    const trashed = await notes.trashPages([p1.id, p2.id]);
+
+    expect(trashed).toBe(2);
+    const trash = await notes.listTrash();
+    const stamps = trash.pages.filter((p) => [p1.id, p2.id].includes(p.id)).map((p) => p.deletedAt);
+    expect(new Set(stamps).size).toBe(1);
+    // both restorable individually
+    await notes.restorePage(p1.id);
+    const alive = await notes.listPages();
+    expect(alive.find((p) => p.id === p1.id)).toBeDefined();
+    expect(alive.find((p) => p.id === p2.id)).toBeUndefined();
+  });
+
+  it("trashPages skips already-trashed rows and returns 0 for an empty batch", async () => {
+    const { sA1 } = await seed();
+    const p1 = await notes.createPage(sA1.id, "One");
+    await notes.trashPage(p1.id);
+
+    expect(await notes.trashPages([])).toBe(0);
+    expect(await notes.trashPages([p1.id])).toBe(0);
+    const trash = await notes.listTrash();
+    expect(trash.pages).toHaveLength(1);
+  });
+});

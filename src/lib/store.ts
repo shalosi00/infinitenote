@@ -52,6 +52,10 @@ interface AppStore {
   movePage: (id: string, dir: -1 | 1) => Promise<void>;
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
+
+  /** Sidebar multi-select bulk actions (issue #27). Both return the number of pages affected. */
+  bulkMovePages: (pageIds: string[], targetSectionId: string) => Promise<number>;
+  bulkDeletePages: (pageIds: string[]) => Promise<number>;
   setPageBackground: (id: string, background: PageBackground) => Promise<void>;
   setPageTags: (id: string, tags: string[]) => Promise<void>;
   tagFilter: string | null;
@@ -290,6 +294,63 @@ export const useAppStore = create<AppStore>((set, get) => ({
     await db.trashPage(id);
     await get().refresh();
     if (next) set({ selection: next });
+  },
+
+  /**
+   * Bulk move (issue #27): append the selected pages to the target section
+   * (cross-notebook allowed). When the currently open page is part of the
+   * batch, the selection follows it to its new home so the canvas keeps
+   * showing the same page; the target section is expanded to reveal it.
+   */
+  bulkMovePages: async (pageIds, targetSectionId) => {
+    const moved = await db.movePagesToSection(pageIds, targetSectionId);
+    if (moved === 0) return 0;
+    await get().refresh();
+    const target = get().sections.find((s) => s.id === targetSectionId);
+    if (!target) return moved;
+    const selection = get().selection;
+    const selectionFollowed =
+      selection && pageIds.includes(selection.pageId)
+        ? {
+            notebookId: target.notebookId,
+            sectionId: target.id,
+            pageId: selection.pageId,
+          }
+        : null;
+    set((s) => ({
+      ...(selectionFollowed ? { selection: selectionFollowed } : {}),
+      expanded: new Set([...s.expanded, target.notebookId, target.id]),
+    }));
+    return moved;
+  },
+
+  /**
+   * Bulk delete (issue #27): trash all selected pages in one transaction.
+   * When the open page is deleted, the next selection is computed against
+   * the tree minus the whole batch (never lands on another deleted page).
+   */
+  bulkDeletePages: async (pageIds) => {
+    const ids = [...new Set(pageIds)];
+    if (ids.length === 0) return 0;
+    const tree = {
+      notebooks: get().notebooks,
+      sections: get().sections,
+      pages: get().pages,
+    };
+    const selection = get().selection;
+    let next = selection;
+    if (selection && ids.includes(selection.pageId)) {
+      // candidates must exclude every deleted page, but keep the open one
+      // for the order lookup inside nextSelectionAfterPageDelete
+      const others = tree.pages.filter(
+        (p) => !ids.includes(p.id) || p.id === selection.pageId
+      );
+      next = nextSelectionAfterPageDelete({ ...tree, pages: others }, selection);
+    }
+    const trashed = await db.trashPages(ids);
+    await get().refresh();
+    if (next) set({ selection: next });
+    return trashed;
   },
 
   setSaveIndicator: (si) => set({ saveIndicator: si }),

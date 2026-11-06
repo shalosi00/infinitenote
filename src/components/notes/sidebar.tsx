@@ -5,18 +5,22 @@
  * - single tap: select
  * - double tap on the label: inline rename
  * - kebab menu: CRUD + reorder + colors + trash
+ * - select mode: checkbox multi-select with bulk move/delete (issue #27)
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   CalendarDays,
+  Check,
   ChevronDown,
   ChevronRight,
   Copy,
   FileText,
   FolderClosed,
+  FolderInput,
   FolderOpen,
+  ListChecks,
   MoreHorizontal,
   Palette,
   Pencil,
@@ -43,9 +47,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
 import { pageHasTag } from "@/lib/tags";
+import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
+import { MovePagesDialog } from "./move-pages-dialog";
 import { NOTEBOOK_COLORS, NOTEBOOK_COLOR_HEX, type Notebook, type PageMeta, type Section } from "@/lib/types";
 import type { Selection } from "@/lib/tree-ops";
 import { byOrder } from "@/lib/types";
+
+/** Prop bundle drilled to every page row (kept in one type so the tree stays readable). */
+interface SelectModeProps {
+  selectMode: boolean;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelect: (pageId: string) => void;
+}
+
+const NO_SELECT: SelectModeProps = {
+  selectMode: false,
+  selectedIds: new Set<string>(),
+  onToggleSelect: () => undefined,
+};
 
 interface SidebarProps {
   onNavigate?: () => void; // close mobile drawer after selection
@@ -63,8 +82,58 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const setTagFilter = useAppStore((s) => s.setTagFilter);
   const createQuickNote = useAppStore((s) => s.createQuickNote);
   const openTodayPage = useAppStore((s) => s.openTodayPage);
+  const expanded = useAppStore((s) => s.expanded);
+  const bulkMovePages = useAppStore((s) => s.bulkMovePages);
+  const bulkDeletePages = useAppStore((s) => s.bulkDeletePages);
 
   const [renaming, setRenaming] = useState<string | null>(null);
+
+  /* -------- multi-select (issue #27): UI-layer state only -------- */
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedRaw, setSelectedRaw] = useState<ReadonlySet<string>>(new Set());
+  const [moveOpen, setMoveOpen] = useState(false);
+
+  // entering the tag filter view is a navigation event — it cancels select
+  // mode. zustand is an external store, so this is a subscription (setState
+  // only runs inside the store's change callback, not in the effect body).
+  useEffect(
+    () =>
+      useAppStore.subscribe((s, prev) => {
+        if (s.tagFilter !== prev.tagFilter) {
+          setSelectMode(false);
+          setSelectedRaw(new Set());
+        }
+      }),
+    []
+  );
+
+  // ids whose pages disappeared (trashed elsewhere / backup restored) are
+  // pruned derivationally — the stored set may lag, every read uses this value
+  const selected = useMemo(() => pruneSelected(selectedRaw, pages), [selectedRaw, pages]);
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedRaw(new Set());
+    setMoveOpen(false);
+  };
+
+  const onToggleSelect = (pageId: string) =>
+    setSelectedRaw((prev) => toggleSelected(pruneSelected(prev, pages), pageId));
+
+  const visible = selectMode ? visiblePageIds(pages, sections, expanded) : [];
+  const allVisibleSelected = allSelected(selected, visible);
+
+  const onSelectAllToggle = () =>
+    setSelectedRaw(allVisibleSelected ? new Set<string>() : new Set(visible));
+
+  const onBulkMove = (targetSectionId: string) => {
+    setMoveOpen(false);
+    void bulkMovePages([...selected], targetSectionId).then(() => exitSelectMode());
+  };
+
+  const onBulkDelete = () => {
+    void bulkDeletePages([...selected]).then(() => exitSelectMode());
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
@@ -72,6 +141,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <span className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Notebooks
         </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 ${selectMode ? "bg-accent text-accent-foreground" : ""}`}
+          data-testid="multiselect-toggle"
+          title="Select pages for bulk move/delete"
+          aria-label="Select pages"
+          aria-pressed={selectMode}
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+        >
+          <ListChecks className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -152,6 +233,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               renaming={renaming}
               setRenaming={setRenaming}
               onNavigate={onNavigate}
+              selectProps={
+                selectMode
+                  ? { selectMode, selectedIds: selected, onToggleSelect }
+                  : NO_SELECT
+              }
             />
           ))}
           {notebooks.length === 0 && (
@@ -165,6 +251,47 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         )}
       </ScrollArea>
 
+      {selectMode && (
+        <div data-testid="bulk-bar" className="border-t bg-sidebar-accent/40 p-2">
+          <div className="flex items-center gap-2 px-1 pb-1.5">
+            <span className="flex-1 text-xs font-medium" data-testid="bulk-count">
+              {selected.size} selected
+            </span>
+            <button
+              type="button"
+              data-testid="bulk-select-all"
+              className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={onSelectAllToggle}
+              disabled={visible.length === 0}
+            >
+              {allVisibleSelected ? "Clear" : `All (${visible.length})`}
+            </button>
+          </div>
+          <div className="flex gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 flex-1 gap-1.5 text-xs font-medium"
+              data-testid="bulk-move"
+              disabled={selected.size === 0}
+              onClick={() => setMoveOpen(true)}
+            >
+              <FolderInput className="h-3.5 w-3.5" /> Move to…
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8 flex-1 gap-1.5 text-xs font-medium"
+              data-testid="bulk-delete"
+              disabled={selected.size === 0}
+              onClick={onBulkDelete}
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Separator />
       <div className="p-2">
         <Button
@@ -177,6 +304,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           Trash
         </Button>
       </div>
+
+      <MovePagesDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        notebooks={notebooks}
+        sections={sections}
+        pages={pages}
+        selectedIds={selected}
+        onMove={onBulkMove}
+      />
     </div>
   );
 }
@@ -193,6 +330,7 @@ function NotebookNode({
   renaming,
   setRenaming,
   onNavigate,
+  selectProps,
 }: {
   notebook: Notebook;
   sections: Section[];
@@ -201,6 +339,7 @@ function NotebookNode({
   renaming: string | null;
   setRenaming: (v: string | null) => void;
   onNavigate?: () => void;
+  selectProps: SelectModeProps;
 }) {
   const expanded = useAppStore((s) => s.expanded.has(notebook.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
@@ -335,6 +474,7 @@ function NotebookNode({
                 renaming={renaming}
                 setRenaming={setRenaming}
                 onNavigate={onNavigate}
+                selectProps={selectProps}
               />
             ))}
           <button
@@ -362,6 +502,7 @@ function SectionNode({
   renaming,
   setRenaming,
   onNavigate,
+  selectProps,
 }: {
   section: Section;
   notebook: Notebook;
@@ -370,6 +511,7 @@ function SectionNode({
   renaming: string | null;
   setRenaming: (v: string | null) => void;
   onNavigate?: () => void;
+  selectProps: SelectModeProps;
 }) {
   const expanded = useAppStore((s) => s.expanded.has(section.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
@@ -381,7 +523,7 @@ function SectionNode({
   const isRenaming = renaming === section.id;
 
   return (
-    <div>
+    <div data-testid="section-row" data-section-id={section.id}>
       <div className="group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-sidebar-accent">
         <button
           type="button"
@@ -465,6 +607,7 @@ function SectionNode({
                 renaming={renaming}
                 setRenaming={setRenaming}
                 onNavigate={onNavigate}
+                selectProps={selectProps}
               />
             ))}
           <button
@@ -492,6 +635,7 @@ function PageNode({
   renaming,
   setRenaming,
   onNavigate,
+  selectProps,
 }: {
   page: PageMeta;
   notebook: Notebook;
@@ -500,6 +644,7 @@ function PageNode({
   renaming: string | null;
   setRenaming: (v: string | null) => void;
   onNavigate?: () => void;
+  selectProps: SelectModeProps;
 }) {
   const rename = useAppStore((s) => s.renamePage);
   const duplicate = useAppStore((s) => s.duplicatePage);
@@ -507,6 +652,8 @@ function PageNode({
   const move = useAppStore((s) => s.movePage);
   const selectPage = useAppStore((s) => s.selectPage);
   const isRenaming = renaming === page.id;
+  const { selectMode, selectedIds, onToggleSelect } = selectProps;
+  const checked = selectedIds.has(page.id);
 
   if (isRenaming) {
     return (
@@ -527,9 +674,32 @@ function PageNode({
     <div
       className="group relative flex items-center rounded-md pr-1 hover:bg-sidebar-accent"
       data-testid="page-row"
+      data-page-id={page.id}
+      data-section-id={section.id}
       data-selected={selected}
+      data-checked={selectMode && checked}
     >
-      {selected && (
+      {selectMode && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={checked}
+          data-testid="page-checkbox"
+          aria-label={`Select ${page.title}`}
+          className="ml-1.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors"
+          style={{
+            borderColor: checked ? "var(--primary)" : "var(--border)",
+            backgroundColor: checked ? "var(--primary)" : "transparent",
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect(page.id);
+          }}
+        >
+          {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+        </button>
+      )}
+      {selected && !selectMode && (
         <span
           className="absolute inset-y-1 left-0 w-[3px] rounded-full"
           style={{ backgroundColor: NOTEBOOK_COLOR_HEX[notebook.color] }}
@@ -541,6 +711,10 @@ function PageNode({
         className="flex min-h-9 min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-left"
         aria-current={selected ? "page" : undefined}
         onClick={() => {
+          if (selectMode) {
+            onToggleSelect(page.id);
+            return;
+          }
           selectPage({ notebookId: notebook.id, sectionId: section.id, pageId: page.id });
           onNavigate?.();
         }}
