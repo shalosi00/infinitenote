@@ -300,3 +300,66 @@ describe("backup / restore", () => {
     expect(await notes.listPages()).toHaveLength(0);
   });
 });
+
+describe("quick notes home (issue #19)", () => {
+  it("bootstraps the notebook + section on first use and is idempotent", async () => {
+    const first = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    expect(first.notebook.name).toBe("Quick Notes");
+    expect(first.section.name).toBe("Quick Notes");
+    expect(first.section.notebookId).toBe(first.notebook.id);
+
+    // second call must REUSE the same rows, not create duplicates
+    const second = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    expect(second.notebook.id).toBe(first.notebook.id);
+    expect(second.section.id).toBe(first.section.id);
+    expect(await notes.listNotebooks()).toHaveLength(1);
+  });
+
+  it("adopts an existing same-name notebook case-insensitively", async () => {
+    const mine = await notes.createNotebook("quick notes", "teal");
+    const home = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    expect(home.notebook.id).toBe(mine.id);
+    const mineSection = await notes.createSection(mine.id, "My own section");
+    await notes.createPage(mineSection.id, "P", null);
+    // section bootstrap still adds its own section next to mine
+    const homeAgain = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    const mineSections = (await notes.listSections()).filter((s) => s.notebookId === mine.id);
+    expect(mineSections.map((s) => s.name).sort()).toEqual(["My own section", "Quick Notes"]);
+    expect(homeAgain.section.id).not.toBe(mineSection.id);
+  });
+
+  it("re-creates the home after the user trashed it", async () => {
+    const first = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    await notes.trashNotebook(first.notebook.id);
+    const second = await notes.ensureQuickNotesHome("Quick Notes", "Quick Notes");
+    expect(second.notebook.id).not.toBe(first.notebook.id);
+    expect((await notes.listNotebooks()).map((n) => n.name)).toEqual(["Quick Notes"]);
+  });
+});
+
+describe("findPageByTitle", () => {
+  it("finds the first alive page with the exact title in a section", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const other = await notes.createSection(nb.id, "Other");
+    const a = await notes.createPage(sec.id, "2026-10-19", null);
+    await notes.createPage(sec.id, "2026-10-19 (2)", null); // prefix, not equal
+    await notes.createPage(other.id, "2026-10-19", null); // wrong section
+
+    const hit = await notes.findPageByTitle(sec.id, "2026-10-19");
+    expect(hit?.id).toBe(a.id);
+
+    // exact matching — no substring or case games
+    expect(await notes.findPageByTitle(sec.id, "2026-10-19 (2)")).not.toBeNull();
+    expect(await notes.findPageByTitle(sec.id, "2026-10-2")).toBeNull();
+    expect(await notes.findPageByTitle(sec.id, "2026-10-19 ")).toBeNull();
+  });
+
+  it("ignores trashed pages", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const a = await notes.createPage(sec.id, "daily", null);
+    await notes.trashPage(a.id);
+    expect(await notes.findPageByTitle(sec.id, "daily")).toBeNull();
+  });
+});

@@ -225,11 +225,53 @@ export async function purgeSection(id: string): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ */
+/* quick notes home (OneNote-style quick capture)                      */
+/* ------------------------------------------------------------------ */
+
+export interface QuickNotesHome {
+  notebook: Notebook;
+  section: Section;
+}
+
+/**
+ * Find-or-create the "Quick Notes" notebook + its "Quick Notes" section.
+ * Idempotent: matches alive rows by name case-insensitively, so renaming or
+ * trashing the home simply results in a fresh one on the next call.
+ */
+export async function ensureQuickNotesHome(
+  notebookName: string,
+  sectionName: string
+): Promise<QuickNotesHome> {
+  const notebooks = await listNotebooks();
+  let notebook = notebooks.find((n) => n.name.toLowerCase() === notebookName.toLowerCase());
+  if (!notebook) {
+    notebook = await createNotebook(notebookName, "amber");
+  }
+  const sections = await listSections();
+  let section = sections.find(
+    (s) => s.notebookId === notebook.id && s.name.toLowerCase() === sectionName.toLowerCase()
+  );
+  if (!section) {
+    section = await createSection(notebook.id, sectionName);
+  }
+  return { notebook, section };
+}
+
+/* ------------------------------------------------------------------ */
 /* pages                                                               */
 /* ------------------------------------------------------------------ */
 
 export async function listPages(): Promise<PageMeta[]> {
   return alive(await db.pages.toArray()).map(({ content: _content, ...meta }) => meta);
+}
+
+/** First alive page with EXACTLY this title inside the section (null when absent). */
+export async function findPageByTitle(sectionId: string, title: string): Promise<PageMeta | null> {
+  const rows = await db.pages.where("sectionId").equals(sectionId).toArray();
+  const hit = alive(rows).find((p) => p.title === title);
+  if (!hit) return null;
+  const { content: _c, ...meta } = hit;
+  return meta;
 }
 
 export async function createPage(

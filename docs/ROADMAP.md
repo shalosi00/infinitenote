@@ -30,8 +30,9 @@ milestones/issues. This file is the plan; the status file is the reality.
 ## v1.3 — Notebook power features
 
 - [x] Tags / labels on pages with tag filter view (issue #18)
-- [ ] Quick notes and a "today" smart page
-- [ ] Print-friendly page export (paginated PDF)
+- [x] Quick notes and a "today" smart page (issue #19) — "Quick note" button
+  + Ctrl/Cmd+Alt+N, pinned Today daily page
+- [ ] Print-friendly page export (paginated PDF) (issue #20)
 - [ ] Multi-select in the sidebar (bulk move/delete)
 - [ ] Keyboard shortcut cheatsheet in-app
 
