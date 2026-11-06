@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-06 |
-| **Current version** | v1.2.0 (tagged, GitHub Release published) |
-| **Phase** | v1.3 in progress on `feat/pdf-export` |
-| **Overall state** | v1.3: tags (#21) + quick notes (#22) merged; PDF export in flight |
+| **Current version** | v1.3.0 (tagged, GitHub Release published) |
+| **Phase** | v1.4 in progress on `docs/sync-research` |
+| **Overall state** | v1.4: multi-select (#30) + cheatsheet (#31) merged; sync research (issue #29) in flight |
 
 ## TL;DR
 
@@ -42,23 +42,26 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
+| Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
+| Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
+| Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 144 unit tests, 45 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 181 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `feat/pdf-export` — print-friendly paginated PDF export (issue #20).
-  144 unit + 45 E2E green locally; CI pending on the PR.
+- `docs/sync-research` — sync & collaboration research write-up
+  (issue #29). Docs-only PR; no runtime changes.
 
-## Next up — v1.3 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. ~~Tags / labels on pages with a tag filter view.~~ — merged via PR #21
-2. ~~Quick notes and a "today" smart page.~~ — merged via PR #22
-3. ~~Print-friendly page export (paginated PDF).~~ — this PR (issue #20)
+1. ~~Multi-select in the sidebar (bulk move/delete).~~ — this PR (issue #27)
+2. ~~Keyboard shortcut cheatsheet in-app.~~ — this PR (issue #28)
+3. ~~Sync & collaboration research write-up.~~ — this PR (issue #29)
 
 ## Repo map (30 seconds)
 
@@ -89,13 +92,39 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 97 unit tests
-make e2e                             # 34 E2E checks (Playwright; boots the app if needed)
+make test                            # 181 unit tests
+make e2e                             # 52 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-06 — sync & collaboration research (issue #29)** —
+  docs/sync-research.md: why snapshot/LWW sync cannot work for scenes,
+  Yjs-vs-Automerge survey (recommendation: Yjs for the no-WASM,
+  any-transport update-log fit), Option A file-based sync folder design
+  (manifest + per-page docs, phased: conflict copies → CRDT merge), Option B
+  self-hostable E2EE blob server (Argon2id passphrase → wrapped content
+  keys, blind server), shared-notebook scoping, and a v1.5/v2.0/post-2.0
+  phased plan. Docs-only; no runtime changes.
+- **2026-11-06 — shortcuts cheatsheet (issue #28)** — `?` (Shift+/) or
+  Ctrl/Cmd+/ (and the sidebar footer button) opens a grouped cheatsheet:
+  General (search, quick note, dialogs), Organizing (rename), Canvas tools
+  and Canvas editing — every entry verified against the real handlers (tool
+  keys probed through the embedded Excalidraw appState; ⌘/Ctrl rendered per
+  platform). 181 unit tests (+11), 52 E2E checks (+3).
+- **2026-11-06 — sidebar multi-select (issue #27)** — a list-checks toggle in
+  the sidebar header turns on checkbox selection for page rows (clicking a
+  row toggles instead of navigating); the bulk bar offers select-all scoped
+  to expanded sections, "Move to…" (any section, cross-notebook, appended in
+  sidebar-visible order, no-op targets disabled) and "Delete" (soft delete
+  with one shared timestamp). The open page follows a bulk move; bulk delete
+  recomputes the selection so it never lands on a deleted page. 170 unit
+  tests (+26), 49 E2E checks (+4).
+
+- **2026-11-06 — v1.3.0 live**: release PR #25 merge-committed to main (f3e154d),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.3.0);
+  v1.3.0 milestone closed, v1.4.0 milestone opened. Issues #18/#19/#20 closed.
 - **2026-11-06 — paginated PDF export (issue #20)** — "Export → PDF — print
   (A4)" renders the scene onto fixed A4 portrait/landscape sheets: content is
   scaled to the printable width and sliced into page bands; images and shapes

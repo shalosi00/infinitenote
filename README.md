@@ -31,6 +31,10 @@ data. No account, no cloud, no lock-in.
 - **Trash** — OneNote-style soft delete with restore and purge.
 - **Paper styles** — plain, ruled and grid paper per page.
 - **Tags** — label pages, filter the sidebar by tag, find them via search.
+- **Multi-select** — check off many pages in the sidebar, then move them to any
+  section or delete them in one go (cross-notebook moves included).
+- **Keyboard shortcuts** — press `?` for the built-in, platform-aware cheatsheet
+  (capture, organizing, canvas tools and editing).
 - **Quick notes** — capture fast: `Ctrl/Cmd+Alt+N` (or the sidebar button) drops
   a dated page into an auto-created *Quick Notes* notebook; the pinned **Today**
   entry opens (or creates) today's daily page and reuses it all day.

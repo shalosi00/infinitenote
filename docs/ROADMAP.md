@@ -34,14 +34,14 @@ milestones/issues. This file is the plan; the status file is the reality.
   + Ctrl/Cmd+Alt+N, pinned Today daily page
 - [x] Print-friendly page export (paginated PDF) (issue #20) — A4
   portrait/landscape, vector text, sliced images, paper-aware
-- [ ] Multi-select in the sidebar (bulk move/delete)
-- [ ] Keyboard shortcut cheatsheet in-app
+- [x] Multi-select in the sidebar (bulk move/delete) (issue #27) — shipped in v1.4.0
+- [x] Keyboard shortcut cheatsheet in-app (issue #28) — shipped in v1.4.0
 
 ## v1.3 — Sync & collaboration (research)
 
-- [ ] File-based sync option (export/import with conflict-free merge via CRDT study)
-- [ ] Optional end-to-end encrypted sync backend (self-hostable, opt-in)
-- [ ] Shared notebooks (research; depends on sync model)
+- [x] File-based sync option (export/import with conflict-free merge via CRDT study) — researched in [docs/sync-research.md](sync-research.md); phased plan: page-granular merge with conflict copies (v1.5) → Yjs merge core (v2.0)
+- [x] Optional end-to-end encrypted sync backend (self-hostable, opt-in) — design outline in [docs/sync-research.md](sync-research.md) §5; implementation post-2.0
+- [x] Shared notebooks (research; depends on sync model) — scoped in [docs/sync-research.md](sync-research.md) §7; blocked on the sync server phase
 
 ## v1.4 — Distribution
 

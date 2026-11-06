@@ -356,6 +356,89 @@ export async function trashPage(id: string): Promise<void> {
   await db.pages.update(id, { deletedAt: now(), updatedAt: now() });
 }
 
+/**
+ * Bulk operations for sidebar multi-select (issue #27). Both are
+ * transactional, idempotent w.r.t. duplicates, and silently skip rows that
+ * are missing or already trashed — a stale checkbox must never corrupt the
+ * move/delete of the rest.
+ */
+
+/**
+ * Move the given pages into a target section, appending them after its
+ * existing pages while preserving their sidebar-visible order (notebook →
+ * section → page). Pages already in the target (and trashed/unknown ids) are
+ * skipped. Returns how many pages actually moved; 0 also when the target
+ * section is missing or trashed.
+ */
+export async function movePagesToSection(
+  pageIds: readonly string[],
+  targetSectionId: string
+): Promise<number> {
+  const target = await db.sections.get(targetSectionId);
+  if (!target || target.deletedAt !== null) return 0;
+  const ids = [...new Set(pageIds)];
+  if (ids.length === 0) return 0;
+
+  // `order` is a sibling index within one section, so the batch's visible
+  // order must be derived from the whole tree (read outside the write tx)
+  const [allSections, allNotebooks] = await Promise.all([
+    db.sections.toArray(),
+    db.notebooks.toArray(),
+  ]);
+  const sectionById = new Map(allSections.map((s) => [s.id, s]));
+  const notebookOrder = new Map(allNotebooks.map((n) => [n.id, n.order]));
+  const treeKey = (p: PageRow): [number, number, number] => {
+    const sec = sectionById.get(p.sectionId);
+    return [sec ? (notebookOrder.get(sec.notebookId) ?? 0) : 0, sec?.order ?? 0, p.order];
+  };
+  const byTreeKey = (a: PageRow, b: PageRow) => {
+    const ka = treeKey(a);
+    const kb = treeKey(b);
+    return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2] || byOrder(a, b);
+  };
+
+  let moved = 0;
+  await db.transaction("rw", db.pages, async () => {
+    const rows = await db.pages.bulkGet(ids);
+    const toMove = rows.filter(
+      (p): p is PageRow => !!p && p.deletedAt === null && p.sectionId !== targetSectionId
+    );
+    if (toMove.length === 0) return;
+    const siblings = await db.pages.where("sectionId").equals(targetSectionId).toArray();
+    const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
+    toMove.sort(byTreeKey);
+    for (const [i, p] of toMove.entries()) {
+      await db.pages.update(p.id, {
+        sectionId: targetSectionId,
+        order: maxOrder + 1 + i,
+        updatedAt: now(),
+      });
+    }
+    moved = toMove.length;
+  });
+  return moved;
+}
+
+/**
+ * Soft-delete many pages with one shared timestamp (single undo epoch, each
+ * row individually restorable). Returns how many pages were trashed.
+ */
+export async function trashPages(pageIds: readonly string[]): Promise<number> {
+  const ids = [...new Set(pageIds)];
+  if (ids.length === 0) return 0;
+  const ts = now();
+  let trashed = 0;
+  await db.transaction("rw", db.pages, async () => {
+    const rows = await db.pages.bulkGet(ids);
+    for (const p of rows) {
+      if (!p || p.deletedAt !== null) continue;
+      await db.pages.update(p.id, { deletedAt: ts, updatedAt: ts });
+      trashed += 1;
+    }
+  });
+  return trashed;
+}
+
 export async function restorePage(id: string): Promise<void> {
   const page = await db.pages.get(id);
   if (!page?.deletedAt) return;

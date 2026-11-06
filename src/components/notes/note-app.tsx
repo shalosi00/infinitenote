@@ -51,6 +51,7 @@ import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
+import { ShortcutsDialog } from "./shortcuts-dialog";
 import { usePWA } from "./use-pwa";
 
 export default function NoteApp() {
@@ -114,6 +115,15 @@ export default function NoteApp() {
       if (mod && e.altKey && e.key.toLowerCase() === "n" && !typing) {
         e.preventDefault();
         void useAppStore.getState().createQuickNote();
+      }
+      // shortcuts cheatsheet (issue #28): ? (Shift+/) or Ctrl/Cmd+/, also
+      // from the sidebar footer button. Never while typing — "?" is a
+      // perfectly legal character in notes and inputs. stopPropagation keeps
+      // the embedded Excalidraw from opening its own help modal on "?".
+      if ((e.key === "?" || (mod && !e.altKey && e.key === "/")) && !typing) {
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().setShortcutsOpen(true);
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
@@ -524,6 +534,7 @@ export default function NoteApp() {
 
       <SearchDialog />
       <TrashDialog />
+      <ShortcutsDialog />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
   );
