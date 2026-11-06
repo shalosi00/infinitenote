@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metainfo for the Flathub submission (docs/flathub.md). -->
+<component type="desktop-application">
+  <id>com.infinitenote.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>InfiniteNote</name>
+  <summary>Local-first OneNote-style notebook with an infinite canvas</summary>
+
+  <description>
+    <p>
+      InfiniteNote is an open-source OneNote-style notebook for Linux and
+      Android: organize notes in a Notebook → Section → Page hierarchy and
+      write on an infinite canvas where you can draw and type anywhere.
+      Everything is stored locally (IndexedDB) and the app works offline.
+    </p>
+    <ul>
+      <li>Infinite canvas (Excalidraw): draw, type, move and resize anything</li>
+      <li>Import images, text, Markdown, PDF printouts, Word documents, .excalidraw scenes and OneNote exports (.html and .mht single-file pages with embedded images)</li>
+      <li>Export PNG, SVG, paginated A4 PDF, .excalidraw scenes and full notebook backups</li>
+      <li>Cross-page full-text search, page tags with a filter view, quick capture with a pinned Today page</li>
+      <li>Per-page paper styles: plain, ruled and grid</li>
+      <li>Soft-delete trash with restore, dark mode, offline-first PWA</li>
+      <li>File-based sync to a local folder or ZIP with page-granular merge and conflict copies</li>
+    </ul>
+  </description>
+
+  <developer_name translatable="no">InfiniteNote contributors</developer_name>
+
+  <launchable type="desktop-id">com.infinitenote.app.desktop</launchable>
+
+  <url type="homepage">https://github.com/shalosi00/infinitenote</url>
+  <url type="bugtracker">https://github.com/shalosi00/infinitenote/issues</url>
+  <url type="vcs-browser">https://github.com/shalosi00/infinitenote</url>
+  <url type="contribute">https://github.com/shalosi00/infinitenote/blob/main/CONTRIBUTING.md</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/shalosi00/infinitenote/main/assets/screenshots/light.png</image>
+      <caption>The InfiniteNote workspace: notebook tree on the left, infinite canvas on the right</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/shalosi00/infinitenote/main/assets/screenshots/dark.png</image>
+      <caption>Dark mode</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/shalosi00/infinitenote/main/assets/screenshots/mobile.png</image>
+      <caption>Mobile layout with the navigation drawer</caption>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="1.6.0" date="2026-11-07">
+      <description>
+        <p>Distribution release: the desktop app is packaged for Linux
+        (Tauri shell with deb/rpm/AppImage artifacts attached to GitHub
+        releases, a Flatpak manifest, and an Android Trusted Web Activity
+        scaffold with Digital Asset Links tooling).</p>
+      </description>
+    </release>
+    <release version="1.5.0" date="2026-11-06">
+      <description>
+        <p>File-based sync, phase 1: export notebooks to a sync folder or
+        merge from one (File System Access or ZIP), with page-granular
+        three-way merge, conflict copies and purge tombstones.</p>
+      </description>
+    </release>
+    <release version="1.4.0" date="2026-11-06">
+      <description>
+        <p>Sidebar multi-select with bulk move/delete, an in-app keyboard
+        shortcut cheatsheet, and a sync &amp; collaboration research
+        write-up.</p>
+      </description>
+    </release>
+    <release version="1.3.0" date="2026-11-06">
+      <description>
+        <p>Page tags with a tag filter view, quick capture (Quick note button
+        + Ctrl/Cmd+Alt+N) with a pinned Today daily page, and print-friendly
+        paginated A4 PDF export.</p>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1" />
+
+  <provides>
+    <binary>infinitenote</binary>
+  </provides>
+
+  <categories>
+    <category>NoteTaking</category>
+    <category>Productivity</category>
+    <category>Education</category>
+  </categories>
+
+  <keywords>
+    <keyword translatable="no">notes</keyword>
+    <keyword translatable="no">notebook</keyword>
+    <keyword translatable="no">canvas</keyword>
+    <keyword translatable="no">drawing</keyword>
+    <keyword translatable="no">markdown</keyword>
+    <keyword translatable="no">onenote</keyword>
+  </keywords>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#7c3aed</color>
+    <color type="primary" scheme_preference="dark">#7c3aed</color>
+  </branding>
+</component>
