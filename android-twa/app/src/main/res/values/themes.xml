@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat comes transitively with androidbrowserhelper. -->
+    <style name="Theme.InfiniteNote.Twa" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>

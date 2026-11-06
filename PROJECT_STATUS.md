@@ -8,7 +8,7 @@
 |---|---|
 | **Last updated** | 2026-11-07 |
 | **Current version** | v1.5.0 (tagged, GitHub Release published) |
-| **Phase** | v1.6 in progress — Tauri desktop shell landed; TWA + Flatpak next |
+| **Phase** | v1.6 in progress — Tauri shell + Android TWA landed; Flatpak next |
 | **Overall state** | v1.5.0 released; v1.6.0 pipeline running — see In flight |
 
 ## TL;DR
@@ -52,12 +52,13 @@ export (A4 portrait/landscape, vector text, sliced images).
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 | File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan | Working | 46 sync unit tests + 4 E2E checks (e2e/sync.spec.ts) |
 | Desktop shell (Tauri 2): static-export build path, `src-tauri/` config + icons, Linux artifact workflow | Working — export build verified; binaries built by CI on `main`/tags | desktop-config unit tests + `.github/workflows/desktop.yml` (docs/desktop.md) |
+| Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 
-**Totals: 237 unit tests, 56 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 254 unit tests, 56 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Desktop distribution (v1.6.0 milestone): Tauri shell landed (issue #44); Android TWA scaffold + assetlinks generator (issue #45) and Flatpak packaging (issue #46) are next in the pipeline.
+- Desktop distribution (v1.6.0 milestone): Tauri shell (issue #44) and Android TWA scaffold + assetlinks generator (issue #45) landed; Flatpak packaging (issue #46) is next, then the v1.6.0 release.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
