@@ -1,8 +1,9 @@
 # Sync & Collaboration — Research Write-up
 
-> Status: **research, no implementation** (issue #29, v1.4.0). This document
-> is the decision basis for the sync work on the roadmap. Numbers that were
-> not verifiable at writing time are deliberately qualitative.
+> Status: **phase 1 implemented** (engine: issue #36; adapters/UI: issue #37,
+> v1.5.0) — see `src/lib/sync/`. This document remains the decision basis
+> for the sync work; numbers that were not verifiable at writing time are
+> deliberately qualitative.
 
 ## 1. Where we start from
 
