@@ -78,7 +78,10 @@ export function AppI18nProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppLocaleContext.Provider value={value}>
-      <NextIntlClientProvider locale={locale} messages={CATALOGS[locale]}>
+      {/* timeZone pinned to UTC: no localized dates render through next-intl,
+          and an explicit zone silences the ENVIRONMENT_FALLBACK console error
+          the E2E error collector treats as a failure */}
+      <NextIntlClientProvider locale={locale} messages={CATALOGS[locale]} timeZone="UTC">
         {children}
       </NextIntlClientProvider>
     </AppLocaleContext.Provider>
