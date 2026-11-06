@@ -9,8 +9,16 @@ import { SHORTCUT_GROUPS, displayKeys, isApplePlatform } from "../shortcuts";
 import en from "../../../messages/en.json";
 import zhCN from "../../../messages/zh-CN.json";
 
-const enShortcuts = en.shortcuts as Record<string, Record<string, string>>;
-const zhShortcuts = zhCN.shortcuts as Record<string, Record<string, string>>;
+interface ShortcutCatalog {
+  title: string;
+  description: string;
+  groups: Record<string, string>;
+  entries: Record<string, string>;
+}
+// JSON imports type as precise literals; widen through unknown (top-level
+// title/description are strings, so a direct Record<string, ...> cast fails)
+const enShortcuts = en.shortcuts as unknown as ShortcutCatalog;
+const zhShortcuts = zhCN.shortcuts as unknown as ShortcutCatalog;
 
 describe("SHORTCUT_GROUPS data", () => {
   it("has a non-empty list of uniquely identified groups", () => {
