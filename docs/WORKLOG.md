@@ -38,6 +38,22 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-08 — i18n (issue #54) shipped to develop
+
+- PR #57 (housekeeping) and PR #58 (i18n, closes #54) both merged with all
+  three required CI checks green; develop = b3f06d6. Issue #54 closed.
+- What landed: en/zh-CN chrome catalogs (ICU plurals), localStorage-persisted
+  locale + browser detection, sidebar Language toggle, localized shortcuts
+  cheatsheet (id-based data) and sync summaries (summaryParts + formatter
+  hook), catalog-parity unit tests — 286 unit / 61 E2E checks total.
+- The sandbox restore fired ~6 times this session, twice landing commits on
+  `main` (one pushed before protection caught it; repaired by force-pushing
+  `main` back to ae7eda4 behind a temporary protection lift — twice).
+  Protocol hardened: EVERY bash call begins with `git checkout <branch>`;
+  docs edits use exact-anchor python scripts that assert before writing;
+  local lint/typecheck must run on the verified branch.
+- Next up for v1.7.0: themes gallery (#55), F-Droid recipe (#56).
+
 ## 2026-11-07 — v1.7.0 cycle begins (i18n)
 
 - Resumed after v1.6.0 shipped (Tauri shell, Android TWA, Flatpak packaging;
