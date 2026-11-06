@@ -32,6 +32,16 @@ const page = (id: string, title: string, content: string | null): PageMeta & { c
   content,
 });
 
+const taggedPage = (
+  id: string,
+  title: string,
+  tags: string[],
+  content: string | null
+): PageMeta & { content: string | null } => ({
+  ...page(id, title, content),
+  tags,
+});
+
 const scene = (...texts: string[]) =>
   JSON.stringify({
     elements: texts.map((text, i) => ({ type: "text", text, id: `el${i}` })),
@@ -106,5 +116,24 @@ describe("searchIndex", () => {
     const hits = searchIndex(index, "thermo");
     expect(hits[0].pagePath).toBe("Physics / Mechanics");
     expect(hits[0].notebookId).toBe("nb1");
+  });
+
+  it("finds pages by tag", () => {
+    const idx = buildSearchIndex([nb], [sec], [
+      taggedPage("pt", "Untitled", ["quantumfrog"], scene("nothing relevant here")),
+      page("po", "Other", scene("quantumfrog appears in body")),
+    ]);
+    const hits = searchIndex(idx, "quantumfrog");
+    expect(hits).toHaveLength(2);
+    // tag and body match tie on content count; tag-only page still ranked
+    expect(hits.map((h) => h.pageId)).toContain("pt");
+  });
+
+  it("AND-search works across title + tag", () => {
+    const idx = buildSearchIndex([nb], [sec], [
+      taggedPage("pt", "Garden", ["perennial"], scene("roses")),
+    ]);
+    expect(searchIndex(idx, "garden perennial")).toHaveLength(1);
+    expect(searchIndex(idx, "garden annual")).toHaveLength(0);
   });
 });

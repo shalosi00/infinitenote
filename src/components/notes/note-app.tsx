@@ -4,7 +4,7 @@
  * InfiniteNote — top-level application shell.
  * Layout: header + (sidebar | canvas). Mobile: sidebar becomes a drawer.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Download,
@@ -20,7 +20,9 @@ import {
   PenLine,
   Search,
   Sun,
+  Tags,
   Upload,
+  X,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,10 +37,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppStore } from "@/lib/store";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
-import type { PageBackground } from "@/lib/types";
+import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
+import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
@@ -54,6 +58,7 @@ export default function NoteApp() {
     addNotebook,
     renamePage,
     setPageBackground,
+    setPageTags,
     restoreBackupArchive,
   } = useAppStore();
   const { resolvedTheme, setTheme } = useTheme();
@@ -67,6 +72,9 @@ export default function NoteApp() {
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
   );
+
+  const pages = useAppStore((s) => s.pages);
+  const allTags = useMemo(() => collectTags(pages), [pages]);
 
   useEffect(() => {
     void load();
@@ -358,6 +366,13 @@ export default function NoteApp() {
                 )}
                 <div className="flex-1" />
 
+                {/* page tags */}
+                <TagPicker
+                  page={currentPage}
+                  allTags={allTags}
+                  onSetTags={(tags) => void setPageTags(currentPage.id, tags)}
+                />
+
                 {/* page paper style */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -444,6 +459,111 @@ export default function NoteApp() {
       <TrashDialog />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* tag picker (page header)                                              */
+/* ------------------------------------------------------------------ */
+
+function TagPicker({
+  page,
+  allTags,
+  onSetTags,
+}: {
+  page: PageMeta;
+  allTags: TagCount[];
+  onSetTags: (tags: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const tags = page.tags ?? [];
+
+  const commit = (raw: string) => {
+    const next = addTag(tags, raw);
+    if (next !== tags) onSetTags(next);
+    setDraft("");
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-muted-foreground"
+          aria-label="Page tags"
+          data-testid="tag-picker"
+        >
+          <Tags className="h-4 w-4" />
+          {tags.length > 0 && <span data-testid="tag-count">{tags.length}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-3" data-testid="tag-menu">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Page tags
+        </p>
+        {tags.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No tags yet — add one below.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5" data-testid="tag-chips">
+            {tags.map((t) => (
+              <span
+                key={t}
+                data-testid={`tag-chip-${t}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+              >
+                {t}
+                <button
+                  type="button"
+                  aria-label={`Remove tag ${t}`}
+                  data-testid={`tag-chip-remove-${t}`}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onSetTags(removeTag(tags, t))}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && draft.trim()) {
+              e.preventDefault();
+              commit(draft);
+            }
+          }}
+          placeholder="Add tag + Enter"
+          className="mt-2 h-8 text-sm"
+          aria-label="Add tag"
+          data-testid="tag-input"
+        />
+        {allTags.length > 0 && (
+          <>
+            <Separator className="my-2" />
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Existing tags
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.slice(0, 8).map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  type="button"
+                  data-testid={`tag-quick-add-${tag}`}
+                  className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
+                  title={`Add "${tag}" (used by ${count} page${count === 1 ? "" : "s"})`}
+                  onClick={() => commit(tag)}
+                >
+                  + {tag}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 

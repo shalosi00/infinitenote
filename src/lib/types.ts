@@ -76,6 +76,8 @@ export interface PageRow {
   deletedAt: number | null;
   /** paper style — plain by default (absent on pre-v1.2 rows) */
   background?: PageBackground;
+  /** short labels used by the sidebar tag filter and search */
+  tags?: string[];
   /** serialized Excalidraw scene: { elements, files } — kept out of tree listings */
   content?: string | null;
 }

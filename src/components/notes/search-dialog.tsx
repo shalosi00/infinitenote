@@ -52,7 +52,7 @@ export function SearchDialog() {
   }, [query, pages, sections, notebooks, contents]);
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput
         placeholder="Search all pages…"
         value={query}

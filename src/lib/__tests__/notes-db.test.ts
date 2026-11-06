@@ -216,6 +216,40 @@ describe("trash", () => {
   });
 });
 
+describe("page tags", () => {
+  it("setPageTags round-trips and clears", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const page = await notes.createPage(sec.id, "P");
+    await notes.setPageTags(page.id, ["idea", "work"]);
+    let list = await notes.listPages();
+    expect(list.find((p) => p.id === page.id)?.tags).toEqual(["idea", "work"]);
+    await notes.setPageTags(page.id, []);
+    list = await notes.listPages();
+    expect(list.find((p) => p.id === page.id)?.tags).toEqual([]);
+  });
+
+  it("backup and restore preserve tags (and paper style)", async () => {
+    const nb = await notes.createNotebook("NB", "teal");
+    const sec = await notes.createSection(nb.id, "S");
+    const page = await notes.createPage(sec.id, "P");
+    await notes.setPageTags(page.id, ["recipe", "urgent"]);
+    await notes.setPageBackground(page.id, "ruled");
+
+    const json = await notes.buildBackup();
+    const parsed = JSON.parse(json);
+    const archived = parsed.notebooks[0].sections[0].pages[0];
+    expect(archived.tags).toEqual(["recipe", "urgent"]);
+    expect(archived.background).toBe("ruled");
+
+    const restoredCount = await notes.restoreBackup(json);
+    expect(restoredCount).toBe(1);
+    const restored = (await notes.listPages()).find((p) => p.id !== page.id);
+    expect(restored?.tags).toEqual(["recipe", "urgent"]);
+    expect(restored?.background).toBe("ruled");
+  });
+});
+
 describe("backup / restore", () => {
   it("round-trips a full library through buildBackup + restoreBackup", async () => {
     const nb = await notes.createNotebook("Backup NB", "teal");

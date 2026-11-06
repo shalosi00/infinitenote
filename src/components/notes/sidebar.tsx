@@ -22,6 +22,8 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
+  Tag as TagIcon,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
+import { pageHasTag } from "@/lib/tags";
 import { NOTEBOOK_COLORS, NOTEBOOK_COLOR_HEX, type Notebook, type PageMeta, type Section } from "@/lib/types";
 import type { Selection } from "@/lib/tree-ops";
 import { byOrder } from "@/lib/types";
@@ -54,6 +57,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const addNotebook = useAppStore((s) => s.addNotebook);
   const setTrashOpen = useAppStore((s) => s.setTrashOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
+  const tagFilter = useAppStore((s) => s.tagFilter);
+  const setTagFilter = useAppStore((s) => s.setTagFilter);
 
   const [renaming, setRenaming] = useState<string | null>(null);
 
@@ -88,6 +93,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <Separator />
 
       <ScrollArea className="min-h-0 flex-1">
+        {tagFilter ? (
+          <TagFilterView
+            tag={tagFilter}
+            pages={pages}
+            sections={sections}
+            notebooks={notebooks}
+            onClear={() => setTagFilter(null)}
+            onNavigate={onNavigate}
+          />
+        ) : (
         <nav aria-label="Notebook tree" className="flex flex-col gap-0.5 p-2">
           {notebooks.map((nb) => (
             <NotebookNode
@@ -109,6 +124,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </p>
           )}
         </nav>
+        )}
       </ScrollArea>
 
       <Separator />
@@ -502,6 +518,25 @@ function PageNode({
           {page.title}
         </span>
       </button>
+      {(page.tags?.length ?? 0) > 0 && (
+        <span className="flex shrink-0 items-center gap-1">
+          {page.tags!.slice(0, 3).map((t) => (
+            <button
+              key={t}
+              type="button"
+              data-testid={`page-tag-${t}`}
+              className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={`Filter by tag "${t}"`}
+              onClick={() => useAppStore.getState().setTagFilter(t)}
+            >
+              {t}
+            </button>
+          ))}
+          {page.tags!.length > 3 && (
+            <span className="text-[10px] text-muted-foreground">+{page.tags!.length - 3}</span>
+          )}
+        </span>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -533,6 +568,87 @@ function PageNode({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* tag filter view (sidebar)                                            */
+/* ------------------------------------------------------------------ */
+
+function TagFilterView({
+  tag,
+  pages,
+  sections,
+  notebooks,
+  onClear,
+  onNavigate,
+}: {
+  tag: string;
+  pages: PageMeta[];
+  sections: Section[];
+  notebooks: Notebook[];
+  onClear: () => void;
+  onNavigate?: () => void;
+}) {
+  const matches = pages.filter((p) => pageHasTag(p.tags, tag)).sort(byOrder);
+  const pathOf = (p: PageMeta) => {
+    const sec = sections.find((s) => s.id === p.sectionId);
+    const nb = sec ? notebooks.find((n) => n.id === sec.notebookId) : undefined;
+    return [nb?.name, sec?.name].filter(Boolean).join(" / ") || "…";
+  };
+
+  return (
+    <div className="p-2" data-testid="tag-filter-view">
+      <div className="mb-2 flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5">
+        <TagIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-xs">
+          Pages tagged <span className="font-semibold">"{tag}"</span>
+          <span className="ml-1 text-muted-foreground">({matches.length})</span>
+        </span>
+        <button
+          type="button"
+          data-testid="tag-filter-clear"
+          aria-label="Clear tag filter"
+          className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+          onClick={onClear}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {matches.length === 0 ? (
+        <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+          No pages carry this tag.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {matches.map((p) => {
+            const sec = sections.find((s) => s.id === p.sectionId);
+            const nb = sec ? notebooks.find((n) => n.id === sec.notebookId) : undefined;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                data-testid="tag-filter-row"
+                className="flex min-h-9 flex-col items-start justify-center gap-0.5 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent"
+                onClick={() => {
+                  if (sec && nb) {
+                    useAppStore.getState().selectPage({
+                      notebookId: nb.id,
+                      sectionId: sec.id,
+                      pageId: p.id,
+                    });
+                  }
+                  onNavigate?.();
+                }}
+              >
+                <span className="w-full truncate text-sm">{p.title}</span>
+                <span className="w-full truncate text-[10px] text-muted-foreground">{pathOf(p)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
