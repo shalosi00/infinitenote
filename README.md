@@ -30,6 +30,9 @@ data. No account, no cloud, no lock-in.
 - **Trash** — OneNote-style soft delete with restore and purge.
 - **Paper styles** — plain, ruled and grid paper per page.
 - **Tags** — label pages, filter the sidebar by tag, find them via search.
+- **Quick notes** — capture fast: `Ctrl/Cmd+Alt+N` (or the sidebar button) drops
+  a dated page into an auto-created *Quick Notes* notebook; the pinned **Today**
+  entry opens (or creates) today's daily page and reuses it all day.
 - **Dark mode** and responsive layout with a mobile drawer.
 - **Local-first** — data lives in your browser's IndexedDB; works fully offline.
 - **Installable PWA** — one tap / one click to install on Linux and Android.

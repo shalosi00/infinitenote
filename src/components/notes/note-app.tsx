@@ -92,17 +92,54 @@ export default function NoteApp() {
     };
   }, []);
 
-  // global shortcut: Ctrl/Cmd+K opens search
+  // global shortcuts: Ctrl/Cmd+K opens search, Ctrl/Cmd+Alt+N starts a quick note.
+  // Capture phase: the Excalidraw container consumes keydowns while focused,
+  // so bubble-phase window listeners never see shortcuts mid-drawing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         useAppStore.getState().setSearchOpen(true);
       }
+      // OneNote's quick capture is Win+Alt+N — the web equivalent is Ctrl/Cmd+Alt+N.
+      // Must not fire while typing in an input/textarea (some IMEs use it).
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      if (mod && e.altKey && e.key.toLowerCase() === "n" && !typing) {
+        e.preventDefault();
+        void useAppStore.getState().createQuickNote();
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, []);
+
+  // quick capture focus: when the store bumps canvasFocus (quick note / Today),
+  // move keyboard focus onto the freshly mounted canvas container so typing and
+  // shortcuts work immediately. The shell never remounts, so the ref reliably
+  // remembers what was already applied across page switches.
+  const canvasFocus = useAppStore((s) => s.canvasFocus);
+  const appliedFocus = useRef(0);
+  useEffect(() => {
+    if (canvasFocus === appliedFocus.current) return;
+    appliedFocus.current = canvasFocus;
+    // give the new page's canvas a beat to mount before grabbing the element
+    const timer = setTimeout(() => {
+      const started = Date.now();
+      const tryFocus = () => {
+        const el = document.querySelector<HTMLElement>(".excalidraw");
+        if (el) {
+          el.focus();
+          return;
+        }
+        if (Date.now() - started < 2_000) setTimeout(tryFocus, 50);
+      };
+      tryFocus();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [canvasFocus]);
 
   const handleApiReady = useCallback((api: CanvasApi) => {
     canvasApi.current = api;

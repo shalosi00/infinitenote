@@ -8,6 +8,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -18,12 +21,11 @@ import {
   Palette,
   Pencil,
   Plus,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
   Search,
   Tag as TagIcon,
+  Trash2,
   X,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +61,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const tagFilter = useAppStore((s) => s.tagFilter);
   const setTagFilter = useAppStore((s) => s.setTagFilter);
+  const createQuickNote = useAppStore((s) => s.createQuickNote);
+  const openTodayPage = useAppStore((s) => s.openTodayPage);
 
   const [renaming, setRenaming] = useState<string | null>(null);
 
@@ -87,6 +91,40 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           onClick={() => void addNotebook()}
         >
           <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Separator />
+
+      {/* quick capture — always visible, even inside the tag filter view */}
+      <div className="flex gap-1.5 p-2" data-testid="quick-actions">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-8 flex-1 gap-1.5 text-xs font-medium"
+          data-testid="today-button"
+          title="Open today's daily page"
+          aria-label="Open today's daily page"
+          onClick={() => {
+            void openTodayPage();
+            onNavigate?.();
+          }}
+        >
+          <CalendarDays className="h-3.5 w-3.5" /> Today
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-8 flex-1 gap-1.5 text-xs font-medium"
+          data-testid="quick-note-button"
+          title="New quick note (Ctrl+Alt+N)"
+          aria-label="New quick note"
+          onClick={() => {
+            void createQuickNote();
+            onNavigate?.();
+          }}
+        >
+          <Zap className="h-3.5 w-3.5" /> Quick note
         </Button>
       </div>
 
