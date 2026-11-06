@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-06 |
 | **Current version** | v1.3.0 (tagged, GitHub Release published) |
-| **Phase** | v1.4 in progress on `feat/shortcuts-cheatsheet` |
-| **Overall state** | v1.4: multi-select merged (#30); shortcuts cheatsheet (issue #28) in flight |
+| **Phase** | v1.4 in progress on `docs/sync-research` |
+| **Overall state** | v1.4: multi-select (#30) + cheatsheet (#31) merged; sync research (issue #29) in flight |
 
 ## TL;DR
 
@@ -47,20 +47,21 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
+| Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
 **Totals: 181 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `feat/shortcuts-cheatsheet` — in-app keyboard shortcut cheatsheet
-  (issue #28). 181 unit + 52 E2E green locally; CI pending on the PR.
+- `docs/sync-research` — sync & collaboration research write-up
+  (issue #29). Docs-only PR; no runtime changes.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. ~~Multi-select in the sidebar (bulk move/delete).~~ — this PR (issue #27)
 2. ~~Keyboard shortcut cheatsheet in-app.~~ — this PR (issue #28)
-3. Sync & collaboration research write-up (issue #29)
+3. ~~Sync & collaboration research write-up.~~ — this PR (issue #29)
 
 ## Repo map (30 seconds)
 
@@ -98,6 +99,14 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-06 — sync & collaboration research (issue #29)** —
+  docs/sync-research.md: why snapshot/LWW sync cannot work for scenes,
+  Yjs-vs-Automerge survey (recommendation: Yjs for the no-WASM,
+  any-transport update-log fit), Option A file-based sync folder design
+  (manifest + per-page docs, phased: conflict copies → CRDT merge), Option B
+  self-hostable E2EE blob server (Argon2id passphrase → wrapped content
+  keys, blind server), shared-notebook scoping, and a v1.5/v2.0/post-2.0
+  phased plan. Docs-only; no runtime changes.
 - **2026-11-06 — shortcuts cheatsheet (issue #28)** — `?` (Shift+/) or
   Ctrl/Cmd+/ (and the sidebar footer button) opens a grouped cheatsheet:
   General (search, quick note, dialogs), Organizing (rename), Canvas tools
