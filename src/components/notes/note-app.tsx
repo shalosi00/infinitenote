@@ -52,7 +52,27 @@ import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
+import { SyncDialog, describeSummary, type SyncOutcome } from "./sync-dialog";
 import { usePWA } from "./use-pwa";
+import { runSync } from "@/lib/sync/db";
+import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
+import { readSyncFolder, writeSyncFolder } from "@/lib/sync/fsa";
+import type { SyncFolderFiles } from "@/lib/sync/format";
+import type { SyncSummary } from "@/lib/sync/merge";
+
+/** Result summary for an export-only round (no merge happened). */
+const NO_CHANGES_SUMMARY: SyncSummary = {
+  notebooksAdded: 0,
+  sectionsAdded: 0,
+  pagesAdded: 0,
+  pagesUpdated: 0,
+  treeUpdated: 0,
+  pagesConflicted: 0,
+  pagesDeleted: 0,
+  treeDeleted: 0,
+  pagesPurged: 0,
+  treePurged: 0,
+};
 
 export default function NoteApp() {
   const {
@@ -73,6 +93,8 @@ export default function NoteApp() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
+  const [sceneEpoch, setSceneEpoch] = useState(0);
 
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
@@ -164,6 +186,77 @@ export default function NoteApp() {
   }, []);
 
   const showToast = useCallback((message: string) => toast(message), []);
+
+  /* ------------------------------- sync -------------------------------- */
+
+  /**
+   * One sync round (issue #37): flush canvas edits, merge the given folder
+   * (or export-only when null), refresh the tree, and remount the canvas
+   * when the open page's content changed so the pulled scene is visible.
+   */
+  const handleRunSync = useCallback(
+    async (files: SyncFolderFiles | null, opts?: { reloadCanvas?: boolean }): Promise<SyncOutcome> => {
+      await canvasApi.current?.flushSave();
+      const openPageId = useAppStore.getState().selection?.pageId ?? null;
+      const before = openPageId ? await db.getPageContent(openPageId) : null;
+
+      const outcome: SyncOutcome = files
+        ? await runSync(files)
+        : { summary: NO_CHANGES_SUMMARY, folder: await exportSyncFolder() };
+
+      await useAppStore.getState().refresh();
+      const afterPageId = useAppStore.getState().selection?.pageId ?? openPageId;
+      const after = afterPageId ? await db.getPageContent(afterPageId) : null;
+      const contentChanged = afterPageId !== openPageId || JSON.stringify(after) !== JSON.stringify(before);
+      if (contentChanged && (opts?.reloadCanvas ?? true)) {
+        // remount: the canvas' initialData re-reads the merged scene; the
+        // stale stash must never flush over it
+        canvasApi.current?.discardPendingEdits();
+        setSceneEpoch((e) => e + 1);
+      }
+      return outcome;
+    },
+    []
+  );
+
+  /** Foreground re-scan of the connected sync folder (desktop Chromium). */
+  useEffect(() => {
+    let lastRun = 0;
+    let running = false;
+    const onFocus = async () => {
+      if (document.visibilityState !== "visible" || running || Date.now() - lastRun < 30_000)
+        return;
+      running = true;
+      try {
+        const handle = await loadSyncFolderHandle();
+        if (!handle?.queryPermission) return;
+        if ((await handle.queryPermission({ mode: "readwrite" })) !== "granted") return;
+        lastRun = Date.now();
+        const files = await readSyncFolder(handle);
+        if (!files["manifest.json"]) return; // empty/foreign — wait for manual sync
+        const outcome = await handleRunSync(files, {
+          // never discard in-progress edits: defer to the next round instead
+          reloadCanvas: !canvasApi.current?.hasPendingEdits(),
+        });
+        await writeSyncFolder(handle, outcome.folder);
+        const s = outcome.summary;
+        const changed =
+          s.pagesAdded + s.pagesUpdated + s.pagesConflicted + s.pagesDeleted +
+          s.treeDeleted + s.treeUpdated + s.notebooksAdded + s.sectionsAdded;
+        if (changed) toast(`Auto-sync: ${describeSummary(s)}`);
+      } catch {
+        /* background re-scan stays silent — manual sync surfaces errors */
+      } finally {
+        running = false;
+      }
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [handleRunSync]);
 
   /* ----------------------------- import ------------------------------- */
 
@@ -503,7 +596,7 @@ export default function NoteApp() {
               {/* canvas */}
               <div className="relative min-h-0 flex-1">
                 <CanvasEditor
-                  key={currentPage.id}
+                  key={`${currentPage.id}:${sceneEpoch}`}
                   pageId={currentPage.id}
                   title={currentPage.title}
                   theme={theme}
@@ -535,6 +628,7 @@ export default function NoteApp() {
       <SearchDialog />
       <TrashDialog />
       <ShortcutsDialog />
+      <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
   );

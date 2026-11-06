@@ -20,6 +20,7 @@ import {
   FolderClosed,
   FolderInput,
   FolderOpen,
+  FolderSync,
   Keyboard,
   ListChecks,
   MoreHorizontal,
@@ -50,6 +51,7 @@ import { useAppStore } from "@/lib/store";
 import { pageHasTag } from "@/lib/tags";
 import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
 import { MovePagesDialog } from "./move-pages-dialog";
+import { useSyncDialog } from "./sync-dialog";
 import { NOTEBOOK_COLORS, NOTEBOOK_COLOR_HEX, type Notebook, type PageMeta, type Section } from "@/lib/types";
 import type { Selection } from "@/lib/tree-ops";
 import { byOrder } from "@/lib/types";
@@ -295,6 +297,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       <Separator />
       <div className="flex flex-col gap-0.5 p-2">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          size="sm"
+          data-testid="sync-button"
+          title="Sync devices (folder or ZIP)"
+          aria-label="Sync devices"
+          onClick={() => useSyncDialog.getState().setOpen(true)}
+        >
+          <FolderSync className="h-4 w-4" />
+          Sync
+        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground"

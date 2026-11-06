@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-06 |
-| **Current version** | v1.3.0 (tagged, GitHub Release published) |
-| **Phase** | v1.4 in progress on `docs/sync-research` |
-| **Overall state** | v1.4: multi-select (#30) + cheatsheet (#31) merged; sync research (issue #29) in flight |
+| **Last updated** | 2026-11-07 |
+| **Current version** | v1.4.0 (tagged, GitHub Release published) |
+| **Phase** | v1.5 in progress on `feat/sync-ui` |
+| **Overall state** | v1.5: sync engine landed (#39); sync UI (issue #37) in flight — 227 unit tests green |
 
 ## TL;DR
 
@@ -49,19 +49,25 @@ export (A4 portrait/landscape, vector text, sliced images).
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
+| File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan | Working | 46 sync unit tests + 4 E2E checks (e2e/sync.spec.ts) |
 
-**Totals: 181 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 227 unit tests, 56 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `docs/sync-research` — sync & collaboration research write-up
-  (issue #29). Docs-only PR; no runtime changes.
+- `feat/sync-ui` — file-based sync phase 1, UI half (issue #37): Sync dialog
+  (sidebar footer), sync-folder connect via File System Access (Chromium)
+  with "Sync now", ZIP export/import everywhere else (fflate, on-demand
+  import), foreground re-scan of the connected folder, post-sync canvas
+  reload that never flushes stale scenes. Builds on the engine from #39.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. ~~Multi-select in the sidebar (bulk move/delete).~~ — this PR (issue #27)
-2. ~~Keyboard shortcut cheatsheet in-app.~~ — this PR (issue #28)
-3. ~~Sync & collaboration research write-up.~~ — this PR (issue #29)
+All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+
+1. ~~File-based sync, phase 1: sync-folder export/import with page-granular merge and conflict copies~~ — engine landed (#39); UI in flight (issue #37) (docs/sync-research.md §4)
+2. Tauri wrapper for a native Linux desktop launcher/installer
+3. Android Trusted Web Activity build for direct APK distribution
 
 ## Repo map (30 seconds)
 
@@ -79,6 +85,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 | `src/lib/pdf-layout.ts` | Print pagination math: page bands, box banding, text line flow |
 | `src/lib/pdf-export.ts` | jsPDF renderer: A4 sheets, vector text, clipped slices, paper + footer |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
+| `src/lib/sync/` | File-based sync phase 1: folder format, merge engine (LWW + conflict copies), runSync, ZIP + File System Access adapters, folder-handle state |
+| `src/components/notes/sync-dialog.tsx` | Sync UI: connect folder / Sync now / merge or download sync ZIP, change summary |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
@@ -92,13 +100,26 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 181 unit tests
-make e2e                             # 52 E2E checks (Playwright; boots the app if needed)
+make test                            # 227 unit tests
+make e2e                             # 56 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-07 — sync UI (issue #37)** — Sync dialog in the sidebar footer:
+  connect a sync folder (File System Access, Chromium desktop) with
+  "Sync now" + background re-scan on window focus, or download/merge a sync
+  ZIP on any browser (fflate, loaded on demand). Merges surface a change
+  summary; the open page reloads after a sync without flushing stale
+  canvas state. 227 unit tests (+4), 56 E2E checks (+4).
+- **2026-11-07 — sync engine re-landed (issue #36, PR #39)** — #38 merged
+  empty due to a sandbox glitch (branch ref reset before the PR opened);
+  #39 re-landed the identical engine: folder format, three-way merge with
+  conflict copies, purge tombstones, Dexie v2, runSync. 42 unit tests.
+- **2026-11-06 — v1.4.0 live**: release PR #34 merge-committed to main (cf99ae4),
+  tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.4.0);
+  v1.4.0 milestone closed, v1.5.0 milestone opened. Issues #27/#28/#29 closed.
 - **2026-11-06 — sync & collaboration research (issue #29)** —
   docs/sync-research.md: why snapshot/LWW sync cannot work for scenes,
   Yjs-vs-Automerge survey (recommendation: Yjs for the no-WASM,
