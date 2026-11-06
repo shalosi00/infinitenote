@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-06 |
 | **Current version** | v1.3.0 (tagged, GitHub Release published) |
-| **Phase** | v1.4 in progress on `feat/sidebar-multiselect` |
-| **Overall state** | v1.4: sidebar multi-select (issue #27) in flight |
+| **Phase** | v1.4 in progress on `feat/shortcuts-cheatsheet` |
+| **Overall state** | v1.4: multi-select merged (#30); shortcuts cheatsheet (issue #28) in flight |
 
 ## TL;DR
 
@@ -43,22 +43,23 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
+| Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 170 unit tests, 49 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 181 unit tests, 52 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `feat/sidebar-multiselect` — sidebar multi-select with bulk move/delete
-  (issue #27). 170 unit + 49 E2E green locally; CI pending on the PR.
+- `feat/shortcuts-cheatsheet` — in-app keyboard shortcut cheatsheet
+  (issue #28). 181 unit + 52 E2E green locally; CI pending on the PR.
 
 ## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. ~~Multi-select in the sidebar (bulk move/delete).~~ — this PR (issue #27)
-2. Keyboard shortcut cheatsheet in-app (issue #28)
+2. ~~Keyboard shortcut cheatsheet in-app.~~ — this PR (issue #28)
 3. Sync & collaboration research write-up (issue #29)
 
 ## Repo map (30 seconds)
@@ -90,13 +91,19 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 170 unit tests
-make e2e                             # 49 E2E checks (Playwright; boots the app if needed)
+make test                            # 181 unit tests
+make e2e                             # 52 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-06 — shortcuts cheatsheet (issue #28)** — `?` (Shift+/) or
+  Ctrl/Cmd+/ (and the sidebar footer button) opens a grouped cheatsheet:
+  General (search, quick note, dialogs), Organizing (rename), Canvas tools
+  and Canvas editing — every entry verified against the real handlers (tool
+  keys probed through the embedded Excalidraw appState; ⌘/Ctrl rendered per
+  platform). 181 unit tests (+11), 52 E2E checks (+3).
 - **2026-11-06 — sidebar multi-select (issue #27)** — a list-checks toggle in
   the sidebar header turns on checkbox selection for page rows (clicking a
   row toggles instead of navigating); the bulk bar offers select-all scoped
