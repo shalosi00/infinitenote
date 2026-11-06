@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=InfiniteNote
+GenericName=Notebook
+Comment=Local-first OneNote-style notebook with an infinite canvas
+Exec=infinitenote
+Icon=com.infinitenote.app
+Terminal=false
+Categories=NoteTaking;Productivity;Education;
+Keywords=notes;notebook;canvas;drawing;markdown;onenote;
+StartupWMClass=InfiniteNote
+MimeType=image/png;image/jpeg;image/webp;image/svg+xml;application/pdf;text/markdown;text/plain;application/json;
