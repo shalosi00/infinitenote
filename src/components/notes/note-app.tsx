@@ -18,6 +18,7 @@ import {
   NotebookPen,
   PackageOpen,
   PenLine,
+  Printer,
   Search,
   Sun,
   Tags,
@@ -35,6 +36,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -182,7 +186,7 @@ export default function NoteApp() {
 
   /* ------------------------------ export ------------------------------- */
 
-  const handleExport = async (kind: "png" | "svg" | "scene" | "backup") => {
+  const handleExport = async (kind: "png" | "svg" | "scene" | "pdf-portrait" | "pdf-landscape" | "backup") => {
     if (kind === "backup") {
       const json = await db.buildBackup();
       const blob = new Blob([json], { type: "application/json" });
@@ -198,9 +202,16 @@ export default function NoteApp() {
       toast.error("Open a page first, then export.");
       return;
     }
-    if (kind === "png") await canvasApi.current.exportPng();
-    if (kind === "svg") await canvasApi.current.exportSvg();
-    if (kind === "scene") await canvasApi.current.exportSceneFile();
+    try {
+      if (kind === "png") await canvasApi.current.exportPng();
+      if (kind === "svg") await canvasApi.current.exportSvg();
+      if (kind === "scene") await canvasApi.current.exportSceneFile();
+      if (kind === "pdf-portrait") await canvasApi.current.exportPdf("portrait");
+      if (kind === "pdf-landscape") await canvasApi.current.exportPdf("landscape");
+    } catch (err) {
+      // empty page etc. — surface instead of failing silently
+      toast.error(err instanceof Error ? err.message : "Export failed.");
+    }
   };
 
   /* --------------------------- drag & drop ----------------------------- */
@@ -323,6 +334,25 @@ export default function NoteApp() {
             <DropdownMenuItem onClick={() => void handleExport("svg")}>
               <FileUp /> SVG vector
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
+                <Printer /> PDF — print (A4)
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                <DropdownMenuItem
+                  data-testid="export-pdf-portrait"
+                  onClick={() => void handleExport("pdf-portrait")}
+                >
+                  <Printer /> A4 portrait
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="export-pdf-landscape"
+                  onClick={() => void handleExport("pdf-landscape")}
+                >
+                  <Printer /> A4 landscape
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Everything</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("backup")}>

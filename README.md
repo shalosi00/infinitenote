@@ -25,7 +25,8 @@ data. No account, no cloud, no lock-in.
   Word documents, OneNote-exported HTML **and OneNote `.mht` single-file pages with
   embedded images** (see the [migration guide](docs/onenote-migration.md)), and
   `.excalidraw` scenes.
-- **Export** — PNG, SVG, scene JSON, or a full notebook backup file.
+- **Export** — PNG, SVG, scene JSON, paginated **PDF (A4 portrait/landscape)**
+  with selectable vector text, or a full notebook backup file.
 - **Search** — instant full-text search across every page (`Ctrl+K`).
 - **Trash** — OneNote-style soft delete with restore and purge.
 - **Paper styles** — plain, ruled and grid paper per page.

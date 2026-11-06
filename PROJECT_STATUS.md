@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-06 |
 | **Current version** | v1.2.0 (tagged, GitHub Release published) |
-| **Phase** | v1.3 in progress on `feat/quick-notes` |
-| **Overall state** | v1.3: tags merged (#21); quick notes in flight |
+| **Phase** | v1.3 in progress on `feat/pdf-export` |
+| **Overall state** | v1.3: tags (#21) + quick notes (#22) merged; PDF export in flight |
 
 ## TL;DR
 
@@ -26,7 +26,8 @@ OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
 single-file pages with embedded images + Graph export runbook) and page paper
 styles (plain/ruled/grid). v1.3 adds page tags, OneNote-style quick capture
 ("Quick note" button + Ctrl/Cmd+Alt+N, a pinned **Today** daily page that is
-created on first open and reused all day).
+created on first open and reused all day), and print-friendly paginated PDF
+export (A4 portrait/landscape, vector text, sliced images).
 
 ## What works today (verified by tests)
 
@@ -37,7 +38,7 @@ created on first open and reused all day).
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
 | Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw` | Working | 30 E2E checks with fixture files |
-| Exports: PNG, SVG, .excalidraw, notebook backup | Working | E2E serialization check |
+| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware)**, notebook backup | Working | 16 unit tests + 3 E2E checks |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
@@ -46,18 +47,18 @@ created on first open and reused all day).
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
 
-**Totals: 128 unit tests, 42 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 144 unit tests, 45 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- `feat/quick-notes` — quick notes + "today" smart page (issue #19).
-  128 unit + 42 E2E green locally; CI pending on the PR.
+- `feat/pdf-export` — print-friendly paginated PDF export (issue #20).
+  144 unit + 45 E2E green locally; CI pending on the PR.
 
 ## Next up — v1.3 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. ~~Tags / labels on pages with a tag filter view.~~ — merged via PR #21
-2. ~~Quick notes and a "today" smart page.~~ — this PR (issue #19)
-3. Print-friendly page export (paginated PDF) — issue #20
+2. ~~Quick notes and a "today" smart page.~~ — merged via PR #22
+3. ~~Print-friendly page export (paginated PDF).~~ — this PR (issue #20)
 
 ## Repo map (30 seconds)
 
@@ -72,6 +73,8 @@ created on first open and reused all day).
 | `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
 | `src/lib/tags.ts` | Page tags: normalization, dedupe, collect + filter helpers |
 | `src/lib/quick-notes.ts` | Quick capture: date keys, quick-note/daily-page titles |
+| `src/lib/pdf-layout.ts` | Print pagination math: page bands, box banding, text line flow |
+| `src/lib/pdf-export.ts` | jsPDF renderer: A4 sheets, vector text, clipped slices, paper + footer |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
@@ -93,6 +96,14 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-06 — paginated PDF export (issue #20)** — "Export → PDF — print
+  (A4)" renders the scene onto fixed A4 portrait/landscape sheets: content is
+  scaled to the printable width and sliced into page bands; images and shapes
+  print as continuous clipped slices across pages while text flows line-by-line
+  (never cut mid-glyph) as selectable vector Helvetica; rotated elements and
+  non-Latin text fall back to 2× raster snippets; paper style (ruled/grid) and
+  a title/page-number footer are drawn per sheet; always light paper. New dep:
+  jspdf (loaded on demand). 144 unit tests (+16), 45 E2E checks (+3).
 - **2026-11-06 — quick notes + Today page (issue #19)** — "Quick note" button in
   the sidebar and Ctrl/Cmd+Alt+N append a dated page to an auto-bootstrapped
   "Quick Notes" notebook/section and focus the canvas for typing; a pinned
