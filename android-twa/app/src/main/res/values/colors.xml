@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colors mirror public/manifest.webmanifest (theme_color/background_color)
+     so the wrapper and the PWA look identical; pinned by unit tests. -->
+<resources>
+    <color name="theme_color">#7C3AED</color>
+    <color name="background_color">#FFFFFF</color>
+    <color name="navigation_color">#FFFFFF</color>
+    <color name="ic_launcher_background">#7C3AED</color>
+</resources>
