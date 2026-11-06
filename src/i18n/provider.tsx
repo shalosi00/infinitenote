@@ -59,7 +59,10 @@ export function AppI18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = next;
   }, []);
 
-  // hydrate once: persisted choice wins, otherwise detect from the browser
+  // hydrate once: persisted choice wins, otherwise detect from the browser.
+  // Deliberately an effect: reading localStorage/navigator during render
+  // would mismatch the server-rendered (English) HTML. The single extra
+  // render it triggers is the accepted cost of the no-SSR-mismatch flip.
   useEffect(() => {
     let stored: string | null = null;
     try {
@@ -71,6 +74,7 @@ export function AppI18nProvider({ children }: { children: React.ReactNode }) {
       ? stored
       : detectLocale(typeof navigator !== "undefined" ? navigator.languages : []);
     document.documentElement.lang = initial;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration external-store sync (see above)
     setLocaleState(initial);
   }, []);
 
