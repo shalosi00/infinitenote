@@ -321,3 +321,38 @@
     build flag rather than NODE_ENV.
 - Verified end state: 419 unit tests + 96 E2E checks green in CI on every
   required job; 0 open bugs; v1.8.0 continues with #64/#65.
+
+## 2026-11-07 — #122 completed, #64 bundled-asset Android wrapper
+
+- Resumed post-v1.9.0: wiped stale local state, synced to GitHub, picked up
+  the open v1.10 tracker (#64/#65 + manual-pass findings #122/#123).
+- **#122 root cause was NOT the mht path.** Deep-dive: Excalidraw 0.18's own
+  drop handler (`handleAppOnDrop`) also inserts the first dropped image
+  natively, and the library NEVER flips an image element from "pending" to
+  "saved" (only the hosted app does). A dropped image therefore landed
+  TWICE — our importer's "saved" copy plus a native duplicate persisting as
+  "pending" forever; reproduced with a synthetic DataTransfer drop (4
+  elements where 3 belong). PR #125 (merged concurrently) had fixed only the
+  persisted-flag invariant; PR #126 completed it: capture-phase interception
+  of OS file drops on `<main>` (single-sourced imports), autosave stash
+  routed through `sanitizeScene` (paste/image-tool images can no longer
+  persist as "pending"), `normalizeImageStatuses` extracted + reused in
+  `appendScene`, synthetic drag-drop E2E regression. Squash-merged with all
+  three required checks green.
+- **#64 shipped on `feat/64-bundled-twa`**: a TWA cannot serve APK assets
+  (Custom Tabs run in the browser process), so the scaffold's launcher is
+  now `BundledSiteActivity` — a WebView + `WebViewAssetLoader` serving the
+  static export (`bun run build:desktop` → `out/`, synced by a Gradle
+  `syncWebAssets` task) on the reserved `appassets.androidplatform.net`
+  origin. Airplane-mode first run renders; `assets/www` missing → live PWA
+  fallback; deep links stay assetlinks-verified on the same host;
+  androidbrowserhelper/LauncherActivity retired from the scaffold
+  (bubblewrap path still documented); IndexedDB lives in the app's WebView
+  sandbox. 7 new android-config pins (launcher identity, webkit dep,
+  sync task wiring, asset origin, fallback URL parity, storage locality);
+  F-Droid policy notes + description updated (English UI with CJK content).
+- **Environment note**: a second agent session is concurrently active in
+  this sandbox (its work landed as #125/#127 and it is building #65). Tree
+  state flapped between sessions — every commit now stages an explicit
+  file list, and PRs avoid the other session's in-flight files.
+- Next: #65 review when its PR opens; v1.10.0 release when #64+#65 merge.

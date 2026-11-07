@@ -96,14 +96,16 @@ When the release flow bumps the version (say 1.6.0 → 1.7.0):
   outside the declared dependency repositories. The TWA scaffold builds
   clean; if a dependency ever ships blobs, add a `sudo:`/clean-recipe
   workaround and document it here.
-- **Offline behavior**: F-Droid prefers apps that work without network.
-  InfiniteNote's PWA core is offline-first, but the TWA wrapper loads the
-  web app from the deployed origin on first run. If a reviewer rejects the
-  TWA on those grounds, the follow-up path is bundling the static export
-  (`bun run build:desktop` output) into the APK via
-  `WebViewAssetLoader` — the scaffold already keeps that option open.
-- **Tracking**: none. The app makes no network calls beyond loading the PWA
-  origin; declare no anti-features and keep it that way.
+- **Offline behavior (issue #64, shipped)**: the APK bundles the static
+  web export (`bun run build:desktop` output) and serves it through
+  `WebViewAssetLoader` — airplane-mode first run renders the app, no network
+  needed. The deployed PWA origin is only a runtime fallback when the assets
+  were not synced into the build. Release builds intended for F-Droid MUST
+  run `bun run build:desktop` before `gradle assembleRelease` so the assets
+  are present.
+- **Tracking**: none. The bundled app makes no network calls at all; the
+  fallback path only loads the app's own PWA origin. Declare no
+  anti-features and keep it that way.
 
 ## Troubleshooting
 
