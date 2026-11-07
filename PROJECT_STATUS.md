@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-07 |
-| **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) — v1.7.0 in progress on `develop` |
-| **Phase** | v1.7 complete (i18n + themes + F-Droid) — release flow next |
-| **Overall state** | 326 unit + 65 E2E green; 0 open issues — v1.7 complete, release flow next |
+| **Current version** | v1.7.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)) |
+| **Phase** | v1.7 shipped — v1.8.0 milestone open (issues #63/#64/#65) |
+| **Overall state** | 326 unit + 65 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -24,7 +24,7 @@ All data is local (IndexedDB). The UI is bilingual (English / 简体中文, swit
 (or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
 a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
 Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
-Flatpak/Flathub packaging recipe. v1.7 so far adds UI internationalization
+Flatpak/Flathub packaging recipe. v1.7 adds UI internationalization
 (English + 简体中文), a themes gallery — six accent themes layered over
 light/dark via a sidebar gallery with live swatches — and the F-Droid build
 recipe with its validation tooling.
@@ -68,17 +68,14 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- Nothing — the v1.7.0 milestone is complete (i18n #54, themes #55,
-  F-Droid #56); the release flow (version bump → release PR → tag) is next.
+- Nothing yet — the v1.8.0 milestone is open with three issues created from
+  the roadmap backlog; next cycle picks them up in order.
 
-## Next up — v1.8 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.8 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-The full v1.7 milestone shipped. v1.8 planning happens at release time; backlog
-candidates:
-
-1. Localized first-run seed content + generated page/notebook names
-2. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance
-3. Drawing shape library beyond Excalidraw defaults
+1. Localized first-run seed content + generated page/notebook names (#63)
+2. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance (#64)
+3. Drawing shape library beyond Excalidraw defaults (#65)
 
 ## Repo map (30 seconds)
 
@@ -119,6 +116,24 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-07 — v1.7.0 released**: release PR #62 merge-committed to main
+  (60e9d3a), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)
+  and published with release notes; v1.7.0 milestone closed, v1.8.0 opened
+  with issues #63/#64/#65 from the backlog. The v1.7 cycle shipped i18n
+  (#54/#58), the themes gallery (#55/#59) and the F-Droid recipe (#56/#60) —
+  326 unit tests, 65 E2E checks, all required CI green on every PR.
+- **2026-11-07 — Themes gallery (issue #55)** — six accent themes (violet
+  default, ocean, forest, sunset, rose, graphite) layered over light/dark
+  via `data-theme` on `<html>`: pure catalog (`lib/themes.ts`), sidebar
+  gallery dialog with live light/dark swatches, pre-paint restore script in
+  the root layout, persisted choice, full en/zh-CN catalogs. 19 new unit
+  tests (+4 E2E checks). PR #59.
+- **2026-11-07 — F-Droid recipe (issue #56)** — `packaging/fdroid/`
+  build metadata, `scripts/fdroid-check.mjs` validator (required fields,
+  versionCode scheme major×100+minor×10+patch, ascending builds, tag refs),
+  cross-file version parity with the TWA scaffold pinned by 21 unit tests,
+  `docs/fdroid.md` runbook (fdroidserver test-build → fdroiddata submission
+  → policy notes incl. the bundled-asset TWA follow-up). PR #60.
 - **2026-11-07 — housekeeping (#57)** — development journal is now a tracked
   file (`docs/WORKLOG.md`); gitignore/AGENTS updated so working state can
   never silently live in untracked files; roadmap v1.6/v1.7 sections
