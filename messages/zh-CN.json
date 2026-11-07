@@ -64,7 +64,8 @@
     },
     "loadFailed": "无法打开你的笔记",
     "loadFailedBody": "本地数据库无法打开（可能被占用或暂不可用）。数据不会丢失——请重试。",
-    "retry": "重试"
+    "retry": "重试",
+    "toastRecordingNoPage": "录音已丢弃——当前没有打开的页面"
   },
   "canvas": {
     "importedImages": "已导入 {count} 张图片",

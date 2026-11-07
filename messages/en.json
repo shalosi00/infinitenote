@@ -64,7 +64,8 @@
     },
     "loadFailed": "Could not open your notes",
     "loadFailedBody": "The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "toastRecordingNoPage": "Recording discarded — no page is open"
   },
   "canvas": {
     "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",

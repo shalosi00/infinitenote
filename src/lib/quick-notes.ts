@@ -17,9 +17,11 @@ export function todayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-/** Title for a fresh quick note: "Quick note 2026-10-19 14:32" (24h clock). */
+/** Title for a fresh quick note: "Quick note 2026-10-19 14:32:07" (24h clock).
+ * Seconds resolution (issue #95): two quick notes inside one minute must
+ * not collide into identical titles. */
 export function quickNoteTitle(d: Date = new Date()): string {
-  return `Quick note ${todayKey(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return `Quick note ${todayKey(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
 /** Matches titles that are exactly a daily page key ("YYYY-MM-DD"). */

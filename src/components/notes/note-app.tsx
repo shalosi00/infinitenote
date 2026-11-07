@@ -142,6 +142,13 @@ export default function NoteApp() {
   /** Insert a finished take on the current page, as an audio block. */
   const insertRecording = useCallback(
     async (blob: Blob, mimeType: string, seconds: number) => {
+      // issue #94: the open page may have been trashed mid-recording — the
+      // canvas is unmounted and a stale api reference would insert into a
+      // detached scene, silently losing the clip
+      if (!useAppStore.getState().selection) {
+        toast.error(t("toastRecordingNoPage"));
+        return;
+      }
       const name = buildRecordingFileName(recorderExtensionForMime(mimeType));
       const file = new File([blob], name, { type: mimeType });
       await canvasApi.current?.importFiles([file]);
@@ -203,6 +210,22 @@ export default function NoteApp() {
       } else {
         toast.error(t("toastMicFailed"));
       }
+    };
+    // issue #93: a dead input device (mic unplugged, OS revoke) fires an
+    // error event and may never reach onstop — without this handler the app
+    // stayed in "recording" mode forever with the timer running. Salvage
+    // what was captured when possible, otherwise tear down cleanly.
+    recorder.onerror = () => {
+      try {
+        if (recorder.state !== "inactive") {
+          recorder.stop(); // onstop tears down + salvages the chunks so far
+          return;
+        }
+      } catch {
+        /* recorder already dead */
+      }
+      teardownRecording();
+      toast.error(t("toastMicFailed"));
     };
     recorder.start(250); // timeslice: data arrives even on abrupt stops
     streamRef.current = stream;

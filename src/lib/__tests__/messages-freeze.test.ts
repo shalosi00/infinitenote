@@ -59,6 +59,7 @@ const EXPECTED_KEYS: string[] = [
   "app.toastOpenFirstImport",
   "app.toastRecorderUnsupported",
   "app.toastRecordingInserted",
+  "app.toastRecordingNoPage",
   "app.toastRestoreFailed",
   "app.toastRestored",
   "app.toggleTheme",

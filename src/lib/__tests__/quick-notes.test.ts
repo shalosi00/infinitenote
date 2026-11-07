@@ -29,8 +29,8 @@ describe("todayKey", () => {
 
 describe("quickNoteTitle", () => {
   it("stamps the title with the local date and 24h time", () => {
-    expect(quickNoteTitle(new Date(2026, 9, 19, 9, 5))).toBe("Quick note 2026-10-19 09:05");
-    expect(quickNoteTitle(new Date(2026, 9, 19, 14, 32))).toBe("Quick note 2026-10-19 14:32");
+    expect(quickNoteTitle(new Date(2026, 9, 19, 9, 5, 7))).toBe("Quick note 2026-10-19 09:05:07");
+    expect(quickNoteTitle(new Date(2026, 9, 19, 14, 32, 59))).toBe("Quick note 2026-10-19 14:32:59");
   });
 
   it("agrees with todayKey on the date part", () => {
