@@ -63,6 +63,42 @@
 - Next: v1.10.0 in roadmap order — #64 bundled-asset TWA, then #65 shape
   library, developed under the new skills' discipline.
 
+## 2026-11-07 — full human-style manual test pass: every feature green
+
+- Direct user request: "Test every feature like a human." Drove the real
+  UI in headless Chromium (agent-browser CLI): real clicks, real mouse
+  drawing (pixel-verified ink placement), real drag-drops, real downloads,
+  IndexedDB ground-truth checks. Full report with the per-feature matrix:
+  docs/manual-test-2026-11-07.md.
+- Coverage: first-run seed; hierarchy CRUD (create/rename/color/duplicate/
+  reorder/trash via menus, double-click and header paths); canvas (rect,
+  freehand, text, move, paper styles); ALL NINE import types dropped in
+  one batch onto one canvas (41 elements; parsed docx lists/tables,
+  OneNote HTML, mht text+embedded image, markdown, txt, PDF printout
+  images, scene merge, audio embeddable) then ink+text annotated on top
+  (43); every export validated on disk (PNG 2049x12498, SVG with embedded
+  images, scene 43 els/6 files, A4 PDFs 5pp portrait + 10pp landscape
+  with vector text and paper ruling, backup JSON nested+trash-excluded,
+  sync ZIP manifest+pages); Ctrl+K content search (found a keyword buried
+  in imported txt, breadcrumb + jump); trash restore + purge-with-
+  tombstone; tags add/chips/filter/jump/clear; quick note button +
+  Ctrl+Alt+N + Today daily page; shortcuts cheatsheet; themes gallery
+  (Forest applied + persisted), dark mode, mobile drawer; multi-select
+  bulk move (source section correctly disabled, DB-verified); sync
+  dialog + ZIP; audio playback on canvas (double-click activate, play
+  advanced currentTime) and graceful no-mic record failure (#93);
+  full-reload persistence (notebooks/sections/pages/scene/tags/paper/
+  theme/mode/tombstone all intact).
+- Result: 0 user-facing bugs. Two findings filed: #122 (cosmetic: mht
+  image element persists status "pending" though data saved + rendering
+  verified) and #123 (feat: restore last-opened page on reload).
+- Console-error triage: only harness artifacts (synthetic file-upload
+  NotReadableError — drag-drop + CI setInputFiles both work) and a
+  dev-only Excalidraw worker fallback; nothing app-attributable.
+- Tooling note: two test helpers added under scripts/ (shot-check.py
+  screenshot sanity, fixture-server.py CORS fixtures) — dev-sandbox
+  utilities, not shipped.
+
 ## 2026-11-07 — v1.8.0 + v1.9.0 releases: English-only interface
 
 - Cycle-start audit: working tree clean, local develop = origin/develop at
