@@ -23,8 +23,8 @@
     "alias": "infinitenote"
   },
   "packageId": "com.infinitenote.app",
-  "appVersionName": "1.6.0",
-  "appVersionCode": 160,
+  "appVersionName": "1.7.0",
+  "appVersionCode": 170,
   "splashScreen": {
     "backgroundColor": "#ffffff",
     "backgroundColorDark": "#ffffff"
@@ -35,6 +35,6 @@
       "enabled": false
     }
   },
-  "appVersion": "1.6.0",
+  "appVersion": "1.7.0",
   "enableNotifications": false
 }
