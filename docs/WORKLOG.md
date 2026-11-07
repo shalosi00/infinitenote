@@ -174,3 +174,55 @@
   generated data names ("Quick Notes" notebook, "Quick note …" titles) stay
   English for now — renaming them needs a stable notebook marker (Dexie v3);
   tracked as follow-up work after v1.7.0.
+
+## 2026-11-07 — bug-hunt wave 2: 31 issues fixed (#63, #77–#105, #107)
+
+- Trigger: "Fix 30 more issues" after the wave-1 follow-up. The tracker held
+  only the three open v1.8.0 feature issues, so the wave started with a deep
+  audit of the real `origin/develop` tree (the sandbox repeatedly reverted
+  the working copy to a stale snapshot — every read went through
+  `git show origin/develop:` or a pristine export under
+  `examples/staging/ref/`).
+- The audit produced 30 NEW verified defects (filed as #77–#105 and #107)
+  plus the open #63; all 31 were fixed in six squash-merged PRs, each with
+  unit and/or E2E regression coverage:
+  - #106 state/data integrity — boot-retry instead of a cached rejected
+    promise (#77), savePageContent verifies the Dexie update count (#78),
+    search re-indexes on every open (#79), trash refreshes live (#80),
+    canvas focus on create/duplicate (#81), revealSelection for
+    search/tag jumps (#82).
+  - #108 PDF fidelity — audio embeddables print as labeled strips (#83),
+    non-Latin footer titles rasterize (#84), typed ExportError → localized
+    toasts (#85), printout render capped at 1600px (#87), and the raster
+    fallback restricted to rotated elements so unrotated shapes draw as
+    true vectors again — the vector path had been dead since v1 (#107).
+  - #109 imports — CJK-aware line estimates (#88), SVG intrinsic-size
+    fallback (#89), spaced `<w:br />` recognition (#90), 30 MB audio cap
+    (#91), batched text-import scene updates (#92).
+  - #110 recording + library — MediaRecorder.onerror (#93), detached-canvas
+    guard (#94), seconds-resolution names (#95), shape-library restore (#96).
+  - #111 i18n — generated-names registry localizes every generated name and
+    the welcome seed (#63), localized canvas loading/aria strings (#97,
+    #98), IME-safe Enter on all three text-committing inputs (#99),
+    surrogate-safe tag/snippet truncation (#101).
+  - #112 hardening — SyncFormatError codes → localized sync errors (#86),
+    tag-cap feedback (#100), e2e hooks behind a NEXT_PUBLIC_E2E=1 build
+    flag so ordinary production bundles never ship the reset backdoor
+    (#102), pdfjs-dist pinned exactly to the vendored worker + drift test
+    (#103), ignoreBuildErrors removed (#104), manifest-less folders
+    initialize on "Sync now" (#105).
+- Process incidents worth remembering:
+  - A wave PR rebuilt messages/*.json from a stale snapshot and silently
+    deleted earlier PRs' catalog keys — caught by CI (MISSING_MESSAGE).
+    Fixed forward AND guarded: a catalog-freeze test now pins the complete
+    key set, and every PR overlay derives its catalogs from current
+    develop.
+  - `grep -q` under `set -o pipefail` false-negatives when the upstream
+    `git show` is still writing (SIGPIPE) — the staging apply-scripts now
+    use `grep … >/dev/null` for their merge markers.
+  - The PR-112 merge initially failed on a truncated SHA (40-char
+    required); the e2e CI caught the first #102 attempt because CI runs
+    Playwright against a production build — the final design gates on the
+    build flag rather than NODE_ENV.
+- Verified end state: 419 unit tests + 96 E2E checks green in CI on every
+  required job; 0 open bugs; v1.8.0 continues with #64/#65.
