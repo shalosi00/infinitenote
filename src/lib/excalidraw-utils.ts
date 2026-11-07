@@ -7,11 +7,12 @@
  * loaded by the dynamically-imported canvas wrapper (`ssr: false`).
  */
 import type { ScenePayload } from "./types";
+import { isAudioFile } from "./audio-notes";
 
 /** Imperative surface the canvas exposes to the rest of the app. */
 export interface CanvasApi {
   /** Route files by type: images, text/markdown, PDF (printout), .excalidraw,
-   *  Word documents, HTML pages, OneNote .mht single-file pages. */
+   *  Word documents, HTML pages, OneNote .mht single-file pages, audio clips. */
   importFiles: (files: File[]) => Promise<void>;
   exportPng: () => Promise<void>;
   exportSvg: () => Promise<void>;
@@ -43,9 +44,14 @@ export type FileImportKind =
   | "docx"
   | "html"
   | "mht"
+  | "audio"
   | "unknown";
 
-/** Classify an importable file. Order matters: scene files before generic json. */
+/**
+ * Classify an importable file. Order matters: scene files before generic
+ * json; audio before the generic buckets so clips never fall through to
+ * "unknown" (their extensions are nobody else's).
+ */
 export function classifyFile(file: File): FileImportKind {
   const name = file.name.toLowerCase();
   if (name.endsWith(".excalidraw") || name.endsWith(".excalidraw.json")) return "excalidraw";
@@ -53,6 +59,9 @@ export function classifyFile(file: File): FileImportKind {
   if (file.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(name)) {
     return "image";
   }
+  // Audio clips (imported files AND in-app recordings — MediaRecorder stamps
+  // audio/webm). .webm stays non-audio unless the MIME says so (video default).
+  if (isAudioFile(file.name, file.type)) return "audio";
   // Word documents (OneNote "Save as Word" export), HTML pages
   // (OneNote "Save as" HTML export) and .mht single-file pages
   // (OneNote "Save as" .mht export) — all structured imports.

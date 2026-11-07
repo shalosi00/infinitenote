@@ -14,12 +14,14 @@ import {
   Image as ImageIcon,
   LayoutTemplate,
   Menu,
+  Mic,
   Moon,
   NotebookPen,
   PackageOpen,
   PenLine,
   Printer,
   Search,
+  Square,
   Sun,
   Tags,
   Upload,
@@ -60,6 +62,12 @@ import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
 import { readSyncFolder, writeSyncFolder } from "@/lib/sync/fsa";
 import type { SyncFolderFiles } from "@/lib/sync/format";
 import type { SyncSummary } from "@/lib/sync/merge";
+import {
+  buildRecordingFileName,
+  formatDuration,
+  pickRecorderMimeType,
+  recorderExtensionForMime,
+} from "@/lib/audio-notes";
 
 /** Result summary for an export-only round (no merge happened). */
 const NO_CHANGES_SUMMARY: SyncSummary = {
@@ -101,6 +109,116 @@ export default function NoteApp() {
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
   const [sceneEpoch, setSceneEpoch] = useState(0);
+
+  /* ------------------------- audio recording (issue #67) --------------- */
+
+  /** Wall-clock ms when the current recording started; null = not recording. */
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  /** Whole seconds elapsed in the current recording (drives the timer label). */
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Stop the timer, release the mic, forget the recorder. Safe to call twice. */
+  const teardownRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+    setRecordingStartedAt(null);
+    setRecordingElapsed(0);
+  }, []);
+
+  // release the mic if the app unmounts mid-recording
+  useEffect(() => teardownRecording, [teardownRecording]);
+
+  /** Insert a finished take on the current page, as an audio block. */
+  const insertRecording = useCallback(
+    async (blob: Blob, mimeType: string, seconds: number) => {
+      const name = buildRecordingFileName(recorderExtensionForMime(mimeType));
+      const file = new File([blob], name, { type: mimeType });
+      await canvasApi.current?.importFiles([file]);
+      toast.success(t("toastRecordingInserted", { duration: formatDuration(seconds) }));
+    },
+    [t]
+  );
+
+  const startRecording = useCallback(async () => {
+    if (recordingStartedAt !== null) return;
+    if (!canvasApi.current) {
+      toast.error(t("toastOpenFirstImport"));
+      return;
+    }
+    if (
+      typeof MediaRecorder === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    const mimeType = pickRecorderMimeType((m) => MediaRecorder.isTypeSupported(m));
+    if (!mimeType) {
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        toast.error(t("toastMicDenied"));
+      } else {
+        toast.error(t("toastMicFailed"));
+      }
+      return;
+    }
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    const startedAt = Date.now();
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || mimeType;
+      const seconds = (Date.now() - startedAt) / 1000;
+      const blob = new Blob(chunks, { type });
+      teardownRecording();
+      if (blob.size > 0) {
+        void insertRecording(blob, type, seconds);
+      } else {
+        toast.error(t("toastMicFailed"));
+      }
+    };
+    recorder.start(250); // timeslice: data arrives even on abrupt stops
+    streamRef.current = stream;
+    recorderRef.current = recorder;
+    setRecordingStartedAt(startedAt);
+    setRecordingElapsed(0);
+    timerRef.current = setInterval(() => {
+      setRecordingElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+  }, [recordingStartedAt, t, teardownRecording, insertRecording]);
+
+  const stopRecording = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop(); // onstop inserts the clip + tears down
+    } else {
+      teardownRecording();
+    }
+  }, [teardownRecording]);
 
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
@@ -386,7 +504,7 @@ export default function NoteApp() {
           type="file"
           multiple
           className="hidden"
-          accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
+          accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json,audio/*,.mp3,.wav,.ogg,.oga,.m4a,.aac,.flac,.weba,.opus"
           aria-label={t("importFiles")}
           onChange={(e) => {
             void handleImportFiles(e.target.files);
@@ -423,6 +541,48 @@ export default function NoteApp() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* audio recording (issue #67) */}
+        {recordingStartedAt === null ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            aria-label={t("recordAudio")}
+            title={t("recordAudio")}
+            data-testid="record-audio"
+            onClick={() => void startRecording()}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div
+            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 py-1 dark:border-red-900 dark:bg-red-950/60"
+            data-testid="recording-indicator"
+          >
+            <span className="relative flex h-2.5 w-2.5" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+            </span>
+            <span
+              className="min-w-[2.25rem] text-xs font-semibold tabular-nums text-red-700 dark:text-red-300"
+              data-testid="recording-timer"
+            >
+              {formatDuration(recordingElapsed)}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={t("stopRecording")}
+              title={t("stopRecording")}
+              data-testid="stop-recording"
+              onClick={stopRecording}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          </div>
+        )}
 
         {/* export */}
         <DropdownMenu>

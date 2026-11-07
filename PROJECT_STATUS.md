@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-07 |
 | **Current version** | v1.7.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)) |
-| **Phase** | v1.7 shipped — v1.8.0 milestone open (issues #63/#64/#65) |
-| **Overall state** | 326 unit + 65 E2E green; 0 open issues |
+| **Phase** | v1.7 shipped — v1.8.0 milestone open (issues #63/#64/#65, #67/#68) |
+| **Overall state** | 358 unit + 72 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -17,9 +17,11 @@ InfiniteNote is an open-source OneNote-style notebook for Linux and Android:
 Notebook → Section → Page hierarchy on an infinite canvas (Excalidraw), draw/write
 on anything, import images / text / Markdown / PDF printouts / .excalidraw scenes,
 Word documents, OneNote-exported HTML and OneNote `.mht` single-file pages
-(embedded images included), export PNG / SVG / scenes / full backups, full-text
-search, soft-delete trash, dark mode, per-page paper styles (plain / ruled /
-grid), page tags with a tag filter view, and a fully offline installable PWA.
+(embedded images included), audio clips (import a file or record straight into
+the page, playable on-canvas), export PNG / SVG / scenes / full backups,
+full-text search, soft-delete trash, dark mode, per-page paper styles (plain /
+ruled / grid), page tags with a tag filter view, and a fully offline
+installable PWA.
 All data is local (IndexedDB). The UI is bilingual (English / 简体中文, switchable per device). v1.5 adds file-based sync phase 1: a sync folder
 (or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
 a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
@@ -44,10 +46,11 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
-| Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw` | Working | 30 E2E checks with fixture files |
+| Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** | Working | 30 E2E checks with fixture files |
 | Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware)**, notebook backup | Working | 16 unit tests + 3 E2E checks |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
+| Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
@@ -64,12 +67,13 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 326 unit tests, 65 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 358 unit tests, 72 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing yet — the v1.8.0 milestone is open with three issues created from
-  the roadmap backlog; next cycle picks them up in order.
+- Audio blocks (issue #67) implemented on `develop` via PR — v1.8.0 continues
+  with the import-matrix overlay spec (issue #68), then #63/#64/#65 in roadmap
+  order.
 
 ## Next up — v1.8 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -90,6 +94,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
 | `src/lib/tags.ts` | Page tags: normalization, dedupe, collect + filter helpers |
 | `src/lib/quick-notes.ts` | Quick capture: date keys, quick-note/daily-page titles |
+| `src/lib/audio-notes.ts` | Audio blocks: classification, recorder mime/extension picking, duration + filename helpers, link-scheme markers (issue #67) |
 | `src/lib/pdf-layout.ts` | Print pagination math: page bands, box banding, text line flow |
 | `src/lib/pdf-export.ts` | jsPDF renderer: A4 sheets, vector text, clipped slices, paper + footer |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
@@ -109,8 +114,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 227 unit tests
-make e2e                             # 56 E2E checks (Playwright; boots the app if needed)
+make test                            # 358 unit tests
+make e2e                             # 72 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 

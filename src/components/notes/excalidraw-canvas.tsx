@@ -29,12 +29,16 @@ import {
   importMhtFile,
   importPdfAsPrintout,
   importTextFiles,
+  importAudioFiles,
   exportPng,
   exportSvg,
   exportSceneFile,
   appendScene,
 } from "@/lib/excalidraw-client";
 import { exportPagePdf } from "@/lib/pdf-export";
+import { audioPayloadOf, isAudioBlockLink } from "@/lib/audio-notes";
+import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types";
 
 // Self-host canvas fonts/assets so the app works fully offline.
 if (typeof window !== "undefined") {
@@ -57,6 +61,59 @@ export interface ExcalidrawCanvasProps {
   onApiReady: (api: CanvasApi) => void;
   onSaveIndicator: (state: "saving" | "saved" | "error") => void;
   onToast: (message: string) => void;
+}
+
+/**
+ * Native `<audio controls>` player for one audio embeddable (issue #67).
+ *
+ * Rendered via Excalidraw's `renderEmbeddable` prop instead of the default
+ * iframe: browsers show no UI for a bare audio document, and data: iframes
+ * are blocked in several contexts. The clip stays a first-class scene
+ * element — select it, move it, draw over it — while this component only
+ * owns playback. Pointer events are enabled only while the element is
+ * "active" (selected/double-clicked), which is Excalidraw's own rule for
+ * interactive embeds; the wrapper honors it for us.
+ */
+function AudioEmbeddablePlayer({
+  element,
+  theme,
+}: {
+  element: ExcalidrawEmbeddableElement;
+  theme: "light" | "dark";
+}) {
+  const payload = audioPayloadOf(element.customData);
+  if (!payload) return null; // corrupted block — let Excalidraw render its default
+  const name =
+    typeof element.customData?.audioName === "string" ? element.customData.audioName : "";
+  const dark = theme === "dark";
+  return (
+    <div
+      className="flex h-full w-full flex-col justify-center gap-1 px-2"
+      style={{
+        background: dark ? "#2a2a33" : "#f3f3f7",
+        color: dark ? "#d8d8e2" : "#3f3f4a",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      {name && (
+        <span
+          data-testid="audio-clip-name"
+          className="truncate text-[10px] leading-tight opacity-80"
+          title={name}
+        >
+          ♪ {name}
+        </span>
+      )}
+      <audio
+        controls
+        preload="metadata"
+        src={payload}
+        className="h-7 w-full"
+        aria-label={name || "audio clip"}
+        data-testid="audio-player"
+      />
+    </div>
+  );
 }
 
 export default function ExcalidrawCanvas({
@@ -154,6 +211,7 @@ export default function ExcalidrawCanvas({
         const docxFiles = files.filter((f) => classifyFile(f) === "docx");
         const htmlFiles = files.filter((f) => classifyFile(f) === "html");
         const mhtFiles = files.filter((f) => classifyFile(f) === "mht");
+        const audioFiles = files.filter((f) => classifyFile(f) === "audio");
         let touched = false;
         try {
           if (images.length) {
@@ -200,6 +258,13 @@ export default function ExcalidrawCanvas({
               );
             }
           }
+          if (audioFiles.length) {
+            const n = await importAudioFiles(api, audioFiles);
+            if (n) {
+              touched = true;
+              onToast(`Imported ${n} audio clip${n > 1 ? "s" : ""}`);
+            }
+          }
           if (scenes.length) {
             for (const sceneFile of scenes) {
               const scene = await importExcalidrawFile(sceneFile);
@@ -215,7 +280,8 @@ export default function ExcalidrawCanvas({
             scenes.length +
             docxFiles.length +
             htmlFiles.length +
-            mhtFiles.length;
+            mhtFiles.length +
+            audioFiles.length;
           if (files.length > known) {
             onToast("Some files were skipped (unsupported type)");
           }
@@ -308,6 +374,19 @@ export default function ExcalidrawCanvas({
     }
   }, []);
 
+  /**
+   * Custom renderer for embeddable elements (issue #67): audio clips get a
+   * native `<audio controls>` player; everything else falls back to
+   * Excalidraw's default iframe (returning null/undefined does that).
+   */
+  const renderEmbeddable = useCallback(
+    (element: ExcalidrawEmbeddableElement, _appState: AppState) => {
+      if (!isAudioBlockLink(element.link)) return null;
+      return <AudioEmbeddablePlayer element={element} theme={theme} />;
+    },
+    [theme]
+  );
+
   const viewBackgroundColor = theme === "dark" ? "#1e1e1e" : "#ffffff";
   const ruledColor = theme === "dark" ? "rgba(120, 120, 128, 0.35)" : "rgba(82, 82, 91, 0.25)";
 
@@ -319,6 +398,7 @@ export default function ExcalidrawCanvas({
         onChange={handleChange}
         theme={theme}
         name={title}
+        renderEmbeddable={renderEmbeddable}
         initialData={async () => {
           const payload = await db.getPageContent(pageId);
           return {
@@ -341,7 +421,9 @@ export default function ExcalidrawCanvas({
           },
         }}
         libraryReturnUrl={typeof window !== "undefined" ? window.location.origin : undefined}
-        validateEmbeddable={false}
+        // only our audio blocks (AUDIO_LINK_SCHEME marker) may mount interactive
+        // embeds; every other embeddable stays rejected, exactly as before
+        validateEmbeddable={(url) => isAudioBlockLink(url)}
       />
       {background === "ruled" && (
         <div
