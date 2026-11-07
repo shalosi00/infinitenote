@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-08 |
 | **Current version** | v1.9.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)) |
-| **Phase** | v1.9.0 shipped — v1.10.0 open (features #64/#65) |
-| **Overall state** | 403 unit + 86 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 both being fixed in v1.10.0 (#122: persistence invariant landed) |
+| **Phase** | v1.10.0 in progress — #122 fixed, #123 landed, #64/#65 open |
+| **Overall state** | 409 unit + 89 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 both fixed in v1.10.0 |
 
 ## TL;DR
 
