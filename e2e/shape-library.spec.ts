@@ -96,6 +96,18 @@ test.describe.serial("shape library (issue #65)", () => {
     expect(selected).toBeGreaterThan(0);
   });
 
+  test("inserting the same shape twice yields distinct element ids", async () => {
+    const before = await elementCount(page);
+    await insertShape(page, "ellipse");
+    await insertShape(page, "ellipse");
+    await expectCount(page, before + 2);
+    const scene = JSON.parse(await serializeCurrentPage(page)) as SceneJson;
+    const ellipses = scene.elements.filter((e) => e.type === "ellipse");
+    expect(ellipses.length).toBeGreaterThanOrEqual(2);
+    const ids = new Set(ellipses.map((e) => e.id));
+    expect(ids.size, "two inserts of the same shape must not share an id").toBe(ellipses.length);
+  });
+
   test("arrow variants keep their arrowheads and dash pattern", async () => {
     const scene = JSON.parse(await serializeCurrentPage(page)) as SceneJson;
     const arrows = scene.elements.filter((e) => e.type === "arrow");

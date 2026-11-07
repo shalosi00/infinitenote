@@ -617,8 +617,15 @@ export function insertShapeById(
   if (!def) return false;
   const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
   const appState = api.getAppState();
+  // fresh element ids per insert: catalog skeleton ids are stable
+  // placeholders, but inserting the SAME shape twice must never put two
+  // elements with one id into the live scene — Excalidraw keys its
+  // elementsMap by id, and the collision makes dragging copy #2 mutate
+  // copy #1 (restore() re-ids duplicates on reload, but the live scene
+  // must not get there in the first place)
   const skeletons = def.skeletons.map((s: ShapeSkeleton) => ({
     ...s,
+    id: crypto.randomUUID(),
     x: s.x + anchor.x,
     y: s.y + anchor.y,
     strokeColor:
