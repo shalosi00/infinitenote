@@ -94,14 +94,22 @@ export function sanitizeScene(payload: ScenePayload): ScenePayload {
   return { elements: payload.elements, files };
 }
 
-/** Safe filename from a page title. */
+/**
+ * Safe filename from a page title (issue #74).
+ *
+ * Unicode-aware: letters and digits from ANY script survive (the UI is
+ * bilingual — a 简体中文 title must not collapse to "untitled"), while
+ * filesystem-hostile characters are stripped. Whitespace runs slugify to
+ * "-", the result is capped at 60 code points (never mid-surrogate-pair),
+ * and an empty result falls back to "untitled".
+ */
 export function titleToFilename(title: string, ext: string): string {
-  const base =
-    title
-      .replace(/[^\w\d\-. ]+/g, "")
-      .trim()
-      .replace(/\s+/g, "-")
-      .slice(0, 60) || "untitled";
+  const slug = title
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "") // filesystem-hostile chars
+    .replace(/[^\p{L}\p{N}\-. _]+/gu, "") // keep Unicode letters/digits + -._ and space
+    .trim()
+    .replace(/\s+/g, "-");
+  const base = slug ? Array.from(slug).slice(0, 60).join("") : "untitled";
   return `${base}.${ext}`;
 }
 

@@ -7,6 +7,7 @@
  * `next/dynamic` with `ssr: false` (see canvas-editor.tsx).
  */
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
@@ -37,6 +38,7 @@ import {
 } from "@/lib/excalidraw-client";
 import { exportPagePdf } from "@/lib/pdf-export";
 import { audioPayloadOf, isAudioBlockLink } from "@/lib/audio-notes";
+import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
 
@@ -48,6 +50,24 @@ if (typeof window !== "undefined") {
 
 const AUTOSAVE_DEBOUNCE_MS = 700;
 const LIBRARY_STORAGE_KEY = "infinitenote.library";
+
+/** Translator for the canvas message namespace (next-intl). */
+type CanvasTranslator = ReturnType<typeof useTranslations<"canvas">>;
+
+/**
+ * Compose the .docx / HTML / .mht import toast: text blocks plus an optional
+ * "+ N images" tail. Shared by all three structured importers so they read
+ * alike and stay localized (issue #73).
+ */
+function structuredImportToast(
+  t: CanvasTranslator,
+  name: string,
+  blocks: number,
+  images: number,
+): string {
+  const base = t("importedStructured", { name, blocks });
+  return images > 0 ? `${base} ${t("plusImages", { count: images })}` : base;
+}
 
 /** World-space distance between ruled-paper lines (≈ a text line at 100%). */
 const RULED_GAP = 40;
@@ -129,6 +149,28 @@ export default function ExcalidrawCanvas({
   const latestScene = useRef<ScenePayload | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ruledLayerRef = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * Latest-value refs (issue #72): Excalidraw invokes the `excalidrawAPI`
+   * callback exactly once per mounted editor instance, and the canvas only
+   * remounts when `pageId` changes — so anything the imperative surface
+   * closes over would freeze at mount time. The export surface therefore
+   * reads title / paper style / translator through refs that are re-assigned
+   * on every render, keeping exports and toasts correct after an in-place
+   * rename, paper switch or locale switch.
+   */
+  const t = useTranslations("canvas");
+  const tRef = useRef(t);
+  const titleRef = useRef(title);
+  const backgroundRef = useRef(background);
+  // Refs may only be written outside render (react-hooks/refs) — refresh them
+  // in an effect after every commit. The export surface reads them at
+  // interaction time (menu click), long after the effect has settled.
+  useEffect(() => {
+    tRef.current = t;
+    titleRef.current = title;
+    backgroundRef.current = background;
+  }, [t, title, background]);
 
   /** Write the latest stashed scene into IndexedDB. */
   const doSave = useCallback(async (): Promise<void> => {
@@ -212,57 +254,65 @@ export default function ExcalidrawCanvas({
         const htmlFiles = files.filter((f) => classifyFile(f) === "html");
         const mhtFiles = files.filter((f) => classifyFile(f) === "mht");
         const audioFiles = files.filter((f) => classifyFile(f) === "audio");
+        // always the active locale's translator (issue #73): a locale switch
+        // must not leave the canvas toasting in a stale language
+        const tt = () => tRef.current;
         let touched = false;
         try {
           if (images.length) {
             await importImageFiles(api, images);
             touched = true;
-            onToast(`Imported ${images.length} image${images.length > 1 ? "s" : ""}`);
+            onToast(tt()("importedImages", { count: images.length }));
           }
           if (texts.length) {
-            await importTextFiles(api, texts);
-            touched = true;
-            onToast(`Imported ${texts.length} text file${texts.length > 1 ? "s" : ""}`);
+            const n = await importTextFiles(api, texts);
+            if (n) {
+              touched = true;
+              onToast(tt()("importedTexts", { count: n }));
+            }
+            if (n < texts.length) {
+              // blank / whitespace-only text files produced no content
+              onToast(tt()("emptyFiles"));
+            }
           }
           if (pdfs.length) {
             for (const pdf of pdfs) {
-              const n = await importPdfAsPrintout(api, pdf);
+              const { rendered, total }: PdfPrintoutResult =
+                await importPdfAsPrintout(api, pdf);
               touched = true;
-              onToast(`Inserted PDF printout (${n} page${n > 1 ? "s" : ""})`);
+              onToast(
+                total > rendered
+                  ? tt()("pdfTruncated", { shown: rendered, total })
+                  : tt()("pdfPrintout", { pages: rendered }),
+              );
             }
           }
           if (docxFiles.length) {
             for (const file of docxFiles) {
               const n = await importDocxFile(api, file);
               touched = true;
-              onToast(`Imported "${file.name}" — ${n} text block${n === 1 ? "" : "s"}`);
+              onToast(tt()("importedStructured", { name: file.name, blocks: n }));
             }
           }
           if (htmlFiles.length) {
             for (const file of htmlFiles) {
               const { blocks, images: n } = await importHtmlFile(api, file);
               touched = true;
-              onToast(
-                `Imported "${file.name}" — ${blocks} text block${blocks === 1 ? "" : "s"}` +
-                  (n ? ` + ${n} image${n > 1 ? "s" : ""}` : ""),
-              );
+              onToast(structuredImportToast(tt(), file.name, blocks, n));
             }
           }
           if (mhtFiles.length) {
             for (const file of mhtFiles) {
               const { blocks, images: n } = await importMhtFile(api, file);
               touched = true;
-              onToast(
-                `Imported "${file.name}" — ${blocks} text block${blocks === 1 ? "" : "s"}` +
-                  (n ? ` + ${n} image${n > 1 ? "s" : ""}` : ""),
-              );
+              onToast(structuredImportToast(tt(), file.name, blocks, n));
             }
           }
           if (audioFiles.length) {
             const n = await importAudioFiles(api, audioFiles);
             if (n) {
               touched = true;
-              onToast(`Imported ${n} audio clip${n > 1 ? "s" : ""}`);
+              onToast(tt()("importedAudio", { count: n }));
             }
           }
           if (scenes.length) {
@@ -270,7 +320,7 @@ export default function ExcalidrawCanvas({
               const scene = await importExcalidrawFile(sceneFile);
               appendScene(api, scene);
               touched = true;
-              onToast(`Imported scene "${sceneFile.name}"`);
+              onToast(tt()("importedScene", { name: sceneFile.name }));
             }
           }
           const known =
@@ -283,7 +333,7 @@ export default function ExcalidrawCanvas({
             mhtFiles.length +
             audioFiles.length;
           if (files.length > known) {
-            onToast("Some files were skipped (unsupported type)");
+            onToast(tRef.current("skipped"));
           }
           if (touched) {
             latestScene.current = getScenePayload(api);
@@ -291,16 +341,19 @@ export default function ExcalidrawCanvas({
           }
         } catch (err) {
           console.error(err);
-          onToast("Import failed — see console for details");
+          onToast(tRef.current("importFailed"));
         }
       };
 
       const apiSurface: CanvasApi = {
         importFiles,
-        exportPng: () => exportPng(api, title),
-        exportSvg: () => exportSvg(api, title),
-        exportSceneFile: () => exportSceneFile(api, title),
-        exportPdf: (orientation) => exportPagePdf(api, title, orientation, background),
+        // latest-value refs (issue #72): a rename or paper-style switch must
+        // be reflected in the very next export, without remounting the canvas
+        exportPng: () => exportPng(api, titleRef.current),
+        exportSvg: () => exportSvg(api, titleRef.current),
+        exportSceneFile: () => exportSceneFile(api, titleRef.current),
+        exportPdf: (orientation) =>
+          exportPagePdf(api, titleRef.current, orientation, backgroundRef.current),
         focusContent: () => api.scrollToContent(),
         flushSave,
         hasPendingEdits,
@@ -322,7 +375,7 @@ export default function ExcalidrawCanvas({
         };
       }
     },
-    [title, onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer, hasPendingEdits, discardPendingEdits]
+    [onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer, hasPendingEdits, discardPendingEdits]
   );
 
   /* ----------------------------- lifecycle ----------------------------- */

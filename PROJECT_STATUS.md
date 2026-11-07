@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-07 |
 | **Current version** | v1.7.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)) |
-| **Phase** | v1.7 shipped — v1.8.0 milestone open (issues #63/#64/#65, #67/#68) |
-| **Overall state** | 358 unit + 78 E2E green; 0 open issues |
+| **Phase** | v1.7 shipped — v1.8.0 milestone open (issues #63/#64/#65) |
+| **Overall state** | 368 unit + 85 E2E green; 0 open issues |
 
 ## TL;DR
 
@@ -46,8 +46,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
-| Imports: image, text, Markdown, PDF printout, `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts) |
-| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware)**, notebook backup | Working | 16 unit tests + 3 E2E checks |
+| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts fully localized (en/zh-CN) | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
+| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters | Working | 16 unit tests + 3 E2E checks + e2e/export-filename.spec.ts |
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
@@ -56,7 +56,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
-| UI i18n (issue #54): English + 简体中文 chrome, sidebar Language toggle, persisted locale, browser detection | Working | 20 i18n/sync-summary unit tests + 5 E2E checks (e2e/locale.spec.ts) |
+| UI i18n (issue #54): English + 简体中文 chrome **including canvas import feedback**, sidebar Language toggle, persisted locale, browser detection | Working | 20 i18n/sync-summary unit tests + 5 canvas-i18n tests + 8 E2E checks (e2e/locale.spec.ts, e2e/import-toast-locale.spec.ts) |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
@@ -67,12 +67,15 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 358 unit tests, 78 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 368 unit tests, 85 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Audio (issue #67) and the import-matrix overlay spec (issue #68) are on
-  `develop`; v1.8.0 continues with #63/#64/#65 in roadmap order.
+- Bug-hunt wave 1 (issues #72–#75) fixed on `develop`: exports follow the
+  current title/paper after in-place renames, import toasts are localized,
+  export filenames keep CJK/Unicode titles, and PDF printout imports warn
+  when the 20-page render cap truncates. v1.8.0 continues with
+  #63/#64/#65 in roadmap order.
 
 ## Next up — v1.8 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -113,13 +116,24 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 358 unit tests
-make e2e                             # 78 E2E checks (Playwright; boots the app if needed)
+make test                            # 368 unit tests
+make e2e                             # 85 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-07 — Bug-hunt wave 1 (issues #72–#75)**: a full audit (gates +
+  manual code review of audio/imports/exports/sync/i18n) surfaced four real
+  defects, all fixed in one PR: exports captured stale mount-time
+  title/paper (#72 — latest-value refs in the canvas api surface), canvas
+  import toasts were hardcoded English (#73 — new `canvas.*` message
+  namespace, en + zh-CN), non-ASCII page titles collapsed to "untitled" in
+  export filenames (#74 — Unicode-aware `titleToFilename` + shared
+  `downloadBlob` for backups), and PDF printout imports silently truncated
+  at the 20-page cap (#75 — explicit "first 20 of N pages" notice, blank
+  text files no longer counted as imported). +10 unit tests (368), +7 E2E
+  checks (85).
 - **2026-11-07 — v1.7.0 released**: release PR #62 merge-committed to main
   (60e9d3a), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)
   and published with release notes; v1.7.0 milestone closed, v1.8.0 opened

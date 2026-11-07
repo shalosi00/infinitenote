@@ -90,4 +90,32 @@ describe("titleToFilename", () => {
     const out = titleToFilename("x".repeat(200), "png");
     expect(out.length).toBeLessThanOrEqual(60 + 4);
   });
+
+  it("keeps CJK titles instead of collapsing to untitled (issue #74)", () => {
+    expect(titleToFilename("会议记录", "png")).toBe("会议记录.png");
+    expect(titleToFilename("快速笔记 2026-11-07", "pdf")).toBe(
+      "快速笔记-2026-11-07.pdf",
+    );
+    expect(titleToFilename("日语のノート", "svg")).toBe("日语のノート.svg");
+  });
+
+  it("keeps accented Latin letters", () => {
+    expect(titleToFilename("Café Ünïcode", "svg")).toBe("Café-Ünïcode.svg");
+  });
+
+  it("strips emoji without splitting surrogate pairs", () => {
+    // 📝 (U+1F4DD) is a surrogate pair — it must vanish whole, not leave
+    // a lone (invalid) half behind
+    expect(titleToFilename("📝笔记", "png")).toBe("笔记.png");
+    expect(titleToFilename("a\u{1F600}b", "png")).toBe("ab.png");
+  });
+
+  it("caps CJK length by code points, not UTF-16 units", () => {
+    const out = titleToFilename("字".repeat(80), "png");
+    expect(Array.from(out)).toHaveLength(60 + 4); // 60 字 + ".png"
+  });
+
+  it("still strips hostile characters next to CJK text", () => {
+    expect(titleToFilename("会议:记录?", "png")).toBe("会议记录.png");
+  });
 });
