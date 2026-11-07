@@ -38,6 +38,31 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-08 — vendored mattpocock agent skills into the repo
+
+- Direct user request: install the helpful skills from
+  github.com/mattpocock/skills so future development/fix cycles run with
+  stronger engineering discipline.
+- Cycle-start audit: v1.9.0 released (main 1797bb2, develop f1f1d72), 0 open
+  PRs, v1.10.0 open with #64/#65. All 16 stale local branches were
+  patch-equivalent merged WIP (audio content shipped via the wave-2 squash
+  PRs) and were deleted; local main/develop fast-forwarded to origin.
+- Installed the upstream **promoted** set only (exactly what their plugin
+  ships): 20 engineering + 7 productivity skills → `.agents/skills/`
+  (82 files, 688K), MIT © Matt Pocock, LICENSE + attribution README pinned
+  to upstream commit 4ae2317 (2026-10-31). Excluded deliberately:
+  in-progress (beta), misc (frozen), deprecated.
+- Highest-leverage for this repo: `tdd` (red-green at pre-agreed seams),
+  `diagnosing-bugs` (feedback-loop-first diagnosis), `code-review`
+  (standards + spec axes in parallel subagents), `codebase-design` (deep
+  modules), `pr` (PR-body shape). AGENTS.md now routes agents to the right
+  SKILL.md; PROJECT_STATUS repo map lists the directory.
+- Deliberately tracked in git — NOT the gitignored sandbox `skills/` dir —
+  so the set survives sandbox restores and ships with the repo; top-level
+  `skills/` stays environment-only.
+- Next: v1.10.0 in roadmap order — #64 bundled-asset TWA, then #65 shape
+  library, developed under the new skills' discipline.
+
 ## 2026-11-07 — v1.8.0 + v1.9.0 releases: English-only interface
 
 - Cycle-start audit: working tree clean, local develop = origin/develop at

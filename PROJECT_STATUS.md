@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-07 |
+| **Last updated** | 2026-11-08 |
 | **Current version** | v1.9.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)) |
 | **Phase** | v1.9.0 shipped — v1.10.0 open (features #64/#65) |
 | **Overall state** | 401 unit + 86 E2E green; 0 known bugs |
@@ -123,6 +123,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | `e2e/` + `playwright.config.ts` | Playwright E2E suite — 34 checks, runs in CI (issue #3) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
+| `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
 
 ## Commands cheat-sheet
 
