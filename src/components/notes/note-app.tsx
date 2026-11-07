@@ -50,6 +50,7 @@ import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
 import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
+import { ExportError } from "@/lib/export-errors";
 import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
@@ -442,8 +443,15 @@ export default function NoteApp() {
       if (kind === "pdf-portrait") await canvasApi.current.exportPdf("portrait");
       if (kind === "pdf-landscape") await canvasApi.current.exportPdf("landscape");
     } catch (err) {
-      // empty page etc. — surface instead of failing silently
-      toast.error(err instanceof Error ? err.message : t("toastExportFailed"));
+      // issue #85: never surface raw English error internals — typed export
+      // failures map to localized messages, everything else falls back to
+      // the generic toast
+      if (err instanceof ExportError) {
+        toast.error(t(`exportErrors.${err.code}`));
+      } else {
+        console.error(err);
+        toast.error(t("toastExportFailed"));
+      }
     }
   };
 
