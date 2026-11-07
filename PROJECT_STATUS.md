@@ -8,7 +8,7 @@
 |---|---|
 | **Last updated** | 2026-11-08 |
 | **Current version** | v1.9.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)) |
-| **Phase** | v1.10.0 in progress — #122 (incl. #126 completion)/#123 landed, shape library (#65) landed, bundled TWA (#64) open |
+| **Phase** | v1.10.0 milestone complete pending release — #122/#123/#64/#65 all landed |
 | **Overall state** | 433 unit + 98 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR

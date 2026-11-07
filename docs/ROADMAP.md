@@ -85,8 +85,10 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## v1.10 — Offline-first Android & canvas depth (current)
 
-- [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
-      compliance (issue #64) — follow-up to the F-Droid policy notes
+- [x] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
+      compliance (issue #64) — the wrapper serves the static export from
+      APK assets (appassets.androidplatform.net) with the deployed PWA as
+      fallback (PR #128)
 - [x] Drawing shape library beyond Excalidraw defaults (issue #65) —
       curated catalog (blocks, arrow variants, elbow connectors, sticky
       notes with bound labels) inserted as native elements from the header
