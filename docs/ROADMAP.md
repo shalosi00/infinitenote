@@ -83,7 +83,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] English-only UI shipped as PR #116 (issue #117) — see the v1.9.0
       release notes
 
-## v1.10 — Offline-first Android & canvas depth (current)
+## v1.10 — Offline-first Android & canvas depth (shipped in v1.10.0)
 
 - [x] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
       compliance (issue #64) — the wrapper serves the static export from
@@ -97,6 +97,12 @@ milestones/issues. This file is the plan; the status file is the reality.
       persist with a stale "pending" status once their data is saved
       (issue #122) and the app reopens the last-opened page on reload
       (issue #123)
+
+## v1.11 — Handwriting recognition (research; current)
+
+- [ ] Handwriting recognition research: on-device HTR options for the
+      offline-first PWA + Android wrapper, data flow from freedraw strokes,
+      privacy stance, recommendation + phased plan (issue #133)
 
 ## v1.7 — Internationalization & polish (shipped in v1.7.0)
 
@@ -117,4 +123,4 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## Backlog (unscheduled)
 
-- Handwriting recognition (research).
+- (empty — handwriting recognition research moved to v1.11)

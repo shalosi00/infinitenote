@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-08 |
-| **Current version** | v1.9.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)) |
+| **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) |
 | **Phase** | v1.10.0 milestone complete pending release — #122/#123/#64/#65 all landed |
 | **Overall state** | 433 unit + 98 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
@@ -30,6 +30,13 @@ Flatpak/Flathub packaging recipe. v1.7 adds UI internationalization
 (English + 简体中文), a themes gallery — six accent themes layered over
 light/dark via a sidebar gallery with live swatches — and the F-Droid build
 recipe with its validation tooling.
+v1.10 adds a curated shape library — a OneNote-style Shapes toolbar
+(desktop + mobile) inserting blocks/frames, arrow variants, elbow connectors
+and sticky notes with bound labels as native Excalidraw elements — plus a
+bundled-asset Android wrapper: the TWA serves the static export from APK
+assets via WebViewAssetLoader, so airplane-mode first run renders the app
+(F-Droid offline compliance). Imported images can no longer persist with a
+stale "pending" status, and a full reload reopens the last-opened page.
 **Bug-hunt wave 2** (issues #63, #77–#105, #107 — 31 fixes across 6 PRs) hardened
 the whole surface: honest autosave + boot retry, always-fresh search/trash,
 audio blocks and true vector shapes in PDF exports (CJK-safe footers),
@@ -137,6 +144,13 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-08 — v1.10.0 released**: release PR #131 merge-committed to main
+  (9ee3809), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)
+  and published; v1.10.0 milestone closed (#64/#65/#122/#123), v1.11.0 opened
+  with the handwriting recognition research issue (#133). Ships the curated
+  shape library (#65), the bundled-asset Android TWA (#64), and the
+  manual-pass fixes (#122 pending-status invariant + single-sourced drops,
+  #123 last-opened page restore).
 - **2026-11-07 — v1.9.0 released**: release PR #119 merge-committed to main
   (1797bb2), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)
   and published; v1.9.0 milestone closed (#117), v1.10.0 opened with

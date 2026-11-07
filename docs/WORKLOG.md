@@ -38,6 +38,59 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-08 — v1.10.0 cycle: shape library (#65), manual-pass fixes (#122/#123), release
+
+- **Cycle-start audit** (git is the truth): the task brief described a stale
+  v1.3.0 state; the repo was actually at v1.9.0 (main 6e54129, develop
+  0ea7326) with v1.10.0 open (#64/#65) and two unassigned manual-pass issues
+  (#122 cosmetic pending-status, #123 last-page restore). Both were absorbed
+  into the v1.10.0 milestone.
+- **#122 fixed on `fix/image-pending-status` (PR #125)**: an image element
+  whose file data is present can no longer persist as `pending` — the
+  invariant is enforced in `sanitizeScene`, the single choke point every
+  save flows through (native Excalidraw paste/drop inserts flip to `saved`
+  asynchronously; a racing autosave used to freeze the stale flag). 2 new
+  unit tests. A concurrent session completed the fix as PR #126
+  (single-sourced OS file drops + autosave stash sanitization) while this
+  cycle moved on — both halves landed.
+- **#123 shipped on `feat/restore-last-page` (PR #127)**: OneNote-style
+  reopen-where-you-left-off. The selection persists to localStorage via one
+  module-level store subscription (covers ALL writers); boot reads the
+  stored selection BEFORE any refresh (the boot refresh's firstPageSelection
+  default is itself a selection change and would clobber the stored value —
+  found by E2E debugging with writer stack traces), then validates against
+  the freshly loaded tree: trashed/deleted pages fall back to the first
+  page, moved pages reopen under their new home. Pure `lib/last-page.ts` +
+  8 unit tests + 3 E2E checks.
+- **#65 shipped on `feat/shape-library` (PR #129)**: curated OneNote-style
+  shape picker in the header toolbar (12 shapes, 4 categories — blocks,
+  arrow variants, elbow/plain connectors, sticky notes/callouts with bound
+  editable labels). Pure catalog `lib/shape-library.ts` (INHERIT_* sentinels
+  resolve to the user's toolbar colors at insert time), insertion as NATIVE
+  Excalidraw elements via `insertShapeById`, auto-selected on insert. 12
+  unit + 8 E2E checks (incl. real pointer-selection via Excalidraw's own
+  scene→viewport transform, .excalidraw round-trip, mobile drawer layout).
+  Dev-only font-subset worker console noise filtered in the E2E collector.
+- **#64 landed concurrently as PR #128** (the second agent session in this
+  sandbox finished its bundled-asset TWA: WebViewAssetLoader serving the
+  static export from APK assets, airplane-mode first run works). This cycle
+  re-based the shape-library staging onto it and checked #64 off in the
+  ROADMAP instead of redoing the work.
+- **Release v1.10.0**: version-bump PR #130 (package.json, tauri.conf.json,
+  Cargo.toml, twa-manifest.json, build.gradle.kts → 1.10.0/200 + F-Droid
+  build entry), release PR #131 merge-committed to main (9ee3809), tag +
+  GitHub Release published, issues #122/#123/#64/#65 closed via the API
+  (squash keywords only auto-close against the default branch), milestone
+  closed, v1.11.0 opened with the handwriting-recognition research issue
+  (#133). Final quality: 433 unit + 98 E2E green, 0 known bugs.
+- **Environment**: the sandbox reverts trees to stale snapshots between AND
+  mid tool-calls — tracked files get re-clobbered, the old session's
+  unshipped WIP (shapes-dialog.tsx, a normalizeImageStatuses test variant,
+  android-twa java sources) kept resurrecting and broke gates twice. The
+  apply.sh staging scripts gained a contamination sweep (any tracked file
+  modified outside the staging overlay is restored from origin/develop),
+  revert probes before test runs, and a pre-commit re-overlay in ship mode.
+
 ## 2026-11-08 — vendored mattpocock agent skills into the repo
 
 - Direct user request: install the helpful skills from
