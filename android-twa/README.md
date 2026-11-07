@@ -1,9 +1,10 @@
-# InfiniteNote Android TWA scaffold
+# InfiniteNote Android scaffold (bundled-asset wrapper)
 
-Reference Gradle project for the InfiniteNote **Trusted Web Activity** (TWA):
-a thin Android wrapper that runs the deployed PWA fullscreen in a Chrome
-Custom Tab with no browser UI, verified against the web app via Digital Asset
-Links.
+Reference Gradle project for the InfiniteNote Android app: a thin wrapper
+whose `BundledSiteActivity` serves the static web export from the APK assets
+via `WebViewAssetLoader` (issue #64) — fully offline, F-Droid compliant —
+with the deployed PWA origin as runtime fallback and Digital Asset
+Links-verified deep links.
 
 **Read [docs/android-twa.md](../docs/android-twa.md) before building** — it
 covers the two supported paths:

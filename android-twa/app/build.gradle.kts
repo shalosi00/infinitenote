@@ -53,8 +53,20 @@ android {
 }
 
 dependencies {
-    // TWA: LauncherActivity + trusted-web-activity plumbing + Digital Asset
-    // Links verification.
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.5.0")
+    // WebViewAssetLoader: serves the bundled static export on the reserved
+    // https://appassets.androidplatform.net origin (issue #64).
+    implementation("androidx.webkit:webkit:1.12.1")
 }
+
+// Sync the static web export (repo-root out/, produced by
+// `bun run build:desktop`) into the APK assets. Skips gracefully when the
+// export is absent — e.g. a source-only F-Droid build without the bun
+// toolchain — in which case BundledSiteActivity falls back to the live PWA
+// origin at runtime.
+val syncWebAssets by tasks.registering(Sync::class) {
+    from(rootProject.file("../out"))
+    into(file("src/main/assets/www"))
+    onlyIf { rootProject.file("../out/index.html").exists() }
+}
+
+tasks.named("preBuild") { dependsOn(syncWebAssets) }

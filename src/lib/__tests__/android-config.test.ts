@@ -54,14 +54,66 @@ describe("android-twa wrapper vs PWA parity", () => {
     const android = read("android-twa/app/src/main/AndroidManifest.xml");
     expect(twa.host).toBe("https://shalosi00.github.io");
     expect(android).toContain('android:host="shalosi00.github.io"');
-    expect(android).toContain(`android:value="${twa.host}${twa.startUrl}"`);
+    expect(android).toContain(`android:pathPrefix="${twa.startUrl.replace(/\/$/, "")}/"`);
   });
 
-  it("links the browser-helper LauncherActivity and INTERNET permission", () => {
+  it("keeps the INTERNET permission for the live-origin fallback", () => {
     const android = read("android-twa/app/src/main/AndroidManifest.xml");
-    expect(android).toContain("com.google.androidbrowserhelper.trusted.LauncherActivity");
     expect(android).toContain("android.permission.INTERNET");
-    expect(read("android-twa/app/build.gradle.kts")).toContain("androidbrowserhelper");
+  });
+});
+
+describe("bundled-asset launcher (issue #64)", () => {
+  const android = read("android-twa/app/src/main/AndroidManifest.xml");
+  const gradle = read("android-twa/app/build.gradle.kts");
+  const activity = read(
+    "android-twa/app/src/main/java/com/infinitenote/app/BundledSiteActivity.java",
+  );
+
+  it("makes BundledSiteActivity the single launcher activity", () => {
+    expect(android).toContain('android:name=".BundledSiteActivity"');
+    expect(android).toContain('android:name="android.intent.action.MAIN"');
+    expect(android).toContain('android:name="android.intent.category.LAUNCHER"');
+    // the Custom Tabs LauncherActivity is retired with the WebView wrapper
+    expect(android).not.toContain("androidbrowserhelper");
+  });
+
+  it("keeps the verified https deep-link filter on the bundled launcher", () => {
+    expect(android).toMatch(/BundledSiteActivity[\s\S]*autoVerify="true"/);
+    expect(android).toContain('android:scheme="https"');
+  });
+
+  it("pins androidx.webkit for WebViewAssetLoader", () => {
+    expect(gradle).toContain('implementation("androidx.webkit:webkit:');
+  });
+
+  it("syncs the static export into the APK assets before every build", () => {
+    expect(gradle).toContain("val syncWebAssets by tasks.registering(Sync::class)");
+    expect(gradle).toContain('from(rootProject.file("../out"))');
+    expect(gradle).toContain('into(file("src/main/assets/www"))');
+    // a missing export must SKIP (source-only builds still configure),
+    // never fail the build
+    expect(gradle).toContain("onlyIf { rootProject.file(\"../out/index.html\").exists() }");
+    expect(gradle).toContain('tasks.named("preBuild") { dependsOn(syncWebAssets) }');
+  });
+
+  it("serves the bundled site from the reserved asset origin", () => {
+    expect(activity).toContain("appassets.androidplatform.net");
+    expect(activity).toContain("AssetsPathHandler");
+    expect(activity).toContain('.addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))');
+  });
+
+  it("falls back to the deployed PWA origin when assets are missing", () => {
+    const twa = readJson("android-twa/twa-manifest.json");
+    expect(activity).toContain(`LIVE_ORIGIN = "${twa.host}${twa.startUrl}"`);
+    expect(activity).toContain("hasBundledSite()");
+  });
+
+  it("keeps storage local to the app sandbox", () => {
+    expect(activity).toContain("setDomStorageEnabled(true)");
+    expect(activity).toContain("setAllowFileAccess(false)");
+    expect(activity).toContain("setAllowContentAccess(false)");
+    expect(android).toContain('android:usesCleartextTraffic="false"');
   });
 });
 
