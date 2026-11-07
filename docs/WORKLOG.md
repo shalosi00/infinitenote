@@ -38,6 +38,41 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-07 — audio blocks (#67) + full import matrix (#68) shipped to develop
+
+- Cycle start: v1.7.0 released (main 60e9d3a), v1.8.0 milestone open with
+  #63/#64/#65. New work came in as a direct user request: test importing
+  every file type + writing/drawing on top of it all, and add audio
+  recording + import. Filed as #67/#68 in the v1.8.0 milestone, implemented
+  in roadmap order.
+- Audio blocks (PR #69, closes #67): `lib/audio-notes.ts` (classification,
+  recorder mime preference order, extension mapping, duration format,
+  recording filenames, data-URL repair), `importAudioFiles` → embeddable
+  elements, header Mic button → getUserMedia + MediaRecorder with a live
+  mm:ss timer, native `<audio controls>` players via Excalidraw's
+  `renderEmbeddable`, clip names in full-text search, en/zh-CN strings.
+- **Two Excalidraw 0.18 landmines documented for the future:**
+  1. `validateEmbeddable={false}` rejects EVERY embeddable — the render gate
+     (`renderEmbeddables()`) only mounts elements whose link passes
+     `embeddableURLValidator`. Fixed with a predicate fn that accepts only
+     our `infinitenote:audio` marker scheme.
+  2. Scene restore runs every element `link` through sanitizeUrl, which
+     rewrites ALL `data:` URLs to `about:blank` — payloads can never ride on
+     `link`. Audio bytes live in `customData.audioData` (restore and both
+     export clearers pass customData through untouched); `link` carries only
+     the marker.
+- Import-matrix overlay spec (PR #70, closes #68): all nine kinds in ONE
+  batch → 36 elements on one canvas, freedraw + typed annotation on top,
+  reload persistence. Two more E2E-only gotchas: the floating Shapes island
+  swallows pointer events left-of-center on the canvas (strokes/typing must
+  start right of it), and embeddable players only mount when the element
+  intersects the viewport — tall pages need `scrollToContent(…,
+  { fitToViewport: true })` before asserting players after a reload.
+- Quality: 358 unit tests (+31), 78 E2E checks (+7 audio, +6 matrix), all
+  three required CI checks green on both PRs, 0 known bugs.
+- v1.8.0 continues with #63 (localized seed content), #64 (bundled-asset
+  TWA), #65 (shape library).
+
 ## 2026-11-08 — themes gallery (#55) + F-Droid (#56) shipped; v1.7.0 released
 
 - Themes gallery (PR #59, closes #55): six accent themes over light/dark via
