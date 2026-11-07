@@ -409,3 +409,18 @@
   state flapped between sessions — every commit now stages an explicit
   file list, and PRs avoid the other session's in-flight files.
 - Next: #65 review when its PR opens; v1.10.0 release when #64+#65 merge.
+
+## 2026-11-08 — v1.10.0 shipped + v1.10.1 patch (shape id collision)
+
+- v1.10.0 went out while its review was still landing: bundled-asset
+  Android wrapper (#64/#128), curated shape library (#65/#129), the
+  manual-pass fixes (#122 via #125+#126, #123 via #127). Release PR #131
+  (merge-commit), tag v1.10.0, GitHub Release published, milestone closed,
+  v1.11.0 opened (#133 handwriting-recognition research).
+- Review of #129 found a live-scene id collision (static skeleton ids +
+  regenerateIds: false ⇒ inserting the same shape twice made dragging copy
+  #2 mutate copy #1 — restore() heals it on reload, but the live scene must
+  never get there). The fix crossed paths with the release merge, so it
+  ships as **v1.10.1**: PR #132 (fresh crypto.randomUUID() per insert +
+  E2E double-insert guard), then this bump (package.json / twa-manifest /
+  gradle at 1.10.1 / versionCode 201, F-Droid Builds entry for v1.10.1).

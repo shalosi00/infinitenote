@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-08 |
-| **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) |
-| **Phase** | v1.10.0 milestone complete pending release — #122/#123/#64/#65 all landed |
-| **Overall state** | 433 unit + 98 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
+| **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
+| **Overall state** | 433 unit + 99 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR
 
