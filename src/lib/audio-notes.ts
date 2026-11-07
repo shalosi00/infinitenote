@@ -97,8 +97,10 @@ export function formatDuration(totalSeconds: number): string {
 
 /**
  * Build the filename for a just-finished recording, e.g.
- * "Recording 2026-11-07 14-05.webm". Dashes in the time keep the name a
- * single shell-safe token; the date is local (a recording is a "today" note).
+ * "Recording 2026-11-07 14-05-32.webm". Dashes in the time keep the name a
+ * single shell-safe token; the date is local (a recording is a "today"
+ * note). Seconds resolution (issue #95): two takes inside one minute must
+ * not collide into identical names.
  */
 export function buildRecordingFileName(
   extension: string,
@@ -106,7 +108,7 @@ export function buildRecordingFileName(
 ): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const time = `${pad(now.getHours())}-${pad(now.getMinutes())}`;
+  const time = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
   const ext = extension.replace(/^\.+/, "") || "audio";
   return `Recording ${date} ${time}.${ext}`;
 }

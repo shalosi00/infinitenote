@@ -107,19 +107,25 @@ describe("audio-notes — duration formatting", () => {
 });
 
 describe("audio-notes — recording filename", () => {
-  it("builds a dated, shell-safe filename", () => {
-    const stamp = new Date(2026, 10, 7, 14, 5); // 2026-11-07 14:05 local
-    expect(buildRecordingFileName("webm", stamp)).toBe("Recording 2026-11-07 14-05.webm");
+  it("builds a dated, shell-safe filename with seconds resolution (issue #95)", () => {
+    const stamp = new Date(2026, 10, 7, 14, 5, 32); // 2026-11-07 14:05:32 local
+    expect(buildRecordingFileName("webm", stamp)).toBe("Recording 2026-11-07 14-05-32.webm");
+  });
+
+  it("distinguishes two takes recorded in the same minute", () => {
+    const a = new Date(2026, 10, 7, 14, 5, 7);
+    const b = new Date(2026, 10, 7, 14, 5, 9);
+    expect(buildRecordingFileName("webm", a)).not.toBe(buildRecordingFileName("webm", b));
   });
 
   it("zero-pads single-digit parts and strips leading dots from the extension", () => {
-    const stamp = new Date(2026, 0, 3, 9, 2);
-    expect(buildRecordingFileName("m4a", stamp)).toBe("Recording 2026-01-03 09-02.m4a");
-    expect(buildRecordingFileName(".ogg", stamp)).toBe("Recording 2026-01-03 09-02.ogg");
+    const stamp = new Date(2026, 0, 3, 9, 2, 5);
+    expect(buildRecordingFileName("m4a", stamp)).toBe("Recording 2026-01-03 09-02-05.m4a");
+    expect(buildRecordingFileName(".ogg", stamp)).toBe("Recording 2026-01-03 09-02-05.ogg");
   });
 
   it("never emits an empty extension", () => {
-    const stamp = new Date(2026, 10, 7, 14, 5);
+    const stamp = new Date(2026, 10, 7, 14, 5, 32);
     expect(buildRecordingFileName("", stamp)).toMatch(/\.audio$/);
   });
 });

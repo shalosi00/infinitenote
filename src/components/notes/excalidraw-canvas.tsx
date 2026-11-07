@@ -51,6 +51,28 @@ if (typeof window !== "undefined") {
 const AUTOSAVE_DEBOUNCE_MS = 700;
 const LIBRARY_STORAGE_KEY = "infinitenote.library";
 
+/**
+ * Read the persisted shape library back (issue #96): onLibraryChange
+ * saves it on every change; this restores it into the editor on mount.
+ * Corrupt/absent data → null (no library items to restore). Runs in the
+ * browser only — the canvas never mounts on the server.
+ */
+function loadSavedLibrary(): LibraryItems | null {
+  try {
+    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LibraryItems;
+    if (!Array.isArray(parsed)) return null;
+    // light shape guard: every entry must be an object with an id
+    if (!parsed.every((item) => item && typeof item === "object" && "id" in item)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 /** Translator for the canvas message namespace (next-intl). */
 type CanvasTranslator = ReturnType<typeof useTranslations<"canvas">>;
 
@@ -464,6 +486,10 @@ export default function ExcalidrawCanvas({
               viewBackgroundColor,
               gridModeEnabled: background === "grid",
             },
+            // restore the saved shape library (issue #96): it is persisted
+            // on every onLibraryChange and was previously never read back,
+            // so saved items vanished on every reload
+            libraryItems: loadSavedLibrary() ?? undefined,
           };
         }}
         onLibraryChange={handleLibraryChange}
