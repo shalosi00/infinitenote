@@ -22,6 +22,7 @@ import {
   PenLine,
   Printer,
   Search,
+  Shapes,
   Square,
   Sun,
   Tags,
@@ -51,6 +52,7 @@ import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
+import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import {
   addTagWithResult,
@@ -609,6 +611,40 @@ export default function NoteApp() {
             e.target.value = "";
           }}
         />
+        {/* curated shape library (issue #65) — header toolbar, desktop + mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              data-testid="shapes-button"
+              aria-label={"Insert shape"}
+              title={"Insert shape"}
+            >
+              <Shapes className="h-4 w-4" />
+              <span className="hidden sm:inline">{"Shapes"}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-96 w-60 overflow-y-auto" data-testid="shapes-menu">
+            {SHAPE_CATEGORIES.map((category) => (
+              <div key={category}>
+                <DropdownMenuLabel>{category}</DropdownMenuLabel>
+                {shapesByCategory(category).map((shape) => (
+                  <DropdownMenuItem
+                    key={shape.id}
+                    data-testid={`shape-${shape.id}`}
+                    onClick={() => canvasApi.current?.insertShape(shape.id)}
+                  >
+                    {shape.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">

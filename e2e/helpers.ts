@@ -43,6 +43,11 @@ export function attachErrorCollector(page: Page): string[] {
   page.on("console", (message) => {
     if (message.type() !== "error") return;
     if (/Download the React DevTools/i.test(message.text())) return; // dev hint, not an app error
+    // Dev-only Excalidraw font-subset worker construction can hit a
+    // SecurityError in the dev bundle (file:/// chunk URL); Excalidraw logs
+    // it and falls back to the main thread — functionality is unaffected
+    // and the production build serves self-hosted assets. Not an app error.
+    if (/Failed to use workers for subsetting, falling back to the main thread/i.test(message.text())) return;
     errors.push(`console.error: ${message.text()}`);
   });
   return errors;

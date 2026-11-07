@@ -24,6 +24,7 @@ import { sanitizeScene } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
   getScenePayload,
+  insertShapeById,
   importExcalidrawFile,
   importDocxFile,
   importHtmlFile,
@@ -364,6 +365,12 @@ export default function ExcalidrawCanvas({
 
       const apiSurface: CanvasApi = {
         importFiles,
+        // issue #65: curated shape library — unknown ids fall back to a toast
+        insertShape: (shapeId) => {
+          if (!insertShapeById(api, shapeId)) {
+            onToast("Unknown shape");
+          }
+        },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),
