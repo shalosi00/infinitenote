@@ -87,7 +87,10 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
       compliance (issue #64) — follow-up to the F-Droid policy notes
-- [ ] Drawing shape library beyond Excalidraw defaults (issue #65)
+- [x] Drawing shape library beyond Excalidraw defaults (issue #65) —
+      curated catalog (blocks, arrow variants, elbow connectors, sticky
+      notes with bound labels) inserted as native elements from the header
+      toolbar, auto-selected, theme-aware via the current toolbar colors
 - [x] Manual-pass fixes from 2026-11-07: imported images can no longer
       persist with a stale "pending" status once their data is saved
       (issue #122) and the app reopens the last-opened page on reload

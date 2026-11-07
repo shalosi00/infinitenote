@@ -22,6 +22,8 @@ export interface CanvasApi {
   exportPdf: (orientation: "portrait" | "landscape") => Promise<void>;
   /** Zoom viewport to fit existing content. */
   focusContent: () => void;
+  /** Insert one curated library shape by id (issue #65). */
+  insertShape: (shapeId: string) => void;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
   /** True while the canvas holds un-saved edits (autosave debounce pending). */
