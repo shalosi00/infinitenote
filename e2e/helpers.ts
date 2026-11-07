@@ -16,6 +16,11 @@ export interface NoteE2EHooks {
       gridModeEnabled: boolean;
       zoom: { value: number };
     };
+    /** Zoom/pan the viewport to the content; pass fitToViewport to zoom out. */
+    scrollToContent: (
+      target?: unknown,
+      opts?: { fitToViewport?: boolean; viewportZoomFactor?: number }
+    ) => void;
   };
 }
 

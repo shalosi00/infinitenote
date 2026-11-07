@@ -66,8 +66,9 @@ milestones/issues. This file is the plan; the status file is the reality.
       playable `<audio>` blocks on the canvas (embeddable elements, payload in
       customData + `infinitenote:audio` link marker), draw over clips,
       clip names in full-text search
-- [ ] Import-matrix overlay E2E: every file type on one canvas, then write &
-      draw on top (issue #68)
+- [x] Import-matrix overlay E2E: every file type on one canvas, then write &
+      draw on top (issue #68) — 36 imported elements in one batch, freedraw
+      stroke + text annotation over everything, reload persistence
 - [ ] Localized first-run seed content + generated page/notebook names
       (issue #63) — needs a stable quick-notes marker (Dexie v3)
 - [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
