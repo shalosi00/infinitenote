@@ -51,3 +51,4 @@ local-*
 *.pem
 /coverage
 .vercel
+tool-results/

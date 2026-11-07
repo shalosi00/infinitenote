@@ -38,6 +38,52 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-07 — bug-hunt wave 1: audit + four fixes (#72–#75)
+
+- Cycle-start audit against `origin/develop` (bbfc8cb): lint / tsc / 358 unit
+  / 78 E2E all green, 0 open issues — so this wave hunted defects manually:
+  full read-through of audio-notes, the whole import pipeline (client,
+  docx/html/mht parsers), pdf-export, notes-db, sync/merge, store, search,
+  i18n, themes and both big components.
+- Four real bugs found, filed as #72–#75, fixed in one PR
+  (`fix/bugfix-wave-1`, staged under `examples/staging/bugfix-wave-1/`):
+  1. **#72 stale export surface** — Excalidraw invokes `excalidrawAPI` once
+     per mount and the canvas only remounts on pageId change, so PNG/SVG/
+     scene/PDF exports closed over the mount-time title and paper style.
+     Rename a page → export still used the old filename; switch paper → PDF
+     kept the old ruling. Fix: latest-value refs (title/background/translator)
+     refreshed in an effect (`react-hooks/refs` forbids render-time writes)
+     and read at interaction time.
+  2. **#73 unlocalized import toasts** — the canvas built every import
+     toast as hardcoded English template strings; zh-CN users got English
+     feedback. Fix: new `canvas.*` message namespace (11 keys, en + zh-CN,
+     ICU plurals preserving the exact legacy English strings), translator
+     read through the same latest-value ref so a mid-session locale switch
+     localizes the very next toast.
+  3. **#74 "untitled" exports** — `titleToFilename` used ASCII-only `\w`,
+     so 会议记录 exported as untitled.png. Fix: Unicode-aware slug
+     (keep `\p{L}\p{N}`, strip hostile chars, cap by code points — never
+     mid-surrogate). Backup export now reuses `downloadBlob` (the hand-rolled
+     anchor revoked its URL synchronously — racy in Safari/Firefox).
+  4. **#75 silent PDF truncation** — printout imports cap at 20 rendered
+     pages without telling the user, and blank text files counted as
+     imported. Fix: `importPdfAsPrintout` returns `{rendered, total}` and
+     the toast says "first 20 of 25 pages"; `importTextFiles` counts only
+     files that produced content ("Some files had no importable content").
+- Tests: +10 unit (368 total — 5 filename cases, 5 canvas-i18n key/
+  placeholder parity cases) and +7 E2E checks (85 total) across
+  `export-filename.spec.ts` (rename → download name), `import-toast-locale.
+  spec.ts` (en + zh-CN toasts incl. the localized truncation notice) and
+  `import-pdf-truncation.spec.ts` (generated 25-page fixture, 20 land on
+  canvas with the notice; blank .txt not reported). Fixture generator
+  committed as `e2e/fixtures/gen-pdf-fixture.py` (dependency-free).
+- Environment note: mid-session tree flips hit hard this cycle — one
+  snapshot read a stale tree and nearly staged pre-audio sources; the
+  staging scaffold now re-verifies HEAD (bbfc8cb guard) before copying, and
+  every gate/E2E invocation re-applies from staging first.
+- Next: v1.8.0 roadmap order — #63 localized seed content, #64 bundled-asset
+  TWA, #65 shape library.
+
 ## 2026-11-07 — audio blocks (#67) + full import matrix (#68) shipped to develop
 
 - Cycle start: v1.7.0 released (main 60e9d3a), v1.8.0 milestone open with

@@ -115,9 +115,11 @@ export async function importTextFiles(
 ): Promise<number> {
   const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
   let y = anchor.y;
+  let imported = 0;
   for (const file of files) {
     const text = (await file.text()).slice(0, 60_000); // hard cap for sanity
     if (!text.trim()) continue;
+    imported += 1;
     const skeletons = [
       {
         type: "text" as const,
@@ -137,7 +139,9 @@ export async function importTextFiles(
     const estHeight = Math.max(1, Math.ceil(text.length / 70)) * 26 + 60;
     y += estHeight;
   }
-  return files.length;
+  // count only files that produced content (issue #75): blank files must
+  // not be reported as imported
+  return imported;
 }
 
 /* ------------------------------------------------------------------ */
@@ -441,16 +445,29 @@ export async function importAudioFiles(
 /* PDF printout (OneNote-style: each page rendered onto the canvas)    */
 /* ------------------------------------------------------------------ */
 
+/** How much of a PDF actually made it onto the canvas (issue #75). */
+export interface PdfPrintoutResult {
+  /** pages rendered as canvas images (capped by MAX_PRINTOUT_PAGES) */
+  rendered: number;
+  /** pages the document actually contains — larger than `rendered` means
+   *  the import was truncated and the user must be told */
+  total: number;
+}
+
+/** Render cap per imported PDF — keeps monster documents usable on canvas. */
+const MAX_PRINTOUT_PAGES = 20;
+
 export async function importPdfAsPrintout(
   api: ExcalidrawImperativeAPI,
   file: File,
   onProgress?: (done: number, total: number) => void
-): Promise<number> {
+): Promise<PdfPrintoutResult> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   const buf = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-  const maxPages = Math.min(doc.numPages, 20); // guard against monsters
+  const total = doc.numPages;
+  const maxPages = Math.min(total, MAX_PRINTOUT_PAGES); // guard against monsters
   const anchor = nextInsertPosition(api.getSceneElements());
   const newFiles: NonNullable<ScenePayload["files"]> = {};
   const skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }> = [];
@@ -486,7 +503,7 @@ export async function importPdfAsPrintout(
     onProgress?.(i, maxPages);
   }
   applySkeletons(api, skeletons, newFiles);
-  return skeletons.length;
+  return { rendered: skeletons.length, total };
 }
 
 /* ------------------------------------------------------------------ */

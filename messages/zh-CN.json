@@ -60,6 +60,19 @@
     "toastOpenFirstExport": "请先打开一个页面，再导出。",
     "toastExportFailed": "导出失败。"
   },
+  "canvas": {
+    "importedImages": "已导入 {count} 张图片",
+    "importedTexts": "已导入 {count} 个文本文件",
+    "emptyFiles": "部分文件没有可导入的内容",
+    "pdfPrintout": "已插入 PDF 打印件（{pages} 页）",
+    "pdfTruncated": "已插入 PDF 打印件（共 {total} 页，仅前 {shown} 页——单文件渲染上限为 20 页）",
+    "importedStructured": "已导入“{name}”——{blocks} 个文本块",
+    "plusImages": "另含 {count} 张图片",
+    "importedAudio": "已导入 {count} 段音频",
+    "importedScene": "已导入场景“{name}”",
+    "skipped": "部分文件已跳过（不支持的类型）",
+    "importFailed": "导入失败——详情见控制台"
+  },
   "paper": {
     "background": "页面背景",
     "style": "纸张样式",

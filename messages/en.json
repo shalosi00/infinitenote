@@ -60,6 +60,19 @@
     "toastOpenFirstExport": "Open a page first, then export.",
     "toastExportFailed": "Export failed."
   },
+  "canvas": {
+    "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",
+    "importedTexts": "Imported {count, plural, =1 {1 text file} other {# text files}}",
+    "emptyFiles": "Some files had no importable content",
+    "pdfPrintout": "Inserted PDF printout ({pages, plural, =1 {1 page} other {# pages}})",
+    "pdfTruncated": "Inserted PDF printout (first {shown} of {total} pages) — the render cap is 20 pages",
+    "importedStructured": "Imported \"{name}\" — {blocks, plural, =1 {1 text block} other {# text blocks}}",
+    "plusImages": "+ {count, plural, =1 {1 image} other {# images}}",
+    "importedAudio": "Imported {count, plural, =1 {1 audio clip} other {# audio clips}}",
+    "importedScene": "Imported scene \"{name}\"",
+    "skipped": "Some files were skipped (unsupported type)",
+    "importFailed": "Import failed — see console for details"
+  },
   "paper": {
     "background": "Page background",
     "style": "Paper style",

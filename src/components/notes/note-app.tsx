@@ -47,6 +47,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAppStore } from "@/lib/store";
 import { useTranslations } from "next-intl";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
+import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
@@ -416,12 +417,13 @@ export default function NoteApp() {
   const handleExport = async (kind: "png" | "svg" | "scene" | "pdf-portrait" | "pdf-landscape" | "backup") => {
     if (kind === "backup") {
       const json = await db.buildBackup();
-      const blob = new Blob([json], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `infinitenote-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      // reuse the shared helper (issue #74): it appends the anchor and defers
+      // revoking the object URL, so the download cannot race the revocation
+      // in Safari/Firefox the way a hand-rolled synchronous click could
+      downloadBlob(
+        new Blob([json], { type: "application/json" }),
+        `infinitenote-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      );
       toast.success(t("toastBackupDownloaded"));
       return;
     }
