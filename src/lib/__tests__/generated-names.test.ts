@@ -1,18 +1,17 @@
 /// <reference types="bun-types" />
 /**
- * Bug-hunt wave 2, PR 5 — localized generated names (issue #63) and
- * surrogate-safe truncation (issue #101).
+ * Bug-hunt wave 2 follow-up — generated names (issue #63) and
+ * surrogate-safe truncation (issue #101). The names registry is a plain
+ * English set since the UI went English-only (v1.9); the truncation guards
+ * are locale-independent input hardening and stay fully covered.
  */
 import { describe, expect, it } from "bun:test";
-import {
-  generatedNames,
-  setGeneratedNamesLocale,
-} from "../generated-names";
+import { generatedNames } from "../generated-names";
 import { normalizeTag, MAX_TAG_LENGTH } from "../tags";
 import { searchIndex, buildSearchIndex } from "../search";
 
 describe("generated names (issue #63)", () => {
-  it("defaults to English", () => {
+  it("renders the exact English names the UI shows", () => {
     expect(generatedNames().notebook(3)).toBe("Notebook 3");
     expect(generatedNames().section(2)).toBe("Section 2");
     expect(generatedNames().page(1)).toBe("Page 1");
@@ -20,32 +19,25 @@ describe("generated names (issue #63)", () => {
     expect(generatedNames().conflict("Notes", "2026-11-07")).toBe(
       "Notes (conflict 2026-11-07)",
     );
+    expect(generatedNames().restoredNotebook).toBe("Restored notebook");
+    expect(generatedNames().restoredSection).toBe("Restored section");
+    expect(generatedNames().restoredPage).toBe("Restored page");
+    expect(generatedNames().untitled).toBe("Untitled");
     expect(generatedNames().quickNotesNotebook).toBe("Quick Notes");
+    expect(generatedNames().quickNotesSection).toBe("Quick Notes");
+    expect(generatedNames().quickNotePrefix).toBe("Quick note ");
+    expect(generatedNames().recordingPrefix).toBe("Recording ");
     expect(generatedNames().welcome.notebook).toBe("Welcome Notebook");
+    expect(generatedNames().welcome.startHere).toBe("Start here");
+    expect(generatedNames().welcome.title).toBe("Welcome to InfiniteNote");
+    expect(generatedNames().welcome.body).toContain("infinite canvas");
   });
 
-  it("switches to 简体中文 names when the locale changes", () => {
-    setGeneratedNamesLocale("zh-CN");
-    expect(generatedNames().notebook(3)).toBe("笔记本 3");
-    expect(generatedNames().section(2)).toBe("分区 2");
-    expect(generatedNames().page(1)).toBe("页面 1");
-    expect(generatedNames().copy("笔记")).toBe("笔记（副本）");
-    expect(generatedNames().conflict("笔记", "2026-11-07")).toBe(
-      "笔记（冲突 2026-11-07）",
-    );
-    expect(generatedNames().restoredPage).toBe("恢复的页面");
-    expect(generatedNames().untitled).toBe("无标题");
-    expect(generatedNames().quickNotesNotebook).toBe("快速笔记");
-    expect(generatedNames().quickNotePrefix).toBe("快速笔记 ");
-    expect(generatedNames().recordingPrefix).toBe("录音 ");
-    expect(generatedNames().welcome.notebook).toBe("欢迎使用");
-    setGeneratedNamesLocale("en"); // never leak locale state into other tests
-  });
-
-  it("restores English after switching back", () => {
-    setGeneratedNamesLocale("zh-CN");
-    setGeneratedNamesLocale("en");
-    expect(generatedNames().notebook(1)).toBe("Notebook 1");
+  it("is stateless — every call returns the same set", () => {
+    const a = generatedNames();
+    const b = generatedNames();
+    expect(a.notebook(7)).toBe(b.notebook(7));
+    expect(a.welcome.body).toBe(b.welcome.body);
   });
 });
 

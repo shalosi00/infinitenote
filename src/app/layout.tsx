@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
-import { AppI18nProvider } from "@/i18n/provider";
 import { themePreloadScript } from "@/lib/themes";
 
 const geistSans = Geist({
@@ -59,10 +58,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themePreloadScript() }}
         />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AppI18nProvider>
-            {children}
-            <Toaster />
-          </AppI18nProvider>
+          {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

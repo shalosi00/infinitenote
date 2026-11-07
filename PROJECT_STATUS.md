@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-07 |
-| **Current version** | v1.7.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.7.0)) |
-| **Phase** | v1.7 shipped — v1.8.0 milestone open (features #64/#65; #63 closed by bug-hunt wave 2) |
-| **Overall state** | 419 unit + 96 E2E green; 0 open bugs |
+| **Current version** | v1.8.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.8.0)) |
+| **Phase** | v1.8.0 shipped — v1.9.0 open: English-only UI (i18n layer removed), features #64/#65 |
+| **Overall state** | 401 unit + 86 E2E green; 0 known bugs |
 
 ## TL;DR
 
@@ -22,7 +22,7 @@ the page, playable on-canvas), export PNG / SVG / scenes / full backups,
 full-text search, soft-delete trash, dark mode, per-page paper styles (plain /
 ruled / grid), page tags with a tag filter view, and a fully offline
 installable PWA.
-All data is local (IndexedDB). The UI is bilingual (English / 简体中文, switchable per device). v1.5 adds file-based sync phase 1: a sync folder
+All data is local (IndexedDB). The UI is English-only (the v1.7 English/简体中文 layer was removed in v1.9); CJK note *content* remains fully supported. v1.5 adds file-based sync phase 1: a sync folder
 (or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
 a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
 Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
@@ -53,7 +53,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
-| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts fully localized (en/zh-CN) | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
+| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
 | Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts |
 | Cross-page search (Ctrl+K — content index reloads on every open), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
@@ -63,7 +63,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
-| UI i18n (issue #54): English + 简体中文 chrome **including canvas import feedback**, sidebar Language toggle, persisted locale, browser detection | Working | 20 i18n/sync-summary unit tests + 5 canvas-i18n tests + 8 E2E checks (e2e/locale.spec.ts, e2e/import-toast-locale.spec.ts) |
+| UI: English-only chrome (the v1.7 en/zh-CN i18n layer — next-intl, catalogs, language toggle — was removed in v1.9; single locale, no switcher); CJK content (titles, tags, search, IME-safe input) fully supported | Working | plural/sync-summary/generated-names unit tests + E2E (IME renames, themes labels) |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | Hardened platform: autosave verifies the write landed (no false "Saved"), failed boots offer Retry, shape library survives reloads, recordings survive mic failures and minute-collisions, e2e hooks require a `NEXT_PUBLIC_E2E=1` build, pdfjs-dist pinned to the vendored worker with a drift test, `next build` fails on type errors | Working | hardening/boot-retry/save-content/reveal-focus unit tests + recorder-library/state-freshness E2E |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
@@ -75,7 +75,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 419 unit tests, 96 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 401 unit tests, 86 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -89,11 +89,11 @@ export (A4 portrait/landscape, vector text, sliced images).
   library restore), i18n (localized generated names + seed, IME-safe
   Enter, surrogate-safe truncation) and hardening (localized sync errors,
   tag feedback, flag-gated e2e hooks, pinned pdf.js, honest build,
-  folder-init sync). A message-catalog freeze test guards against silent
-  key loss; every fix carries unit and/or E2E regression coverage.
+  folder-init sync). Every fix carries unit and/or E2E regression coverage.
 
-## Next up — v1.8 (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.9 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
+0. English-only UI — i18n layer removed (this PR)
 1. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance (#64)
 2. Drawing shape library beyond Excalidraw defaults (#65)
 
@@ -111,14 +111,13 @@ export (A4 portrait/landscape, vector text, sliced images).
 | `src/lib/tags.ts` | Page tags: normalization, dedupe, collect + filter helpers |
 | `src/lib/quick-notes.ts` | Quick capture: date keys, quick-note/daily-page titles |
 | `src/lib/audio-notes.ts` | Audio blocks: classification, recorder mime/extension picking, duration + filename helpers, link-scheme markers, import size cap (issue #67, #91, #95) |
-| `src/lib/generated-names.ts` + `src/lib/e2e-gate.ts` | Localized generated names registry (issue #63) + e2e-hook build gate (issue #102) |
+| `src/lib/generated-names.ts` + `src/lib/e2e-gate.ts` | Generated names, English set (issue #63) + e2e-hook build gate (issue #102) |
 | `src/lib/pdf-layout.ts` | Print pagination math: page bands, box banding, text line flow |
 | `src/lib/pdf-export.ts` | jsPDF renderer: A4 sheets, vector text, clipped slices, paper + footer |
 | `src/lib/mht-import.ts` | OneNote phase-2: `.mht` MIME parser (QP/base64 parts, cid/location map) |
 | `src/lib/sync/` | File-based sync phase 1: folder format, merge engine (LWW + conflict copies), runSync, ZIP + File System Access adapters, folder-handle state |
 | `src/components/notes/sync-dialog.tsx` | Sync UI: connect folder / Sync now / merge or download sync ZIP, change summary |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
-| `messages/` + `src/lib/i18n.ts` + `src/i18n/provider.tsx` | UI i18n: en/zh-CN catalogs, locale logic, persisted client provider (issue #54) |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
@@ -131,8 +130,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 419 unit tests
-make e2e                             # 96 E2E checks (Playwright; boots the app if needed)
+make test                            # 401 unit tests
+make e2e                             # 86 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
