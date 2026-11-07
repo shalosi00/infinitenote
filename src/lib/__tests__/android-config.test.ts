@@ -22,10 +22,11 @@ describe("android-twa version parity", () => {
     expect(gradle).toContain(`versionName = "${pkg.version}"`);
   });
 
-  it("encodes the same minor in versionCode (major*100 + minor*10)", () => {
-    const [major, minor] = pkg.version.split(".").map(Number);
-    expect(gradle).toContain(`versionCode = ${major * 100 + minor * 10}`);
-    expect(twa.appVersionCode).toBe(major * 100 + minor * 10);
+  it("encodes the full version in versionCode (major*100 + minor*10 + patch)", () => {
+    const [major, minor, patch] = pkg.version.split(".").map(Number);
+    const code = major * 100 + minor * 10 + (patch ?? 0);
+    expect(gradle).toContain(`versionCode = ${code}`);
+    expect(twa.appVersionCode).toBe(code);
   });
 
   it("keeps the bubblewrap manifest in sync with the gradle config", () => {
