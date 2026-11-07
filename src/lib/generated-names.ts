@@ -1,21 +1,17 @@
 /**
- * Localized generated names (issue #63).
+ * Generated names (issue #63) — every name the app GENERATES for the user:
+ * default notebook/section/page titles, duplicate and conflict suffixes,
+ * restore fallbacks, the Quick Notes home, quick-note and recording
+ * prefixes, and the first-run welcome seed.
  *
- * Every name the app GENERATES for the user — default notebook/section/page
- * titles, duplicate and conflict suffixes, restore fallbacks, the Quick
- * Notes home, quick-note and recording prefixes, and the first-run welcome
- * seed — used to be hardcoded English regardless of the UI locale.
- *
- * This module keeps those call sites pure: they read the active names
- * through a tiny registry that the i18n provider refreshes whenever the
- * locale changes (before first paint on hydration). The default is English,
- * so pure unit tests and SSR see the same strings as before.
+ * The UI is English-only since v1.9, so these are plain constants — no
+ * registry, no locale. Call sites stay pure through the generatedNames()
+ * accessor, which keeps SSR and unit tests trivial.
  *
  * No React, no DOM — safe in the browser bundle, in bun tests and SSR.
  */
-import type { Locale } from "./i18n";
 
-/** Interface every locale's generated names must satisfy. */
+/** Every name the app generates for the user. */
 export interface GeneratedNames {
   /** default notebook title, e.g. "Notebook 3" */
   notebook: (n: number) => string;
@@ -52,78 +48,40 @@ export interface GeneratedNames {
   };
 }
 
-/** Template shape of the `generated` namespace in the message catalogs. */
-interface GeneratedTemplates {
-  notebook: string;
-  section: string;
-  page: string;
-  copy: string;
-  conflict: string;
-  restoredNotebook: string;
-  restoredSection: string;
-  restoredPage: string;
-  untitled: string;
-  quickNotesNotebook: string;
-  quickNotesSection: string;
-  quickNotePrefix: string;
-  recordingPrefix: string;
+const ENGLISH_NAMES: GeneratedNames = {
+  notebook: (n) => `Notebook ${n}`,
+  section: (n) => `Section ${n}`,
+  page: (n) => `Page ${n}`,
+  copy: (title) => `${title} (copy)`,
+  conflict: (title, date) => `${title} (conflict ${date})`,
+  restoredNotebook: "Restored notebook",
+  restoredSection: "Restored section",
+  restoredPage: "Restored page",
+  untitled: "Untitled",
+  quickNotesNotebook: "Quick Notes",
+  quickNotesSection: "Quick Notes",
+  quickNotePrefix: "Quick note ",
+  recordingPrefix: "Recording ",
   welcome: {
-    notebook: string;
-    section: string;
-    ideasSection: string;
-    myNotebook: string;
-    mySection: string;
-    startHere: string;
-    brainstorm: string;
-    pageOne: string;
-    title: string;
-    body: string;
-  };
-}
-
-import enMessages from "../../messages/en.json";
-import zhMessages from "../../messages/zh-CN.json";
-
-const CATALOGS: Record<Locale, GeneratedTemplates> = {
-  en: (enMessages as { generated: GeneratedTemplates }).generated,
-  "zh-CN": (zhMessages as { generated: GeneratedTemplates }).generated,
+    notebook: "Welcome Notebook",
+    section: "Getting Started",
+    ideasSection: "Ideas",
+    myNotebook: "My Notebook",
+    mySection: "New Section",
+    startHere: "Start here",
+    brainstorm: "Brainstorm",
+    pageOne: "Page 1",
+    title: "Welcome to InfiniteNote",
+    body:
+      "An open-source notebook with an infinite canvas.\n\n" +
+      "Left: your Notebooks, Sections and Pages — like OneNote.\n" +
+      "Here: draw anywhere with pen, highlighter, shapes and text.\n\n" +
+      "Import (top right): images, text, Markdown and PDF printouts.\n" +
+      "Everything is saved locally in your browser — offline first.",
+  },
 };
 
-/** Replace `{name}` placeholders in a template. */
-function fill(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? `{${key}}`);
-}
-
-function namesFor(locale: Locale): GeneratedNames {
-  const t = CATALOGS[locale];
-  return {
-    notebook: (n) => fill(t.notebook, { n: String(n) }),
-    section: (n) => fill(t.section, { n: String(n) }),
-    page: (n) => fill(t.page, { n: String(n) }),
-    copy: (title) => fill(t.copy, { title }),
-    conflict: (title, date) => fill(t.conflict, { title, date }),
-    restoredNotebook: t.restoredNotebook,
-    restoredSection: t.restoredSection,
-    restoredPage: t.restoredPage,
-    untitled: t.untitled,
-    quickNotesNotebook: t.quickNotesNotebook,
-    quickNotesSection: t.quickNotesSection,
-    quickNotePrefix: t.quickNotePrefix,
-    recordingPrefix: t.recordingPrefix,
-    welcome: { ...t.welcome },
-  };
-}
-
-const ENGLISH_NAMES = namesFor("en");
-
-let active = ENGLISH_NAMES;
-
-/** Point every generated name at the given locale (called by the i18n provider). */
-export function setGeneratedNamesLocale(locale: Locale): void {
-  active = namesFor(locale);
-}
-
-/** The active generated names — English until the provider hydrates. */
+/** The generated names — a stable, stateless English set. */
 export function generatedNames(): GeneratedNames {
-  return active;
+  return ENGLISH_NAMES;
 }

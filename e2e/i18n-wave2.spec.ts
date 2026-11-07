@@ -3,11 +3,12 @@ import type { Page } from "@playwright/test";
 import { attachErrorCollector, openPage, resetToSeed } from "./helpers";
 
 /**
- * Bug-hunt wave 2, PR 5 — i18n fixes:
- * - #99 Enter during IME composition must not commit renames/tags
- * - #63 generated names (default titles, Quick Notes home) follow the locale
+ * IME-safe text input (issue #99, bug-hunt wave 2): Enter pressed while an
+ * IME composition is active must never commit a rename — CJK users would
+ * otherwise lose their draft mid-composition. (The UI is English-only since
+ * v1.9; input handling stays CJK-safe — these tests type real CJK text.)
  */
-test.describe.serial("wave2 i18n: IME composition + localized generated names", () => {
+test.describe.serial("IME-safe renames (issue #99)", () => {
   let page: Page;
   let consoleErrors: string[];
 
@@ -85,25 +86,5 @@ test.describe.serial("wave2 i18n: IME composition + localized generated names", 
     await expect(
       page.getByTestId("sidebar").getByRole("button", { name: "正在改名", exact: true }),
     ).toBeVisible({ timeout: 10_000 });
-  });
-
-  test("#63 the Quick Notes home and quick-note title follow the locale", async () => {
-    // switch to 简体中文
-    await page.getByTestId("locale-toggle").click();
-
-    // quick capture in zh: the home + the note title must be localized
-    await page.locator('[data-testid="quick-note-button"]').click();
-    // the created page carries the localized prefix (unique: date pattern)
-    await expect(
-      page.getByTestId("sidebar").getByText(/^快速笔记 \d{4}-\d{2}-\d{2}/).first(),
-    ).toBeVisible({ timeout: 10_000 });
-    // and the Quick Notes home notebook exists under its localized name
-    // (the quick-action button shares the label, so assert the tree area)
-    await expect(
-      page.getByTestId("sidebar").locator('nav[aria-label]'),
-    ).toContainText("快速笔记");
-
-    // switch back to English for cleanliness
-    await page.getByTestId("locale-toggle").click();
   });
 });

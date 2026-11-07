@@ -112,6 +112,20 @@ export type SyncErrorCode =
   | "badPageFile"
   | "badTrash";
 
+/** English message per sync failure code (surfaced as toasts, issue #86). */
+export const SYNC_ERROR_MESSAGES: Record<SyncErrorCode, string> = {
+  noManifest:
+    "This folder is not set up for InfiniteNote sync yet — it will be initialized on the next sync.",
+  badManifest:
+    "The sync folder manifest (manifest.json) is invalid. Restore it from a backup or pick another folder.",
+  badVersion:
+    "The sync folder was written by a newer, incompatible InfiniteNote version. Update the app on all devices.",
+  badPageFile:
+    "A page file in the sync folder is corrupt. Restore it from a backup or pick another folder.",
+  badTrash:
+    "The sync folder trash log (trash.jsonl) is corrupt. Restore it from a backup or pick another folder.",
+};
+
 /** Thrown when a folder does not look like an InfiniteNote sync folder. */
 export class SyncFormatError extends Error {
   readonly code: SyncErrorCode;

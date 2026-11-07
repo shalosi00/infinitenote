@@ -1,11 +1,16 @@
 /// <reference types="bun-types" />
 /**
- * Unit tests for the structured sync change summary (src/lib/sync/summary.ts,
- * issue #54 refactor): which changes surface, in which order, and how
- * deletions/purges combine across fields.
+ * Unit tests for the structured sync change summary (src/lib/sync/summary.ts):
+ * which changes surface, in which order, how deletions/purges combine across
+ * fields, and the English label rendering (v1.9, formerly ICU messages).
  */
 import { describe, expect, it } from "bun:test";
-import { summaryParts, type SummaryPart } from "../sync/summary";
+import {
+  summaryParts,
+  summaryPartLabel,
+  formatSyncSummary,
+  type SummaryPart,
+} from "../sync/summary";
 import type { SyncSummary } from "../sync/merge";
 
 const EMPTY: SyncSummary = {
@@ -71,5 +76,29 @@ describe("summaryParts", () => {
 
   it("carries the counts it is given", () => {
     expect(parts({ pagesUpdated: 9 })).toEqual([{ key: "wPagesUpdated", count: 9 }]);
+  });
+});
+
+describe("summaryPartLabel (English plurals)", () => {
+  it("renders the one branch for a single item", () => {
+    expect(summaryPartLabel({ key: "wPagesPulled", count: 1 })).toBe("1 page pulled");
+    expect(summaryPartLabel({ key: "wConflicts", count: 1 })).toBe("1 conflict copy");
+  });
+
+  it("renders the other branch with the count spliced in", () => {
+    expect(summaryPartLabel({ key: "wPagesPulled", count: 3 })).toBe("3 pages pulled");
+    expect(summaryPartLabel({ key: "wTrashed", count: 5 })).toBe("5 items moved to trash");
+  });
+});
+
+describe("formatSyncSummary", () => {
+  it("returns the up-to-date line for a no-op summary", () => {
+    expect(formatSyncSummary(EMPTY)).toBe("Everything already in sync.");
+  });
+
+  it("joins parts with a middle dot and closes with a period", () => {
+    expect(formatSyncSummary({ ...EMPTY, pagesAdded: 2, notebooksAdded: 1 })).toBe(
+      "1 notebook · 2 pages pulled.",
+    );
   });
 });

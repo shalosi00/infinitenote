@@ -6,8 +6,8 @@ import { attachErrorCollector, resetToSeed } from "./helpers";
  * Themes gallery E2E (issue #55).
  * Covers the full DOM contract the unit tests cannot: opening the gallery
  * from the sidebar, the data-theme attribute landing on <html>, persistence
- * via the pre-hydration script across reload, the default clearing the
- * attribute + storage, and the localized (zh-CN) gallery labels.
+ * via the pre-hydration script across reload, and the default clearing the
+ * attribute + storage.
  */
 test.describe.serial("themes gallery", () => {
   let page: Page;
@@ -39,11 +39,15 @@ test.describe.serial("themes gallery", () => {
     await expect(page.getByTestId("themes-dialog")).toBeVisible();
   }
 
-  test("gallery opens with one card per catalog theme", async () => {
+  test("gallery opens with one labeled card per catalog theme", async () => {
     await openGallery();
     for (const id of ["default", "ocean", "forest", "sunset", "rose", "slate"]) {
       await expect(page.getByTestId(`theme-card-${id}`)).toBeVisible();
     }
+    // English gallery labels (the UI is English-only)
+    await expect(page.getByTestId("theme-card-default")).toContainText("Violet (default)");
+    await expect(page.getByTestId("theme-card-ocean")).toContainText("Ocean");
+    await expect(page.getByTestId("theme-card-slate")).toContainText("Graphite");
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("themes-dialog")).toBeHidden();
   });
@@ -76,16 +80,5 @@ test.describe.serial("themes gallery", () => {
     await page.reload();
     await page.locator('[data-testid="page-row"]').first().waitFor({ state: "visible" });
     expect(await rootDataTheme()).toBeNull();
-  });
-
-  test("the gallery is localized after switching to 简体中文", async () => {
-    await page.getByTestId("locale-toggle").click(); // en → zh-CN
-    await openGallery();
-    await expect(page.getByTestId("themes-dialog").locator("h2")).toHaveText("主题");
-    await expect(page.getByTestId("theme-card-ocean")).toContainText("海洋");
-    await expect(page.getByTestId("theme-card-default")).toContainText("紫罗兰");
-    // switch back to English for later specs / deterministic state
-    await page.keyboard.press("Escape");
-    await page.getByTestId("locale-toggle").click();
   });
 });

@@ -1,12 +1,10 @@
 /**
  * Unit tests for the themes gallery core (issue #55).
- * The module is pure — catalog integrity, storage tolerance, the pre-hydration
- * script source and the i18n catalog parity are all asserted here; the DOM
- * behavior is covered by e2e/themes.spec.ts.
+ * The module is pure — catalog integrity (incl. English labels), storage
+ * tolerance and the pre-hydration script source are all asserted here; the
+ * DOM behavior is covered by e2e/themes.spec.ts.
  */
 import { describe, expect, test } from "bun:test";
-import en from "../../../messages/en.json";
-import zhCN from "../../../messages/zh-CN.json";
 import {
   applyThemeToDocument,
   DEFAULT_THEME,
@@ -21,16 +19,6 @@ import {
   type ThemeDefinition,
 } from "../themes";
 
-/** Read a dotted key ("themes.themeOcean") out of a nested catalog. */
-function dig(catalog: Record<string, unknown>, path: string): unknown {
-  let node: unknown = catalog;
-  for (const part of path.split(".")) {
-    if (typeof node !== "object" || node === null) return undefined;
-    node = (node as Record<string, unknown>)[part];
-  }
-  return node;
-}
-
 describe("themes catalog integrity", () => {
   test("ids are unique and match THEME_IDS in order", () => {
     expect(THEMES.map((t) => t.id)).toEqual([...THEME_IDS]);
@@ -41,6 +29,16 @@ describe("themes catalog integrity", () => {
     expect(THEMES.length).toBeGreaterThanOrEqual(5);
     expect(THEMES[0].id).toBe(DEFAULT_THEME);
     expect(THEMES.some((t) => t.id === DEFAULT_THEME)).toBe(true);
+  });
+
+  test("every theme carries a unique, non-empty English gallery label", () => {
+    const labels = THEMES.map((t) => t.label);
+    for (const label of labels) {
+      expect(label.trim().length).toBeGreaterThan(0);
+    }
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(THEMES.find((t) => t.id === "default")?.label).toBe("Violet (default)");
+    expect(THEMES.find((t) => t.id === "slate")?.label).toBe("Graphite");
   });
 
   test("the default theme defines no overrides — it is the shipped palette", () => {
@@ -161,35 +159,5 @@ describe("themePreloadScript", () => {
 
   test("guards against tampered storage values via an id-shaped pattern", () => {
     expect(script).toContain("/^[a-z][a-z0-9-]*$/.test(t)");
-  });
-});
-
-describe("i18n catalog parity for the themes gallery", () => {
-  const labelKey = (id: string) => `themes.theme${id.charAt(0).toUpperCase()}${id.slice(1)}`;
-  const SHARED_KEYS = ["themes.open", "themes.openTitle", "themes.galleryTitle", "themes.description", "themes.active"];
-
-  test("both catalogs provide every gallery chrome key", () => {
-    for (const path of SHARED_KEYS) {
-      expect(typeof dig(en, path), `en.${path}`).toBe("string");
-      expect(typeof dig(zhCN, path), `zh-CN.${path}`).toBe("string");
-    }
-  });
-
-  test("both catalogs provide a non-empty label for every theme", () => {
-    for (const theme of THEMES) {
-      const path = labelKey(theme.id);
-      for (const [name, catalog] of [["en", en], ["zh-CN", zhCN]] as const) {
-        const value = dig(catalog, path);
-        expect(typeof value, `${name}.${path}`).toBe("string");
-        expect((value as string).length, `${name}.${path}`).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  test("labels differ between locales (no untranslated copy-paste)", () => {
-    for (const theme of THEMES) {
-      const path = labelKey(theme.id);
-      expect(dig(en, path)).not.toBe(dig(zhCN, path));
-    }
   });
 });

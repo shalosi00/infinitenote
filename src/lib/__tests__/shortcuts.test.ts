@@ -1,41 +1,26 @@
 /// <reference types="bun-types" />
 /**
- * Unit tests for the shortcuts cheatsheet data module (issue #28) and its
- * i18n wiring (issue #54): groups/entries carry stable ids whose labels live
- * in the message catalogs.
+ * Unit tests for the shortcuts cheatsheet data module (issue #28): the
+ * English labels now live directly on the groups/entries (v1.9 — the
+ * message-catalog indirection went away with the i18n layer).
  */
 import { describe, expect, it } from "bun:test";
 import { SHORTCUT_GROUPS, displayKeys, isApplePlatform } from "../shortcuts";
-import en from "../../../messages/en.json";
-import zhCN from "../../../messages/zh-CN.json";
-
-interface ShortcutCatalog {
-  title: string;
-  description: string;
-  groups: Record<string, string>;
-  entries: Record<string, string>;
-}
-// JSON imports type as precise literals; widen through unknown (top-level
-// title/description are strings, so a direct Record<string, ...> cast fails)
-const enShortcuts = en.shortcuts as unknown as ShortcutCatalog;
-const zhShortcuts = zhCN.shortcuts as unknown as ShortcutCatalog;
 
 describe("SHORTCUT_GROUPS data", () => {
-  it("has a non-empty list of uniquely identified groups", () => {
+  it("has a non-empty list of groups, each with entries", () => {
     expect(SHORTCUT_GROUPS.length).toBeGreaterThan(0);
-    const ids = SHORTCUT_GROUPS.map((g) => g.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const g of SHORTCUT_GROUPS) expect(g.entries.length).toBeGreaterThan(0);
+    for (const g of SHORTCUT_GROUPS) {
+      expect(g.label.trim().length).toBeGreaterThan(0);
+      expect(g.entries.length).toBeGreaterThan(0);
+    }
   });
 
-  it("every entry has non-empty keys and an id that resolves in both catalogs", () => {
+  it("every entry has non-empty keys and a non-empty English label", () => {
     for (const g of SHORTCUT_GROUPS) {
-      expect(enShortcuts.groups[g.id], `group "${g.id}" (en)`).toBeTruthy();
-      expect(zhShortcuts.groups[g.id], `group "${g.id}" (zh-CN)`).toBeTruthy();
       for (const e of g.entries) {
         expect(e.keys.trim().length).toBeGreaterThan(0);
-        expect(enShortcuts.entries[e.id], `entry "${e.id}" (en)`).toBeTruthy();
-        expect(zhShortcuts.entries[e.id], `entry "${e.id}" (zh-CN)`).toBeTruthy();
+        expect(e.label.trim().length).toBeGreaterThan(0);
       }
     }
   });
@@ -43,30 +28,24 @@ describe("SHORTCUT_GROUPS data", () => {
   it("has no duplicate key combinations within a group", () => {
     for (const g of SHORTCUT_GROUPS) {
       const keys = g.entries.map((e) => e.keys);
-      expect(new Set(keys).size, `group "${g.id}"`).toBe(keys.length);
+      expect(new Set(keys).size, `group "${g.label}"`).toBe(keys.length);
     }
   });
 
   it("lists the app's real global shortcuts", () => {
     const all = SHORTCUT_GROUPS.flatMap((g) => g.entries);
-    expect(
-      all.some((e) => e.keys === "Ctrl/Cmd+K" && /search/i.test(enShortcuts.entries[e.id]))
-    ).toBe(true);
-    expect(
-      all.some((e) => e.keys === "Ctrl/Cmd+Alt+N" && /quick note/i.test(enShortcuts.entries[e.id]))
-    ).toBe(true);
-    expect(
-      all.some((e) => e.keys === "?" && /shortcut/i.test(enShortcuts.entries[e.id]))
-    ).toBe(true);
+    expect(all.some((e) => e.keys === "Ctrl/Cmd+K" && /search/i.test(e.label))).toBe(true);
+    expect(all.some((e) => e.keys === "Ctrl/Cmd+Alt+N" && /quick note/i.test(e.label))).toBe(true);
+    expect(all.some((e) => e.keys === "?" && /shortcut/i.test(e.label))).toBe(true);
   });
 
   it("canvas tool entries match the embedded Excalidraw bindings", () => {
-    const tools = SHORTCUT_GROUPS.find((g) => g.id === "canvasTools")?.entries ?? [];
-    const byKey = new Map(tools.map((e) => [e.keys, e.id]));
-    expect(enShortcuts.entries[byKey.get("V / 1")!]).toBe("Select");
-    expect(enShortcuts.entries[byKey.get("P / 7")!]).toBe("Draw (pen / highlighter shapes)");
-    expect(enShortcuts.entries[byKey.get("E")!]).toBe("Eraser");
-    expect(enShortcuts.entries[byKey.get("K")!]).toBe("Laser pointer");
+    const tools = SHORTCUT_GROUPS.find((g) => g.label === "Canvas tools")?.entries ?? [];
+    const byKey = new Map(tools.map((e) => [e.keys, e.label]));
+    expect(byKey.get("V / 1")).toBe("Select");
+    expect(byKey.get("P / 7")).toBe("Draw (pen / highlighter shapes)");
+    expect(byKey.get("E")).toBe("Eraser");
+    expect(byKey.get("K")).toBe("Laser pointer");
   });
 });
 

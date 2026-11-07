@@ -6,6 +6,7 @@
  * ranks matches and jumps to the chosen page.
  */
 import { useEffect, useMemo, useState } from "react";
+import { plural } from "@/lib/plural";
 import { FileText, Search } from "lucide-react";
 import {
   CommandDialog,
@@ -16,12 +17,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useAppStore } from "@/lib/store";
-import { useTranslations } from "next-intl";
 import { buildSearchIndex, searchIndex } from "@/lib/search";
 import { db } from "@/lib/notes-db";
 
 export function SearchDialog() {
-  const t = useTranslations("search");
   const open = useAppStore((s) => s.searchOpen);
   const setOpen = useAppStore((s) => s.setSearchOpen);
   const notebooks = useAppStore((s) => s.notebooks);
@@ -59,14 +58,14 @@ export function SearchDialog() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput
-        placeholder={t("placeholder")}
+        placeholder={"Search all pages…"}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        <CommandEmpty>{t("noResults")}</CommandEmpty>
+        <CommandEmpty>{"No results found."}</CommandEmpty>
         {results.length > 0 && (
-          <CommandGroup heading={t("results", { count: results.length })}>
+          <CommandGroup heading={`${plural(results.length, "1 page", "# pages")}`}>
             {results.map((hit) => (
               <CommandItem
                 key={hit.pageId}
