@@ -38,6 +38,7 @@ import {
 } from "@/lib/excalidraw-client";
 import { exportPagePdf } from "@/lib/pdf-export";
 import { audioPayloadOf, isAudioBlockLink } from "@/lib/audio-notes";
+import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
@@ -391,8 +392,9 @@ export default function ExcalidrawCanvas({
       // the first pan/zoom would show an un-tiled gradient until interaction
       if (background === "ruled") syncRuledLayer(api.getAppState());
 
-      // Test hook — only when explicitly requested via ?e2e=1
-      if (new URLSearchParams(window.location.search).has("e2e")) {
+      // Test hook — ?e2e=1 AND development only (issue #102): Next inlines
+      // NODE_ENV, so the whole block compiles away in production builds
+      if (e2eHooksEnabled(window.location.search, process.env.NEXT_PUBLIC_E2E)) {
         (window as unknown as Record<string, unknown>).__NOTE_E2E__ = {
           excalidraw: api,
           saveNow: flushSave,

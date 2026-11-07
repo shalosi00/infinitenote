@@ -51,7 +51,14 @@ import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError } from "@/lib/export-errors";
-import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
+import { e2eHooksEnabled } from "@/lib/e2e-gate";
+import {
+  addTagWithResult,
+  collectTags,
+  MAX_TAGS_PER_PAGE,
+  removeTag,
+  type TagCount,
+} from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
@@ -262,9 +269,10 @@ export default function NoteApp() {
 
   usePWA();
 
-  // Test hook — full data reset for E2E runs (?e2e=1 only)
+  // Test hook — full data reset for E2E runs (?e2e=1 + development only,
+  // issue #102: the destructive backdoor must never ship in prod bundles)
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has("e2e")) return;
+    if (!e2eHooksEnabled(window.location.search, process.env.NEXT_PUBLIC_E2E)) return;
     (window as unknown as Record<string, unknown>).__NOTE_RESET__ = async () => {
       const dbMod = await import("@/lib/notes-db");
       await dbMod.eraseAllData();
@@ -879,8 +887,15 @@ function TagPicker({
   const tags = page.tags ?? [];
 
   const commit = (raw: string) => {
-    const next = addTag(tags, raw);
-    if (next !== tags) onSetTags(next);
+    // report WHY nothing happened instead of silently dropping input (#100)
+    const { tags: next, status } = addTagWithResult(tags, raw);
+    if (status === "added") {
+      onSetTags(next);
+    } else if (status === "capped") {
+      toast.error(t("tooManyTags", { count: MAX_TAGS_PER_PAGE }));
+    } else if (status === "duplicate") {
+      toast(t("duplicateTag", { tag: raw.trim() }));
+    }
     setDraft("");
   };
 

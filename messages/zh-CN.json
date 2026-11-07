@@ -96,7 +96,9 @@
     "addTagAria": "添加标签",
     "existing": "已有标签",
     "removeTag": "移除标签 {tag}",
-    "quickAddTitle": "添加“{tag}”（{count, plural, other {# 个页面}}在使用）"
+    "quickAddTitle": "添加“{tag}”（{count, plural, other {# 个页面}}在使用）",
+    "tooManyTags": "一个页面最多只能添加 {count} 个标签",
+    "duplicateTag": "已有标签“{tag}”"
   },
   "sidebar": {
     "notebooks": "笔记本",
@@ -224,7 +226,14 @@
     "wConflicts": "{count, plural, other {# 个冲突副本}}",
     "wTrashed": "{count, plural, other {# 项已移入回收站}}",
     "wTreeUpdated": "{count, plural, other {# 个笔记本/分区已更新}}",
-    "wPurged": "{count, plural, other {# 项已彻底清除}}"
+    "wPurged": "{count, plural, other {# 项已彻底清除}}",
+    "errors": {
+      "noManifest": "此文件夹尚未配置 InfiniteNote 同步——下次同步时将自动初始化。",
+      "badManifest": "同步文件夹的清单（manifest.json）无效。请从备份恢复或选择其他文件夹。",
+      "badVersion": "同步文件夹由更新且不兼容的 InfiniteNote 版本写入。请在所有设备上更新应用。",
+      "badPageFile": "同步文件夹中的某个页面文件已损坏。请从备份恢复或选择其他文件夹。",
+      "badTrash": "同步文件夹的回收站日志（trash.jsonl）已损坏。请从备份恢复或选择其他文件夹。"
+    }
   },
   "empty": {
     "title": "未打开页面",
