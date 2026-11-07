@@ -52,6 +52,7 @@ import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
+import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
 import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import {
@@ -449,6 +450,13 @@ export default function NoteApp() {
       const count = await restoreBackupArchive(json);
       toast.success(`Restored backup — ${plural(count, "1 page", "# pages")} imported.`);
     } catch (err) {
+      // issue #85 parity (found by the import/export round-trip E2E): a user
+      // picking a non-backup file is an EXPECTED failure — toast only, no
+      // console.error noise. Real, unexpected errors still log.
+      if (err instanceof RestoreError) {
+        toast.error(RESTORE_ERROR_MESSAGES[err.code]);
+        return;
+      }
       console.error(err);
       toast.error("Could not restore that backup file.");
     }

@@ -14,6 +14,7 @@
  */
 import Dexie, { type Table } from "dexie";
 import { generatedNames } from "./generated-names";
+import { RestoreError } from "./restore-error";
 import { byOrder } from "./types";
 import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
 
@@ -657,7 +658,7 @@ export async function restoreBackup(json: string): Promise<number> {
     }>;
   };
   if (parsed?.app !== "infinitenote" || !Array.isArray(parsed.notebooks)) {
-    throw new Error("Not an InfiniteNote backup file");
+    throw new RestoreError("Not an InfiniteNote backup file");
   }
   let pageCount = 0;
   const ts = now();
