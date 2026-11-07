@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import * as db from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
+import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./last-page";
 import { quickNoteTitle, todayKey } from "./quick-notes";
 import { generatedNames } from "./generated-names";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
@@ -81,6 +82,23 @@ interface AppStore {
   eraseEverything: () => Promise<void>;
 }
 
+/**
+ * Issue #123: swap the firstPageSelection default (set by refresh()) for the
+ * persisted last-opened page when the stored selection still resolves in the
+ * freshly loaded tree.
+ */
+function restoreLastOpenedPage(stored: Selection | null): void {
+  if (!stored) return;
+  const s = useAppStore.getState();
+  const tree = { notebooks: s.notebooks, sections: s.sections, pages: s.pages };
+  const restored = pickRestoredSelection(stored, tree);
+  if (!restored) return;
+  useAppStore.setState({
+    selection: restored,
+    expanded: defaultExpandedState(tree, restored),
+  });
+}
+
 const DEFAULT_NOTEBOOK_COLORS: NotebookColor[] = ["violet", "teal", "rose", "amber"];
 const nextColor = (n: number) => DEFAULT_NOTEBOOK_COLORS[n % DEFAULT_NOTEBOOK_COLORS.length];
 
@@ -105,6 +123,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   load: () => {
     if (!initialLoadPromise) {
       const run = (async () => {
+        // Issue #123: read the persisted selection BEFORE any refresh() —
+        // the boot refresh sets the firstPageSelection default, which is a
+        // selection change and would overwrite the stored value first.
+        const storedSelection = loadLastSelection();
         await get().refresh();
         const s = get();
         // First run → seed a small welcome notebook so the app is never empty.
@@ -112,6 +134,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
           await seedWelcomeData();
           await get().refresh();
         }
+        // Issue #123: reopen the page the user was working on before the
+        // reload. A page trashed or deleted between sessions fails the tree
+        // validation and boot keeps the firstPageSelection default.
+        restoreLastOpenedPage(storedSelection);
         set({ loadError: null });
       })();
       // A rejected boot promise must never be cached (issue #77): a transient
@@ -509,4 +535,17 @@ async function seedWelcomeData(): Promise<void> {
   const nb2 = await db.createNotebook(names.myNotebook, "teal");
   const sec3 = await db.createSection(nb2.id, names.mySection);
   await db.createPage(sec3.id, names.pageOne, null);
+}
+
+// Issue #123: persist every selection change so a reload reopens where the
+// user left off. Subscribing once at module level covers ALL writers —
+// sidebar clicks, deletes, bulk moves, quick notes, programmatic jumps —
+// without touching each action. Browser-only: the store module also loads
+// during SSR, where localStorage does not exist.
+if (typeof window !== "undefined") {
+  useAppStore.subscribe((state, prev) => {
+    if (state.selection && state.selection !== prev.selection) {
+      saveLastSelection(state.selection);
+    }
+  });
 }
