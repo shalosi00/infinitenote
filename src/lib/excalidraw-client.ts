@@ -32,12 +32,13 @@ import {
 import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
-import { headingFontSize, type ImportedBlock } from "./import-blocks";
+import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
 import { parseMht, resolveMhtResource } from "./mht-import";
 import {
   AUDIO_BLOCK_HEIGHT,
   AUDIO_BLOCK_WIDTH,
   AUDIO_LINK_SCHEME,
+  isAudioImportTooLarge,
   withAudioMime,
 } from "./audio-notes";
 import type { ScenePayload } from "./types";
@@ -85,12 +86,18 @@ export async function importImageFiles(
   const skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }> = [];
   for (const file of files) {
     const dataURL = await fileToDataUrl(file);
-    const { width: w, height: h } = await imageSize(dataURL);
+    const intrinsic = await imageSize(dataURL);
+    // issue #89: SVGs without intrinsic dimensions report 0×0 — fall back
+    // to a sane default instead of collapsing to a 16px sliver
+    const { width: iw, height: ih } = withIntrinsicFallback(
+      intrinsic.width,
+      intrinsic.height,
+    );
     // cap enormous images so they stay usable on canvas
     const maxDim = 1600;
-    const scale = Math.min(1, maxDim / Math.max(w, h));
-    const width = Math.max(16, Math.round(w * scale));
-    const height = Math.max(16, Math.round(h * scale));
+    const scale = Math.min(1, maxDim / Math.max(iw, ih));
+    const width = Math.max(16, Math.round(iw * scale));
+    const height = Math.max(16, Math.round(ih * scale));
     const fileId = crypto.randomUUID() as FileId;
     newFiles[fileId] = {
       id: fileId,
@@ -117,6 +124,10 @@ export async function importTextFiles(
   const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
   let y = anchor.y;
   let imported = 0;
+  // issue #92: batch ALL created elements into ONE scene update — an
+  // update per file re-rendered the canvas and restarted the autosave
+  // debounce once per dropped file
+  const created: ExcalidrawElement[] = [];
   for (const file of files) {
     const text = (await file.text()).slice(0, 60_000); // hard cap for sanity
     if (!text.trim()) continue;
@@ -132,13 +143,18 @@ export async function importTextFiles(
         id: crypto.randomUUID(),
       },
     ];
-    const created = convertToExcalidrawElements(skeletons, { regenerateIds: false });
-    api.updateScene({
-      elements: [...api.getSceneElements(), ...(created as unknown as ExcalidrawElement[])],
-    });
-    // rough height estimate for stacking: chars per wrapped line
-    const estHeight = Math.max(1, Math.ceil(text.length / 70)) * 26 + 60;
+    created.push(
+      ...(convertToExcalidrawElements(skeletons, {
+        regenerateIds: false,
+      }) as unknown as ExcalidrawElement[]),
+    );
+    // stacking estimate, CJK-aware (issue #88): wide characters wrap at
+    // ~1em, not the 0.52em a flat chars-per-line division assumes
+    const estHeight = estimateLineCount(text, 20, 720) * 26 + 60;
     y += estHeight;
+  }
+  if (created.length) {
+    api.updateScene({ elements: [...api.getSceneElements(), ...created] });
   }
   // count only files that produced content (issue #75): blank files must
   // not be reported as imported
@@ -185,9 +201,8 @@ function blocksToSkeletons(
     const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
     const text = `${prefix}${block.text}`;
     const width = 720;
-    // rough wrap estimate: chars per line shrinks as the font grows
-    const charsPerLine = Math.max(16, Math.floor(width / (fontSize * 0.52)));
-    const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+    // CJK-aware wrap estimate (issue #88)
+    const lines = estimateLineCount(text, fontSize, width);
     skeletons.push({
       type: "text",
       text,
@@ -207,8 +222,8 @@ function blockAdvance(block: ImportedBlock): number {
   const fontSize = block.kind === "heading" ? headingFontSize(block.level) : 20;
   const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
   const text = `${prefix}${block.text}`;
-  const charsPerLine = Math.max(16, Math.floor(720 / (fontSize * 0.52)));
-  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  // CJK-aware wrap estimate (issue #88)
+  const lines = estimateLineCount(text, fontSize, 720);
   return lines * fontSize * 1.35 + 14;
 }
 
@@ -408,22 +423,38 @@ export function makeAudioEmbeddable(
   } as unknown as ExcalidrawElement;
 }
 
+/** Outcome of an audio import batch: what landed, what was refused. */
+export interface AudioImportResult {
+  /** clips placed on the canvas */
+  added: number;
+  /** clips skipped for exceeding MAX_AUDIO_IMPORT_BYTES (issue #91) */
+  skippedLarge: number;
+}
+
 /**
  * Import audio files as embeddable audio blocks, stacked below existing
  * content. Each clip keeps its filename for search + the aria label.
+ * Clips larger than the cap are skipped BEFORE any scene mutation (issue
+ * #91): a multi-hundred-MB base64 payload would blow the IndexedDB quota
+ * after the block is already placed, losing the take on the next save.
  */
 export async function importAudioFiles(
   api: ExcalidrawImperativeAPI,
   files: File[],
   insertAt?: { x: number; y: number }
-): Promise<number> {
-  if (!files.length) return 0;
+): Promise<AudioImportResult> {
+  if (!files.length) return { added: 0, skippedLarge: 0 };
   const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
   let y = anchor.y;
   let x = anchor.x;
   let added = 0;
+  let skippedLarge = 0;
   const created: ExcalidrawElement[] = [];
   for (const file of files) {
+    if (isAudioImportTooLarge(file.size)) {
+      skippedLarge += 1;
+      continue;
+    }
     // normalize the MIME (drag-dropped files often arrive with an empty
     // type, which readAsDataURL stamps as application/octet-stream)
     const dataUrl = withAudioMime(await fileToDataUrl(file), file.name);
@@ -439,7 +470,7 @@ export async function importAudioFiles(
   if (created.length) {
     api.updateScene({ elements: [...api.getSceneElements(), ...created] });
   }
-  return added;
+  return { added, skippedLarge };
 }
 
 /* ------------------------------------------------------------------ */

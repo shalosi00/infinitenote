@@ -61,7 +61,10 @@
     "toastExportFailed": "Export failed.",
     "exportErrors": {
       "emptyPage": "Nothing to export — this page is empty."
-    }
+    },
+    "loadFailed": "Could not open your notes",
+    "loadFailedBody": "The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again.",
+    "retry": "Try again"
   },
   "canvas": {
     "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",
@@ -74,7 +77,8 @@
     "importedAudio": "Imported {count, plural, =1 {1 audio clip} other {# audio clips}}",
     "importedScene": "Imported scene \"{name}\"",
     "skipped": "Some files were skipped (unsupported type)",
-    "importFailed": "Import failed — see console for details"
+    "importFailed": "Import failed — see console for details",
+    "audioTooLarge": "Skipped {count, plural, =1 {1 audio file} other {# audio files}} — larger than 30 MB, too big to store reliably"
   },
   "paper": {
     "background": "Page background",

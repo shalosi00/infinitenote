@@ -194,3 +194,16 @@ export function withAudioMime(dataUrl: string, fileName: string): string | null 
 /** World-space size of an audio block on the canvas (a player strip). */
 export const AUDIO_BLOCK_WIDTH = 360;
 export const AUDIO_BLOCK_HEIGHT = 80;
+
+/**
+ * Import size cap for audio clips (issue #91). A clip becomes a base64
+ * data: payload (~1.37× its size) stored inside the scene, so anything
+ * past this risks blowing the IndexedDB quota on the NEXT autosave — after
+ * the block is already on the canvas. 30 MB keeps hour-long opus takes.
+ */
+export const MAX_AUDIO_IMPORT_BYTES = 30 * 1024 * 1024;
+
+/** Should this audio file be refused at import time (issue #91)? */
+export function isAudioImportTooLarge(byteSize: number): boolean {
+  return byteSize > MAX_AUDIO_IMPORT_BYTES;
+}
