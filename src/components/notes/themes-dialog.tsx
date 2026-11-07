@@ -11,7 +11,6 @@
  * the attribute and the storage key.
  */
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,16 +29,6 @@ import {
   type ThemeId,
 } from "@/lib/themes";
 
-/** Catalog keys per theme id — explicit so tsc checks every entry exists. */
-const THEME_LABEL_KEY: Record<ThemeId, string> = {
-  default: "themeDefault",
-  ocean: "themeOcean",
-  forest: "themeForest",
-  sunset: "themeSunset",
-  rose: "themeRose",
-  slate: "themeSlate",
-};
-
 export function ThemesDialog({
   open,
   onOpenChange,
@@ -47,7 +36,6 @@ export function ThemesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const t = useTranslations("themes");
   const [active, setActive] = useState<ThemeId>(DEFAULT_THEME);
 
   // Re-read the persisted theme each time the gallery opens so the active
@@ -55,7 +43,7 @@ export function ThemesDialog({
   useEffect(() => {
     if (!open) return;
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration sync from an external store (localStorage), same pattern as the i18n provider
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration sync from an external store (localStorage)
       setActive(parseStoredTheme(window.localStorage.getItem(THEME_STORAGE_KEY)));
     } catch {
       /* storage unavailable — show the default as active */
@@ -80,10 +68,12 @@ export function ThemesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg" data-testid="themes-dialog">
         <DialogHeader>
-          <DialogTitle>{t("galleryTitle")}</DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
+          <DialogTitle>Themes</DialogTitle>
+          <DialogDescription>
+            Accent colors layered on top of light and dark mode.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="listbox" aria-label={t("galleryTitle")}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="listbox" aria-label="Themes">
           {THEMES.map((theme) => {
             const isActive = theme.id === active;
             return (
@@ -108,10 +98,10 @@ export function ThemesDialog({
                     />
                   </span>
                   {isActive && (
-                    <Check className="h-4 w-4 text-primary" aria-label={t("active")} data-testid={`theme-card-${theme.id}-active`} />
+                    <Check className="h-4 w-4 text-primary" aria-label="Active" data-testid={`theme-card-${theme.id}-active`} />
                   )}
                 </span>
-                <span className="text-sm font-normal">{t(THEME_LABEL_KEY[theme.id] as Parameters<typeof t>[0])}</span>
+                <span className="text-sm font-normal">{theme.label}</span>
               </Button>
             );
           })}

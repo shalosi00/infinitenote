@@ -5,6 +5,7 @@
  * Layout: header + (sidebar | canvas). Mobile: sidebar becomes a drawer.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { plural } from "@/lib/plural";
 import { useTheme } from "next-themes";
 import {
   Download,
@@ -45,12 +46,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppStore } from "@/lib/store";
-import { useTranslations } from "next-intl";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
 import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
-import { ExportError } from "@/lib/export-errors";
+import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import {
   addTagWithResult,
@@ -64,7 +64,8 @@ import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
-import { SyncDialog, useSyncSummaryFormatter, type SyncOutcome } from "./sync-dialog";
+import { SyncDialog, type SyncOutcome } from "./sync-dialog";
+import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
 import { runSync } from "@/lib/sync/db";
 import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
@@ -92,12 +93,15 @@ const NO_CHANGES_SUMMARY: SyncSummary = {
   treePurged: 0,
 };
 
+/** English labels for the page paper-style menu (plain / ruled / grid). */
+const PAPER_STYLE_LABELS: Record<PageBackground, string> = {
+  plain: "Plain",
+  ruled: "Ruled",
+  grid: "Grid",
+};
+
 export default function NoteApp() {
-  const t = useTranslations("app");
-  const tCommon = useTranslations("common");
-  const tSync = useTranslations("sync");
-  const tPaper = useTranslations("paper");
-  const formatSummary = useSyncSummaryFormatter();
+  const formatSummary = formatSyncSummary;
   const {
     loaded,
     loadError,
@@ -153,33 +157,33 @@ export default function NoteApp() {
       // canvas is unmounted and a stale api reference would insert into a
       // detached scene, silently losing the clip
       if (!useAppStore.getState().selection) {
-        toast.error(t("toastRecordingNoPage"));
+        toast.error("Open a page first, then record audio.");
         return;
       }
       const name = buildRecordingFileName(recorderExtensionForMime(mimeType));
       const file = new File([blob], name, { type: mimeType });
       await canvasApi.current?.importFiles([file]);
-      toast.success(t("toastRecordingInserted", { duration: formatDuration(seconds) }));
+      toast.success(`Inserted recording (${formatDuration(seconds)}).`);
     },
-    [t]
+    []
   );
 
   const startRecording = useCallback(async () => {
     if (recordingStartedAt !== null) return;
     if (!canvasApi.current) {
-      toast.error(t("toastOpenFirstImport"));
+      toast.error("Open a page first, then import files.");
       return;
     }
     if (
       typeof MediaRecorder === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      toast.error(t("toastRecorderUnsupported"));
+      toast.error("Audio recording is not supported in this browser.");
       return;
     }
     const mimeType = pickRecorderMimeType((m) => MediaRecorder.isTypeSupported(m));
     if (!mimeType) {
-      toast.error(t("toastRecorderUnsupported"));
+      toast.error("Audio recording is not supported in this browser.");
       return;
     }
     let stream: MediaStream;
@@ -188,9 +192,9 @@ export default function NoteApp() {
     } catch (err) {
       const name = err instanceof DOMException ? err.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
-        toast.error(t("toastMicDenied"));
+        toast.error("Microphone access was denied.");
       } else {
-        toast.error(t("toastMicFailed"));
+        toast.error("Could not start or finish the recording.");
       }
       return;
     }
@@ -199,7 +203,7 @@ export default function NoteApp() {
       recorder = new MediaRecorder(stream, { mimeType });
     } catch {
       stream.getTracks().forEach((track) => track.stop());
-      toast.error(t("toastRecorderUnsupported"));
+      toast.error("Audio recording is not supported in this browser.");
       return;
     }
     const startedAt = Date.now();
@@ -215,7 +219,7 @@ export default function NoteApp() {
       if (blob.size > 0) {
         void insertRecording(blob, type, seconds);
       } else {
-        toast.error(t("toastMicFailed"));
+        toast.error("Could not start or finish the recording.");
       }
     };
     // issue #93: a dead input device (mic unplugged, OS revoke) fires an
@@ -232,7 +236,7 @@ export default function NoteApp() {
         /* recorder already dead */
       }
       teardownRecording();
-      toast.error(t("toastMicFailed"));
+      toast.error("Could not start or finish the recording.");
     };
     recorder.start(250); // timeslice: data arrives even on abrupt stops
     streamRef.current = stream;
@@ -242,7 +246,7 @@ export default function NoteApp() {
     timerRef.current = setInterval(() => {
       setRecordingElapsed(Math.floor((Date.now() - startedAt) / 1000));
     }, 1000);
-  }, [recordingStartedAt, t, teardownRecording, insertRecording]);
+  }, [recordingStartedAt, teardownRecording, insertRecording]);
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
@@ -404,7 +408,7 @@ export default function NoteApp() {
         const changed =
           s.pagesAdded + s.pagesUpdated + s.pagesConflicted + s.pagesDeleted +
           s.treeDeleted + s.treeUpdated + s.notebooksAdded + s.sectionsAdded;
-        if (changed) toast(tSync("autoSync", { summary: formatSummary(s) }));
+        if (changed) toast(`Auto-sync: ${formatSummary(s)}`);
       } catch {
         /* background re-scan stays silent — manual sync surfaces errors */
       } finally {
@@ -417,7 +421,7 @@ export default function NoteApp() {
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("focus", onFocus);
     };
-  }, [handleRunSync, tSync, formatSummary]);
+  }, [handleRunSync, formatSummary]);
 
   /* ----------------------------- import ------------------------------- */
 
@@ -429,7 +433,7 @@ export default function NoteApp() {
   const handleImportFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     if (!canvasApi.current) {
-      toast.error(t("toastOpenFirstImport"));
+      toast.error("Open a page first, then import files.");
       return;
     }
     await canvasApi.current.importFiles(Array.from(files));
@@ -441,10 +445,10 @@ export default function NoteApp() {
     try {
       const json = await file.text();
       const count = await restoreBackupArchive(json);
-      toast.success(t("toastRestored", { count }));
+      toast.success(`Restored backup — ${plural(count, "1 page", "# pages")} imported.`);
     } catch (err) {
       console.error(err);
-      toast.error(t("toastRestoreFailed"));
+      toast.error("Could not restore that backup file.");
     }
   };
 
@@ -460,11 +464,11 @@ export default function NoteApp() {
         new Blob([json], { type: "application/json" }),
         `infinitenote-backup-${new Date().toISOString().slice(0, 10)}.json`,
       );
-      toast.success(t("toastBackupDownloaded"));
+      toast.success("Backup downloaded.");
       return;
     }
     if (!canvasApi.current || !currentPage) {
-      toast.error(t("toastOpenFirstExport"));
+      toast.error("Open a page first, then export.");
       return;
     }
     try {
@@ -478,10 +482,10 @@ export default function NoteApp() {
       // failures map to localized messages, everything else falls back to
       // the generic toast
       if (err instanceof ExportError) {
-        toast.error(t(`exportErrors.${err.code}`));
+        toast.error(EXPORT_ERROR_MESSAGES[err.code]);
       } else {
         console.error(err);
-        toast.error(t("toastExportFailed"));
+        toast.error("Export failed.");
       }
     }
   };
@@ -508,11 +512,11 @@ export default function NoteApp() {
               <NotebookPen className="h-8 w-8 text-destructive" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">{t("loadFailed")}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t("loadFailedBody")}</p>
+              <h2 className="text-lg font-semibold">{"Could not open your notes"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{"The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again."}</p>
             </div>
             <Button onClick={() => void load().catch(() => undefined)} className="gap-2">
-              <NotebookPen className="h-4 w-4" /> {t("retry")}
+              <NotebookPen className="h-4 w-4" /> {"Try again"}
             </Button>
           </div>
         </div>
@@ -522,7 +526,7 @@ export default function NoteApp() {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <NotebookPen className="h-8 w-8 animate-pulse" />
-          <p className="text-sm">{t("opening")}</p>
+          <p className="text-sm">{"Opening your notebooks…"}</p>
         </div>
       </div>
     );
@@ -536,7 +540,7 @@ export default function NoteApp() {
           variant="ghost"
           size="icon"
           className="h-9 w-9 md:hidden"
-          aria-label={t("openNavigation")}
+          aria-label={"Open navigation"}
           onClick={() => setDrawerOpen(true)}
         >
           <Menu className="h-5 w-5" />
@@ -556,7 +560,7 @@ export default function NoteApp() {
           onClick={() => useAppStore.getState().setSearchOpen(true)}
         >
           <Search className="h-4 w-4" />
-          <span className="hidden lg:inline">{t("searchPages")}</span>
+          <span className="hidden lg:inline">{"Search pages"}</span>
           <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium lg:inline">
             Ctrl K
           </kbd>
@@ -571,7 +575,7 @@ export default function NoteApp() {
           multiple
           className="hidden"
           accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json,audio/*,.mp3,.wav,.ogg,.oga,.m4a,.aac,.flac,.weba,.opus"
-          aria-label={t("importFiles")}
+          aria-label={"Import files"}
           onChange={(e) => {
             void handleImportFiles(e.target.files);
             e.target.value = "";
@@ -582,7 +586,7 @@ export default function NoteApp() {
           type="file"
           className="hidden"
           accept="application/json,.json"
-          aria-label={t("restoreBackupFile")}
+          aria-label={"Restore backup file"}
           onChange={(e) => {
             void handleRestoreBackup(e.target.files);
             e.target.value = "";
@@ -592,18 +596,18 @@ export default function NoteApp() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
               <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("import")}</span>
+              <span className="hidden sm:inline">{"Import"}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>{t("insertInto")}</DropdownMenuLabel>
+            <DropdownMenuLabel>{"Insert into current page"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={openFilePicker}>
-              <ImageIcon /> {t("importItems")}
+              <ImageIcon /> {"Images, PDF, Word, HTML, text, audio…"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t("library")}</DropdownMenuLabel>
+            <DropdownMenuLabel>{"Library"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => backupInputRef.current?.click()}>
-              <FileJson /> {t("restoreBackup")}
+              <FileJson /> {"Restore backup (.json)"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -614,8 +618,8 @@ export default function NoteApp() {
             variant="ghost"
             size="icon"
             className="h-9 w-9"
-            aria-label={t("recordAudio")}
-            title={t("recordAudio")}
+            aria-label={"Record audio"}
+            title={"Record audio"}
             data-testid="record-audio"
             onClick={() => void startRecording()}
           >
@@ -640,8 +644,8 @@ export default function NoteApp() {
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              aria-label={t("stopRecording")}
-              title={t("stopRecording")}
+              aria-label={"Stop recording"}
+              title={"Stop recording"}
               data-testid="stop-recording"
               onClick={stopRecording}
             >
@@ -655,43 +659,43 @@ export default function NoteApp() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
               <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("export")}</span>
+              <span className="hidden sm:inline">{"Export"}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>{t("exportCurrent")}</DropdownMenuLabel>
+            <DropdownMenuLabel>{"Current page"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("scene")}>
-              <FileDown /> {t("exportScene")}
+              <FileDown /> {"Excalidraw scene (.excalidraw)"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => void handleExport("png")}>
-              <ImageIcon /> {t("exportPng")}
+              <ImageIcon /> {"PNG image"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => void handleExport("svg")}>
-              <FileUp /> {t("exportSvg")}
+              <FileUp /> {"SVG vector"}
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
-                <Printer /> {t("exportPdf")}
+                <Printer /> {"PDF — print (A4)"}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-56">
                 <DropdownMenuItem
                   data-testid="export-pdf-portrait"
                   onClick={() => void handleExport("pdf-portrait")}
                 >
-                  <Printer /> {t("pdfPortrait")}
+                  <Printer /> {"A4 portrait"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   data-testid="export-pdf-landscape"
                   onClick={() => void handleExport("pdf-landscape")}
                 >
-                  <Printer /> {t("pdfLandscape")}
+                  <Printer /> {"A4 landscape"}
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t("exportEverything")}</DropdownMenuLabel>
+            <DropdownMenuLabel>{"Everything"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("backup")}>
-              <PackageOpen /> {t("exportBackup")}
+              <PackageOpen /> {"Full backup (.json)"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -702,7 +706,7 @@ export default function NoteApp() {
           variant="ghost"
           size="icon"
           className="h-9 w-9"
-          aria-label={t("toggleTheme")}
+          aria-label={"Toggle theme"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -719,7 +723,7 @@ export default function NoteApp() {
         {/* mobile drawer */}
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetContent side="left" className="w-72 p-0">
-            <SheetTitle className="sr-only">{t("navigation")}</SheetTitle>
+            <SheetTitle className="sr-only">{"Navigation"}</SheetTitle>
             <Sidebar onNavigate={() => setDrawerOpen(false)} />
           </SheetContent>
         </Sheet>
@@ -757,13 +761,13 @@ export default function NoteApp() {
                       if (e.key === "Enter") e.currentTarget.blur();
                       if (e.key === "Escape") setTitleDraft(null);
                     }}
-                    aria-label={t("pageTitle")}
+                    aria-label={"Page title"}
                   />
                 ) : (
                   <button
                     type="button"
                     className="truncate rounded px-1 py-1 text-left text-sm font-medium hover:bg-muted"
-                    title={t("clickToRename")}
+                    title={"Click to rename this page"}
                     onClick={() => setTitleDraft(currentPage.title)}
                   >
                     {currentPage.title}
@@ -785,17 +789,17 @@ export default function NoteApp() {
                       variant="ghost"
                       size="sm"
                       className="gap-2 text-muted-foreground"
-                      aria-label={tPaper("background")}
+                      aria-label={"Page background"}
                       data-testid="background-picker"
                     >
                       <LayoutTemplate className="h-4 w-4" />
                       <span className="hidden sm:inline">
-                        {tPaper((currentPage.background ?? "plain") as "plain")}
+                        {PAPER_STYLE_LABELS[currentPage.background ?? "plain"]}
                       </span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" data-testid="paper-menu">
-                    <DropdownMenuLabel>{tPaper("style")}</DropdownMenuLabel>
+                    <DropdownMenuLabel>{"Paper style"}</DropdownMenuLabel>
                     {(["plain", "ruled", "grid"] as const).map((kind) => (
                       <DropdownMenuItem
                         key={kind}
@@ -806,7 +810,7 @@ export default function NoteApp() {
                         onClick={() => void setPageBackground(currentPage.id, kind)}
                       >
                         <PaperSwatch kind={kind} />
-                        {tPaper(kind)}
+                        {PAPER_STYLE_LABELS[kind]}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -819,11 +823,11 @@ export default function NoteApp() {
                 >
                   <PenLine className="h-3.5 w-3.5" />
                   {saveIndicator === "saving"
-                    ? tCommon("saving")
+                    ? "Saving…"
                     : saveIndicator === "error"
-                      ? tCommon("saveFailed")
+                      ? "Save failed"
                       : saveIndicator === "saved"
-                        ? tCommon("saved")
+                        ? "Saved"
                         : ""}
                 </span>
               </div>
@@ -850,9 +854,9 @@ export default function NoteApp() {
             <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
               <div className="rounded-xl border-2 border-dashed border-primary/50 px-10 py-8 text-center">
                 <Upload className="mx-auto h-8 w-8 text-primary" />
-                <p className="mt-2 text-sm font-medium">{t("dropTitle")}</p>
+                <p className="mt-2 text-sm font-medium">{"Drop files to insert them"}</p>
                 <p className="text-xs text-muted-foreground">
-                  {t("dropBody")}
+                  {"Images, PDF printouts, Word & HTML pages, OneNote .mht, text, audio clips, .excalidraw scenes"}
                 </p>
               </div>
             </div>
@@ -882,7 +886,6 @@ function TagPicker({
   allTags: TagCount[];
   onSetTags: (tags: string[]) => void;
 }) {
-  const t = useTranslations("tags");
   const [draft, setDraft] = useState("");
   const tags = page.tags ?? [];
 
@@ -892,9 +895,9 @@ function TagPicker({
     if (status === "added") {
       onSetTags(next);
     } else if (status === "capped") {
-      toast.error(t("tooManyTags", { count: MAX_TAGS_PER_PAGE }));
+      toast.error(`A page can carry at most ${MAX_TAGS_PER_PAGE} tags`);
     } else if (status === "duplicate") {
-      toast(t("duplicateTag", { tag: raw.trim() }));
+      toast(`Already tagged \"${raw.trim()}\"`);
     }
     setDraft("");
   };
@@ -906,7 +909,7 @@ function TagPicker({
           variant="ghost"
           size="sm"
           className="gap-1.5 text-muted-foreground"
-          aria-label={t("title")}
+          aria-label={"Page tags"}
           data-testid="tag-picker"
         >
           <Tags className="h-4 w-4" />
@@ -915,10 +918,10 @@ function TagPicker({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-3" data-testid="tag-menu">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("title")}
+          {"Page tags"}
         </p>
         {tags.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("none")}</p>
+          <p className="text-xs text-muted-foreground">{"No tags yet — add one below."}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5" data-testid="tag-chips">
             {tags.map((chip) => (
@@ -930,7 +933,7 @@ function TagPicker({
                 {chip}
                 <button
                   type="button"
-                  aria-label={t("removeTag", { tag: chip })}
+                  aria-label={`Remove tag ${chip}`}
                   data-testid={`tag-chip-remove-${chip}`}
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => onSetTags(removeTag(tags, chip))}
@@ -953,16 +956,16 @@ function TagPicker({
               commit(draft);
             }
           }}
-          placeholder={t("addTag")}
+          placeholder={"Add tag + Enter"}
           className="mt-2 h-8 text-sm"
-          aria-label={t("addTagAria")}
+          aria-label={"Add tag"}
           data-testid="tag-input"
         />
         {allTags.length > 0 && (
           <>
             <Separator className="my-2" />
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("existing")}
+              {"Existing tags"}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {allTags.slice(0, 8).map(({ tag, count }) => (
@@ -971,7 +974,7 @@ function TagPicker({
                   type="button"
                   data-testid={`tag-quick-add-${tag}`}
                   className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
-                  title={t("quickAddTitle", { tag, count })}
+                  title={`Add \"${tag}\" (used by ${plural(count, "1 page", "# pages")})`}
                   onClick={() => commit(tag)}
                 >
                   + {tag}
@@ -1013,7 +1016,6 @@ function PaperSwatch({ kind }: { kind: PageBackground }) {
 /* ------------------------------------------------------------------ */
 
 function EmptyState({ onCreateNotebook }: { onCreateNotebook: () => void }) {
-  const t = useTranslations("empty");
   return (
     <div className="flex h-full items-center justify-center p-6">
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
@@ -1021,13 +1023,13 @@ function EmptyState({ onCreateNotebook }: { onCreateNotebook: () => void }) {
           <NotebookPen className="h-8 w-8 text-primary" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold">{t("title")}</h2>
+          <h2 className="text-lg font-semibold">{"No page open"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("body")}
+            {"Create a notebook, add a section, then a page — and start drawing on the infinite canvas."}
           </p>
         </div>
         <Button onClick={onCreateNotebook} className="gap-2">
-          <NotebookPen className="h-4 w-4" /> {t("create")}
+          <NotebookPen className="h-4 w-4" /> {"Create a notebook"}
         </Button>
       </div>
     </div>

@@ -60,7 +60,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Flatpak packaging — AppStream metainfo, flatpak-builder manifest
       (extra-data AppImage), Flathub runbook (issue #46)
 
-## v1.8 — Offline-first Android & canvas depth (current)
+## v1.8 — Offline-first Android & canvas depth (shipped in v1.8.0)
 
 - [x] Audio on pages: import audio files + record in-app (issue #67) —
       playable `<audio>` blocks on the canvas (embeddable elements, payload in
@@ -69,8 +69,17 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Import-matrix overlay E2E: every file type on one canvas, then write &
       draw on top (issue #68) — 36 imported elements in one batch, freedraw
       stroke + text annotation over everything, reload persistence
-- [ ] Localized first-run seed content + generated page/notebook names
-      (issue #63) — needs a stable quick-notes marker (Dexie v3)
+- [x] Localized first-run seed content + generated page/notebook names
+      (issue #63) — shipped by bug-hunt wave 2 (PR #111); the locale layer
+      itself was removed again in v1.9 (English-only UI)
+
+## v1.9 — Focus: one language, same depth (current)
+
+- [x] English-only UI — the v1.7 en/zh-CN i18n layer (next-intl, message
+      catalogs, language toggle, locale-aware generated names) is removed;
+      every string is a plain English literal. CJK *content* (titles, tags,
+      search, IME-safe input, CJK-aware import layout, PDF footers) stays
+      fully supported.
 - [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
       compliance (issue #64) — follow-up to the F-Droid policy notes
 - [ ] Drawing shape library beyond Excalidraw defaults (issue #65)
@@ -94,6 +103,4 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## Backlog (unscheduled)
 
-- Drawing shape library beyond Excalidraw defaults, handwriting recognition
-  (research), localized first-run seed content + generated page/notebook names
-  (needs a stable quick-notes marker, Dexie v3).
+- Handwriting recognition (research).

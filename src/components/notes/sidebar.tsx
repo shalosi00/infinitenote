@@ -8,6 +8,7 @@
  * - select mode: checkbox multi-select with bulk move/delete (issue #27)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { plural } from "@/lib/plural";
 import {
   ArrowDown,
   ArrowUp,
@@ -22,7 +23,6 @@ import {
   FolderOpen,
   FolderSync,
   Keyboard,
-  Languages,
   ListChecks,
   MoreHorizontal,
   Palette,
@@ -49,9 +49,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
-import { useTranslations } from "next-intl";
-import { useAppLocale } from "@/i18n/provider";
-import { localeLabel, nextLocale } from "@/lib/i18n";
 import { pageHasTag } from "@/lib/tags";
 import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
 import { MovePagesDialog } from "./move-pages-dialog";
@@ -79,11 +76,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const t = useTranslations("sidebar");
-  const tCommon = useTranslations("common");
-  const tBulk = useTranslations("bulk");
-  const tThemes = useTranslations("themes");
-  const { locale, setLocale } = useAppLocale();
   const notebooks = useAppStore((s) => s.notebooks);
   const sections = useAppStore((s) => s.sections);
   const pages = useAppStore((s) => s.pages);
@@ -153,15 +145,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
       <div className="flex items-center gap-1 px-3 pt-3 pb-2">
         <span className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("notebooks")}
+          {"Notebooks"}
         </span>
         <Button
           variant="ghost"
           size="icon"
           className={`h-7 w-7 ${selectMode ? "bg-accent text-accent-foreground" : ""}`}
           data-testid="multiselect-toggle"
-          title={t("selectPages")}
-          aria-label={t("selectPagesAria")}
+          title={"Select pages for bulk move/delete"}
+          aria-label={"Select pages"}
           aria-pressed={selectMode}
           onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
         >
@@ -171,8 +163,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          title={t("searchPages")}
-          aria-label={t("searchPagesAria")}
+          title={"Search all pages (Ctrl+K)"}
+          aria-label={"Search all pages"}
           onClick={() => setSearchOpen(true)}
         >
           <Search className="h-4 w-4" />
@@ -181,8 +173,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          title={t("addNotebook")}
-          aria-label={t("addNotebook")}
+          title={"Add notebook"}
+          aria-label={"Add notebook"}
           onClick={() => void addNotebook()}
         >
           <Plus className="h-4 w-4" />
@@ -198,28 +190,28 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           size="sm"
           className="h-8 flex-1 gap-1.5 text-xs font-medium"
           data-testid="today-button"
-          title={t("todayTitle")}
-          aria-label={t("todayTitle")}
+          title={"Open today's daily page"}
+          aria-label={"Open today's daily page"}
           onClick={() => {
             void openTodayPage();
             onNavigate?.();
           }}
         >
-          <CalendarDays className="h-3.5 w-3.5" /> {t("today")}
+          <CalendarDays className="h-3.5 w-3.5" /> {"Today"}
         </Button>
         <Button
           variant="secondary"
           size="sm"
           className="h-8 flex-1 gap-1.5 text-xs font-medium"
           data-testid="quick-note-button"
-          title={t("quickNoteTitle")}
-          aria-label={t("quickNoteAria")}
+          title={"New quick note (Ctrl+Alt+N)"}
+          aria-label={"New quick note"}
           onClick={() => {
             void createQuickNote();
             onNavigate?.();
           }}
         >
-          <Zap className="h-3.5 w-3.5" /> {t("quickNote")}
+          <Zap className="h-3.5 w-3.5" /> {"Quick note"}
         </Button>
       </div>
 
@@ -236,7 +228,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             onNavigate={onNavigate}
           />
         ) : (
-        <nav aria-label={t("treeAria")} className="flex flex-col gap-0.5 p-2">
+        <nav aria-label={"Notebook tree"} className="flex flex-col gap-0.5 p-2">
           {notebooks.map((nb) => (
             <NotebookNode
               key={nb.id}
@@ -256,9 +248,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           ))}
           {notebooks.length === 0 && (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              {t("noNotebooks1")}
+              {"No notebooks yet."}
               <br />
-              {t("noNotebooks2")}
+              {"Tap + to create your first one."}
             </p>
           )}
         </nav>
@@ -269,7 +261,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <div data-testid="bulk-bar" className="border-t bg-sidebar-accent/40 p-2">
           <div className="flex items-center gap-2 px-1 pb-1.5">
             <span className="flex-1 text-xs font-medium" data-testid="bulk-count">
-              {tBulk("selected", { count: selected.size })}
+              {`${plural(selected.size, "1 selected", "# selected")}`}
             </span>
             <button
               type="button"
@@ -278,7 +270,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               onClick={onSelectAllToggle}
               disabled={visible.length === 0}
             >
-              {allVisibleSelected ? tBulk("clear") : tBulk("all", { count: visible.length })}
+              {allVisibleSelected ? "Clear" : `All (${visible.length})`}
             </button>
           </div>
           <div className="flex gap-1.5">
@@ -290,7 +282,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               disabled={selected.size === 0}
               onClick={() => setMoveOpen(true)}
             >
-              <FolderInput className="h-3.5 w-3.5" /> {tBulk("moveTo")}
+              <FolderInput className="h-3.5 w-3.5" /> {"Move to…"}
             </Button>
             <Button
               variant="destructive"
@@ -300,7 +292,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               disabled={selected.size === 0}
               onClick={onBulkDelete}
             >
-              <Trash2 className="h-3.5 w-3.5" /> {tCommon("delete")}
+              <Trash2 className="h-3.5 w-3.5" /> {"Delete"}
             </Button>
           </div>
         </div>
@@ -313,24 +305,24 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           className="w-full justify-start gap-2 text-muted-foreground"
           size="sm"
           data-testid="sync-button"
-          title={t("syncTitle")}
-          aria-label={t("syncTitle")}
+          title={"Sync devices (folder or ZIP)"}
+          aria-label={"Sync devices (folder or ZIP)"}
           onClick={() => useSyncDialog.getState().setOpen(true)}
         >
           <FolderSync className="h-4 w-4" />
-          {t("sync")}
+          {"Sync"}
         </Button>
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground"
           size="sm"
           data-testid="shortcuts-button"
-          title={t("shortcutsTitle")}
-          aria-label={t("shortcutsTitle")}
+          title={"Keyboard shortcuts (?)"}
+          aria-label={"Keyboard shortcuts (?)"}
           onClick={() => useAppStore.getState().setShortcutsOpen(true)}
         >
           <Keyboard className="h-4 w-4" />
-          {t("shortcuts")}
+          {"Shortcuts"}
         </Button>
         <Button
           variant="ghost"
@@ -339,31 +331,19 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           onClick={() => setTrashOpen(true)}
         >
           <Trash2 className="h-4 w-4" />
-          {t("trash")}
+          {"Trash"}
         </Button>
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground"
           size="sm"
           data-testid="themes-button"
-          title={tThemes("openTitle")}
-          aria-label={tThemes("openTitle")}
+          title={"Choose your theme"}
+          aria-label={"Choose your theme"}
           onClick={() => setThemesOpen(true)}
         >
           <Palette className="h-4 w-4" />
-          {tThemes("open")}
-        </Button>
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 text-muted-foreground"
-          size="sm"
-          data-testid="locale-toggle"
-          title={tCommon("language")}
-          aria-label={tCommon("language")}
-          onClick={() => setLocale(nextLocale(locale))}
-        >
-          <Languages className="h-4 w-4" />
-          {localeLabel(nextLocale(locale))}
+          {"Themes"}
         </Button>
       </div>
 
@@ -404,8 +384,6 @@ function NotebookNode({
   onNavigate?: () => void;
   selectProps: SelectModeProps;
 }) {
-  const t = useTranslations("sidebar");
-  const tCommon = useTranslations("common");
   const expanded = useAppStore((s) => s.expanded.has(notebook.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addSection = useAppStore((s) => s.addSection);
@@ -463,7 +441,7 @@ function NotebookNode({
             <span
               className="min-w-0 flex-1 truncate text-sm font-medium"
               onDoubleClick={() => setRenaming(notebook.id)}
-              title={t("doubleClickRename", { name: notebook.name })}
+              title={`${notebook.name} (double-click to rename)`}
             >
               {notebook.name}
             </span>
@@ -475,21 +453,21 @@ function NotebookNode({
               variant="ghost"
               size="icon"
               className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-              aria-label={t("actionsNotebook", { name: notebook.name })}
+              aria-label={`Actions for notebook ${notebook.name}`}
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuItem onClick={() => void addSection(notebook.id)}>
-              <Plus /> {tCommon("newSection")}
+              <Plus /> {"New section"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(notebook.id)}>
-              <Pencil /> {tCommon("rename")}
+              <Pencil /> {"Rename"}
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <Palette /> {tCommon("color")}
+                <Palette /> {"Color"}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-40">
                 <div className="grid grid-cols-4 gap-1.5 p-2">
@@ -497,7 +475,7 @@ function NotebookNode({
                     <button
                       key={c}
                       type="button"
-                      aria-label={tCommon("setColor", { color: c })}
+                      aria-label={`Set color ${c}`}
                       className="h-6 w-6 rounded-md border-2 ring-offset-2 transition-transform hover:scale-110 data-[active]:ring-2"
                       data-active={notebook.color === c}
                       style={{
@@ -512,14 +490,14 @@ function NotebookNode({
             </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void move(notebook.id, -1)}>
-              <ArrowUp /> {tCommon("moveUp")}
+              <ArrowUp /> {"Move up"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => void move(notebook.id, 1)}>
-              <ArrowDown /> {tCommon("moveDown")}
+              <ArrowDown /> {"Move down"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => void del(notebook.id)}>
-              <Trash2 /> {tCommon("moveToTrash")}
+              <Trash2 /> {"Move to trash"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -547,7 +525,7 @@ function NotebookNode({
             className="flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
             onClick={() => void addSection(notebook.id)}
           >
-            <Plus className="h-3.5 w-3.5" /> {t("addSection")}
+            <Plus className="h-3.5 w-3.5" /> {"Add section"}
           </button>
         </div>
       )}
@@ -578,8 +556,6 @@ function SectionNode({
   onNavigate?: () => void;
   selectProps: SelectModeProps;
 }) {
-  const t = useTranslations("sidebar");
-  const tCommon = useTranslations("common");
   const expanded = useAppStore((s) => s.expanded.has(section.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addPage = useAppStore((s) => s.addPage);
@@ -621,7 +597,7 @@ function SectionNode({
             <span
               className="min-w-0 flex-1 truncate text-sm text-sidebar-foreground/90"
               onDoubleClick={() => setRenaming(section.id)}
-              title={t("doubleClickRename", { name: section.name })}
+              title={`${section.name} (double-click to rename)`}
             >
               {section.name}
             </span>
@@ -633,28 +609,28 @@ function SectionNode({
               variant="ghost"
               size="icon"
               className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-              aria-label={t("actionsSection", { name: section.name })}
+              aria-label={`Actions for section ${section.name}`}
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuItem onClick={() => void addPage(section.id)}>
-              <Plus /> {tCommon("newPage")}
+              <Plus /> {"New page"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(section.id)}>
-              <Pencil /> {tCommon("rename")}
+              <Pencil /> {"Rename"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void move(section.id, -1)}>
-              <ArrowUp /> {tCommon("moveUp")}
+              <ArrowUp /> {"Move up"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => void move(section.id, 1)}>
-              <ArrowDown /> {tCommon("moveDown")}
+              <ArrowDown /> {"Move down"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => void del(section.id)}>
-              <Trash2 /> {tCommon("moveToTrash")}
+              <Trash2 /> {"Move to trash"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -682,7 +658,7 @@ function SectionNode({
             className="flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
             onClick={() => void addPage(section.id)}
           >
-            <Plus className="h-3.5 w-3.5" /> {t("addPage")}
+            <Plus className="h-3.5 w-3.5" /> {"Add page"}
           </button>
         </div>
       )}
@@ -713,8 +689,6 @@ function PageNode({
   onNavigate?: () => void;
   selectProps: SelectModeProps;
 }) {
-  const t = useTranslations("sidebar");
-  const tCommon = useTranslations("common");
   const rename = useAppStore((s) => s.renamePage);
   const duplicate = useAppStore((s) => s.duplicatePage);
   const del = useAppStore((s) => s.deletePage);
@@ -754,7 +728,7 @@ function PageNode({
           role="checkbox"
           aria-checked={checked}
           data-testid="page-checkbox"
-          aria-label={t("selectPage", { title: page.title })}
+          aria-label={`Select ${page.title}`}
           className="ml-1.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors"
           style={{
             borderColor: checked ? "var(--primary)" : "var(--border)",
@@ -788,7 +762,7 @@ function PageNode({
           onNavigate?.();
         }}
         onDoubleClick={() => setRenaming(page.id)}
-        title={t("doubleClickRename", { name: page.title })}
+        title={`${page.title} (double-click to rename)`}
       >
         <FileText
           className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-foreground" : "text-muted-foreground"}`}
@@ -807,7 +781,7 @@ function PageNode({
               type="button"
               data-testid={`page-tag-${chip}`}
               className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:bg-accent hover:text-foreground"
-              title={t("filterByTag", { tag: chip })}
+              title={`Filter by tag \"${chip}\"`}
               onClick={() => useAppStore.getState().setTagFilter(chip)}
             >
               {chip}
@@ -824,28 +798,28 @@ function PageNode({
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            aria-label={t("actionsPage", { name: page.title })}
+            aria-label={`Actions for page ${page.title}`}
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52">
           <DropdownMenuItem onClick={() => setRenaming(page.id)}>
-            <Pencil /> {tCommon("rename")}
+            <Pencil /> {"Rename"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void duplicate(page.id)}>
-            <Copy /> {tCommon("duplicate")}
+            <Copy /> {"Duplicate"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void move(page.id, -1)}>
-            <ArrowUp /> {tCommon("moveUp")}
+            <ArrowUp /> {"Move up"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void move(page.id, 1)}>
-            <ArrowDown /> {tCommon("moveDown")}
+            <ArrowDown /> {"Move down"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => void del(page.id)}>
-            <Trash2 /> {tCommon("moveToTrash")}
+            <Trash2 /> {"Move to trash"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -872,7 +846,6 @@ function TagFilterView({
   onClear: () => void;
   onNavigate?: () => void;
 }) {
-  const t = useTranslations("tagFilter");
   const matches = pages.filter((p) => pageHasTag(p.tags, tag)).sort(byOrder);
   const pathOf = (p: PageMeta) => {
     const sec = sections.find((s) => s.id === p.sectionId);
@@ -885,13 +858,13 @@ function TagFilterView({
       <div className="mb-2 flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5">
         <TagIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-xs">
-          {t("pagesTagged", { tag })} <span className="font-semibold">"{tag}"</span>
+          {`Pages tagged \"${tag}\"`} <span className="font-semibold">"{tag}"</span>
           <span className="ml-1 text-muted-foreground">({matches.length})</span>
         </span>
         <button
           type="button"
           data-testid="tag-filter-clear"
-          aria-label={t("clear")}
+          aria-label={"Clear tag filter"}
           className="rounded p-0.5 text-muted-foreground hover:text-foreground"
           onClick={onClear}
         >
@@ -900,7 +873,7 @@ function TagFilterView({
       </div>
       {matches.length === 0 ? (
         <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-          {t("none")}
+          {"No pages carry this tag."}
         </p>
       ) : (
         <div className="flex flex-col gap-0.5">
@@ -951,7 +924,6 @@ function RenameInput({
   onCommit: (value: string) => void;
   onCancel: () => void;
 }) {
-  const tCommon = useTranslations("common");
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
 
@@ -977,7 +949,7 @@ function RenameInput({
         e.stopPropagation();
       }}
       onClick={(e) => e.stopPropagation()}
-      aria-label={tCommon("renameAria")}
+      aria-label={"Rename"}
     />
   );
 }

@@ -43,6 +43,8 @@ export interface ThemeVars {
 
 export interface ThemeDefinition {
   id: ThemeId;
+  /** Gallery label. */
+  label: string;
   /** Light-mode accent overrides (oklch values, same format as globals.css). */
   light: Partial<ThemeVars>;
   /** Dark-mode accent overrides. */
@@ -71,12 +73,14 @@ const ACCENT_VAR_KEYS = THEME_VAR_KEYS;
 export const THEMES: readonly ThemeDefinition[] = [
   {
     id: "default",
+    label: "Violet (default)",
     light: {},
     dark: {},
     preview: { light: "#7c3aed", dark: "#a78bfa" },
   },
   {
     id: "ocean",
+    label: "Ocean",
     light: {
       primary: "oklch(0.546 0.215 262.881)",
       primaryForeground: "oklch(0.985 0 0)",
@@ -95,6 +99,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
   {
     id: "forest",
+    label: "Forest",
     light: {
       primary: "oklch(0.596 0.145 163.225)",
       primaryForeground: "oklch(0.985 0 0)",
@@ -113,6 +118,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
   {
     id: "sunset",
+    label: "Sunset",
     light: {
       primary: "oklch(0.646 0.196 41.116)",
       primaryForeground: "oklch(0.985 0 0)",
@@ -131,6 +137,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
   {
     id: "rose",
+    label: "Rose",
     light: {
       primary: "oklch(0.586 0.253 17.585)",
       primaryForeground: "oklch(0.985 0 0)",
@@ -149,6 +156,7 @@ export const THEMES: readonly ThemeDefinition[] = [
   },
   {
     id: "slate",
+    label: "Graphite",
     light: {
       primary: "oklch(0.507 0.018 255.508)",
       primaryForeground: "oklch(0.985 0 0)",
