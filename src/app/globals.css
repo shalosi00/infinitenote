@@ -151,3 +151,93 @@ html, body { height: 100%; overflow: hidden; }
 [data-slot=sheet-content] {
   border: none;
 }
+
+/* ---------------------------------------------------------------------
+ * Themes gallery (issue #55) — accent overrides per theme id.
+ *
+ * A theme is an accent layer over light/dark: lib/themes.ts owns the
+ * catalog (ids, swatch hexes, the exact same values) and writes the
+ * data-theme attribute on <html>. `[data-theme=x]` restyles light mode,
+ * `[data-theme=x].dark` (higher specificity) restyles dark mode. The
+ * default theme intentionally has no block — it IS this :root palette.
+ * Keep values in sync with src/lib/themes.ts (enforced by themes.test.ts).
+ * --------------------------------------------------------------------- */
+[data-theme="ocean"] {
+  --primary: oklch(0.546 0.215 262.881);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.623 0.214 259.815);
+  --sidebar-primary: oklch(0.546 0.215 262.881);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+}
+
+[data-theme="ocean"].dark {
+  --primary: oklch(0.707 0.165 254.624);
+  --primary-foreground: oklch(0.205 0 0);
+  --ring: oklch(0.623 0.214 259.815);
+  --sidebar-primary: oklch(0.707 0.165 254.624);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+}
+
+[data-theme="forest"] {
+  --primary: oklch(0.596 0.145 163.225);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.696 0.17 162.48);
+  --sidebar-primary: oklch(0.596 0.145 163.225);
+  --sidebar-ring: oklch(0.696 0.17 162.48);
+}
+
+[data-theme="forest"].dark {
+  --primary: oklch(0.792 0.209 151.711);
+  --primary-foreground: oklch(0.205 0 0);
+  --ring: oklch(0.696 0.17 162.48);
+  --sidebar-primary: oklch(0.792 0.209 151.711);
+  --sidebar-ring: oklch(0.696 0.17 162.48);
+}
+
+[data-theme="sunset"] {
+  --primary: oklch(0.646 0.196 41.116);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.705 0.213 47.604);
+  --sidebar-primary: oklch(0.646 0.196 41.116);
+  --sidebar-ring: oklch(0.705 0.213 47.604);
+}
+
+[data-theme="sunset"].dark {
+  --primary: oklch(0.75 0.183 55.934);
+  --primary-foreground: oklch(0.205 0 0);
+  --ring: oklch(0.705 0.213 47.604);
+  --sidebar-primary: oklch(0.75 0.183 55.934);
+  --sidebar-ring: oklch(0.705 0.213 47.604);
+}
+
+[data-theme="rose"] {
+  --primary: oklch(0.586 0.253 17.585);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.645 0.246 16.439);
+  --sidebar-primary: oklch(0.586 0.253 17.585);
+  --sidebar-ring: oklch(0.645 0.246 16.439);
+}
+
+[data-theme="rose"].dark {
+  --primary: oklch(0.712 0.194 13.428);
+  --primary-foreground: oklch(0.205 0 0);
+  --ring: oklch(0.645 0.246 16.439);
+  --sidebar-primary: oklch(0.712 0.194 13.428);
+  --sidebar-ring: oklch(0.645 0.246 16.439);
+}
+
+[data-theme="slate"] {
+  --primary: oklch(0.507 0.018 255.508);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.554 0.02 257.017);
+  --sidebar-primary: oklch(0.507 0.018 255.508);
+  --sidebar-ring: oklch(0.554 0.02 257.017);
+}
+
+[data-theme="slate"].dark {
+  --primary: oklch(0.869 0.012 257.508);
+  --primary-foreground: oklch(0.208 0.013 257.508);
+  --ring: oklch(0.554 0.02 257.017);
+  --sidebar-primary: oklch(0.869 0.012 257.508);
+  --sidebar-ring: oklch(0.554 0.02 257.017);
+}

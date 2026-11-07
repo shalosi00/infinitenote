@@ -202,5 +202,18 @@
     "title": "No page open",
     "body": "Create a notebook, add a section, then a page — and start drawing on the infinite canvas.",
     "create": "Create a notebook"
+  },
+  "themes": {
+    "open": "Themes",
+    "openTitle": "Choose your theme",
+    "galleryTitle": "Themes",
+    "description": "Accent colors layered on top of light and dark mode.",
+    "active": "Active",
+    "themeDefault": "Violet (default)",
+    "themeOcean": "Ocean",
+    "themeForest": "Forest",
+    "themeSunset": "Sunset",
+    "themeRose": "Rose",
+    "themeSlate": "Graphite"
   }
 }

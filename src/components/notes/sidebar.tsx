@@ -55,6 +55,7 @@ import { localeLabel, nextLocale } from "@/lib/i18n";
 import { pageHasTag } from "@/lib/tags";
 import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
 import { MovePagesDialog } from "./move-pages-dialog";
+import { ThemesDialog } from "./themes-dialog";
 import { useSyncDialog } from "./sync-dialog";
 import { NOTEBOOK_COLORS, NOTEBOOK_COLOR_HEX, type Notebook, type PageMeta, type Section } from "@/lib/types";
 import type { Selection } from "@/lib/tree-ops";
@@ -81,6 +82,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const t = useTranslations("sidebar");
   const tCommon = useTranslations("common");
   const tBulk = useTranslations("bulk");
+  const tThemes = useTranslations("themes");
   const { locale, setLocale } = useAppLocale();
   const notebooks = useAppStore((s) => s.notebooks);
   const sections = useAppStore((s) => s.sections);
@@ -103,6 +105,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRaw, setSelectedRaw] = useState<ReadonlySet<string>>(new Set());
   const [moveOpen, setMoveOpen] = useState(false);
+  const [themesOpen, setThemesOpen] = useState(false);
 
   // entering the tag filter view is a navigation event — it cancels select
   // mode. zustand is an external store, so this is a subscription (setState
@@ -342,6 +345,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground"
           size="sm"
+          data-testid="themes-button"
+          title={tThemes("openTitle")}
+          aria-label={tThemes("openTitle")}
+          onClick={() => setThemesOpen(true)}
+        >
+          <Palette className="h-4 w-4" />
+          {tThemes("open")}
+        </Button>
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 text-muted-foreground"
+          size="sm"
           data-testid="locale-toggle"
           title={tCommon("language")}
           aria-label={tCommon("language")}
@@ -352,6 +367,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         </Button>
       </div>
 
+      <ThemesDialog open={themesOpen} onOpenChange={setThemesOpen} />
       <MovePagesDialog
         open={moveOpen}
         onOpenChange={setMoveOpen}
