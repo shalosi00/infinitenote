@@ -34,6 +34,12 @@ import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, type ImportedBlock } from "./import-blocks";
 import { parseMht, resolveMhtResource } from "./mht-import";
+import {
+  AUDIO_BLOCK_HEIGHT,
+  AUDIO_BLOCK_WIDTH,
+  AUDIO_LINK_SCHEME,
+  withAudioMime,
+} from "./audio-notes";
 import type { ScenePayload } from "./types";
 
 const now = () => Date.now();
@@ -344,6 +350,91 @@ export async function importMhtFile(
     return hit ? { dataUrl: hit.dataUrl, mimeType: hit.contentType } : null;
   };
   return insertHtmlContent(api, content, resolver, insertAt);
+}
+
+/* ------------------------------------------------------------------ */
+/* audio import (issue #67)                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Build a complete Excalidraw embeddable element for one audio clip.
+ *
+ * The payload rides in `customData` (audioData + audioName): scene restore
+ * rewrites every `data:` `link` to about:blank (sanitizeUrl), but passes
+ * customData through untouched, while `link` carries the AUDIO_LINK_SCHEME
+ * marker that (a) survives sanitization and (b) lets the canvas's
+ * `validateEmbeddable` gate mount only our audio players. The name also
+ * feeds full-text search (lib/search.ts).
+ */
+export function makeAudioEmbeddable(
+  name: string,
+  dataUrl: string,
+  x: number,
+  y: number
+): ExcalidrawElement {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  return {
+    id: crypto.randomUUID(),
+    type: "embeddable",
+    x,
+    y,
+    width: AUDIO_BLOCK_WIDTH,
+    height: AUDIO_BLOCK_HEIGHT,
+    angle: 0,
+    strokeColor: "#8b8b9e",
+    backgroundColor: "#f3f3f7",
+    fillStyle: "solid",
+    strokeWidth: 1,
+    strokeStyle: "solid",
+    roughness: 0,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed,
+    version: 1,
+    versionNonce: seed,
+    isDeleted: false,
+    boundElements: null,
+    updated: now(),
+    link: AUDIO_LINK_SCHEME,
+    locked: false,
+    customData: { audioName: name, audioData: dataUrl },
+  } as unknown as ExcalidrawElement;
+}
+
+/**
+ * Import audio files as embeddable audio blocks, stacked below existing
+ * content. Each clip keeps its filename for search + the aria label.
+ */
+export async function importAudioFiles(
+  api: ExcalidrawImperativeAPI,
+  files: File[],
+  insertAt?: { x: number; y: number }
+): Promise<number> {
+  if (!files.length) return 0;
+  const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
+  let y = anchor.y;
+  let x = anchor.x;
+  let added = 0;
+  const created: ExcalidrawElement[] = [];
+  for (const file of files) {
+    // normalize the MIME (drag-dropped files often arrive with an empty
+    // type, which readAsDataURL stamps as application/octet-stream)
+    const dataUrl = withAudioMime(await fileToDataUrl(file), file.name);
+    if (!dataUrl) {
+      // defensive: classifyFile already vetted these — anything still
+      // unmappable would render a broken player, so skip it.
+      continue;
+    }
+    created.push(makeAudioEmbeddable(file.name, dataUrl, x, y));
+    y += AUDIO_BLOCK_HEIGHT + 24;
+    added += 1;
+  }
+  if (created.length) {
+    api.updateScene({ elements: [...api.getSceneElements(), ...created] });
+  }
+  return added;
 }
 
 /* ------------------------------------------------------------------ */

@@ -137,3 +137,41 @@ describe("searchIndex", () => {
     expect(searchIndex(idx, "garden annual")).toHaveLength(0);
   });
 });
+
+describe("search — audio clip names (issue #67)", () => {
+  const audioScene = (name: string) =>
+    JSON.stringify({
+      elements: [
+        { type: "text", text: "Lecture notes", id: "el0" },
+        { type: "embeddable", id: "el1", customData: { audioName: name } },
+      ],
+      files: {},
+    });
+
+  it("extracts audio clip filenames from embeddable customData", () => {
+    expect(extractSearchableText(audioScene("interview with Ada.mp3"))).toEqual([
+      "Lecture notes",
+      "interview with Ada.mp3",
+    ]);
+  });
+
+  it("finds pages by audio filename through the index", () => {
+    const idx = buildSearchIndex([nb], [sec], [
+      page("p1", "Field trip", audioScene("birdsong recording.wav")),
+    ]);
+    const hits = searchIndex(idx, "birdsong");
+    expect(hits).toHaveLength(1);
+    expect(hits[0].pageId).toBe("p1");
+  });
+
+  it("ignores audio blocks without a usable name", () => {
+    expect(extractSearchableText(audioScene("   "))).toEqual(["Lecture notes"]);
+    expect(extractSearchableText(audioScene(""))).toEqual(["Lecture notes"]);
+    // non-embeddable elements carrying customData stay out of search
+    const otherScene = JSON.stringify({
+      elements: [{ type: "rectangle", id: "r", customData: { audioName: "x.mp3" } }],
+      files: {},
+    });
+    expect(extractSearchableText(otherScene)).toEqual([]);
+  });
+});
