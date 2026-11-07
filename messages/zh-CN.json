@@ -61,7 +61,10 @@
     "toastExportFailed": "导出失败。",
     "exportErrors": {
       "emptyPage": "没有可导出的内容——此页面为空。"
-    }
+    },
+    "loadFailed": "无法打开你的笔记",
+    "loadFailedBody": "本地数据库无法打开（可能被占用或暂不可用）。数据不会丢失——请重试。",
+    "retry": "重试"
   },
   "canvas": {
     "importedImages": "已导入 {count} 张图片",
@@ -74,7 +77,8 @@
     "importedAudio": "已导入 {count} 段音频",
     "importedScene": "已导入场景“{name}”",
     "skipped": "部分文件已跳过（不支持的类型）",
-    "importFailed": "导入失败——详情见控制台"
+    "importFailed": "导入失败——详情见控制台",
+    "audioTooLarge": "已跳过 {count} 个音频文件——超过 30 MB，无法可靠保存"
   },
   "paper": {
     "background": "页面背景",

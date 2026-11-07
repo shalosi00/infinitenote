@@ -309,10 +309,13 @@ export default function ExcalidrawCanvas({
             }
           }
           if (audioFiles.length) {
-            const n = await importAudioFiles(api, audioFiles);
-            if (n) {
+            const { added, skippedLarge } = await importAudioFiles(api, audioFiles);
+            if (added) {
               touched = true;
-              onToast(tt()("importedAudio", { count: n }));
+              onToast(tt()("importedAudio", { count: added }));
+            }
+            if (skippedLarge) {
+              onToast(tt()("audioTooLarge", { count: skippedLarge }));
             }
           }
           if (scenes.length) {
