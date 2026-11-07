@@ -968,6 +968,10 @@ function RenameInput({
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => onCommit(value)}
       onKeyDown={(e) => {
+        // ignore Enter/Escape while an IME composes (issue #99): Enter
+        // confirms the composition, Escape cancels it — neither should
+        // commit or abort the rename itself
+        if (e.nativeEvent.isComposing) return;
         if (e.key === "Enter") onCommit(value);
         if (e.key === "Escape") onCancel();
         e.stopPropagation();

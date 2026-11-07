@@ -26,6 +26,7 @@
  */
 
 import type { Notebook, PageRow, Section } from "../types";
+import { generatedNames } from "../generated-names";
 import {
   buildManifest,
   reduceTrash,
@@ -39,11 +40,14 @@ export function eventTime(row: { updatedAt: number; deletedAt?: number | null })
   return Math.max(row.updatedAt, row.deletedAt ?? 0);
 }
 
-/** Title of a conflict copy, dated for the local time of the merge. */
+/** Title of a conflict copy, dated for the local time of the merge.
+ * Suffix is localized (issue #63); English by default, so pure merge tests
+ * keep their fixtures. */
 export function conflictTitle(title: string, ts: number): string {
   const d = new Date(ts);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${title} (conflict ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())})`;
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return generatedNames().conflict(title, date);
 }
 
 export interface SyncSummary {

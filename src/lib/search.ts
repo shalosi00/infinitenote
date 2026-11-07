@@ -102,7 +102,13 @@ export function searchIndex(
       notebookId: entry.notebookId,
       pagePath: entry.pagePath,
       title: entry.title,
-      snippet: (firstContentWithTerm ?? entry.contents[0] ?? "").replace(/\s+/g, " ").trim().slice(0, 140),
+      // snippet capped by CODE POINTS (issue #101) — never split an astral
+      // character (emoji, rare CJK) into a broken half
+      snippet: Array.from(
+        (firstContentWithTerm ?? entry.contents[0] ?? "").replace(/\s+/g, " ").trim(),
+      )
+        .slice(0, 140)
+        .join(""),
       score,
     });
   }

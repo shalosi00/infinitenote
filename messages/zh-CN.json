@@ -65,7 +65,7 @@
     "loadFailed": "无法打开你的笔记",
     "loadFailedBody": "本地数据库无法打开（可能被占用或暂不可用）。数据不会丢失——请重试。",
     "retry": "重试",
-    "toastRecordingNoPage": "录音已丢弃——当前没有打开的页面"
+    "loadingCanvas": "正在加载画布…"
   },
   "canvas": {
     "importedImages": "已导入 {count} 张图片",
@@ -79,7 +79,8 @@
     "importedScene": "已导入场景“{name}”",
     "skipped": "部分文件已跳过（不支持的类型）",
     "importFailed": "导入失败——详情见控制台",
-    "audioTooLarge": "已跳过 {count} 个音频文件——超过 30 MB，无法可靠保存"
+    "audioTooLarge": "已跳过 {count} 个音频文件——超过 30 MB，无法可靠保存",
+    "audioClipAria": "音频剪辑"
   },
   "paper": {
     "background": "页面背景",
@@ -242,5 +243,32 @@
     "themeSunset": "日落",
     "themeRose": "玫瑰",
     "themeSlate": "石墨"
+  },
+  "generated": {
+    "notebook": "笔记本 {n}",
+    "section": "分区 {n}",
+    "page": "页面 {n}",
+    "copy": "{title}（副本）",
+    "conflict": "{title}（冲突 {date}）",
+    "restoredNotebook": "恢复的笔记本",
+    "restoredSection": "恢复的分区",
+    "restoredPage": "恢复的页面",
+    "untitled": "无标题",
+    "quickNotesNotebook": "快速笔记",
+    "quickNotesSection": "快速笔记",
+    "quickNotePrefix": "快速笔记 ",
+    "recordingPrefix": "录音 ",
+    "welcome": {
+      "notebook": "欢迎使用",
+      "section": "快速上手",
+      "ideasSection": "灵感",
+      "myNotebook": "我的笔记本",
+      "mySection": "新建分区",
+      "startHere": "从这里开始",
+      "brainstorm": "头脑风暴",
+      "pageOne": "页面 1",
+      "title": "欢迎使用 InfiniteNote",
+      "body": "一个带无限画布的开源笔记本。\n\n左侧：你的笔记本、分区和页面——就像 OneNote。\n这里：用画笔、荧光笔、形状和文字随心书写。\n\n导入（右上角）：图片、文本、Markdown、PDF 打印件、音频等。\n所有内容都保存在浏览器本地——离线优先。"
+    }
   }
 }
