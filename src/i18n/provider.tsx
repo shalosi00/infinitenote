@@ -25,6 +25,7 @@ import {
   isLocale,
   type Locale,
 } from "@/lib/i18n";
+import { setGeneratedNamesLocale } from "@/lib/generated-names";
 
 const CATALOGS: Record<Locale, Record<string, unknown>> = {
   en: en as Record<string, unknown>,
@@ -51,6 +52,9 @@ export function AppI18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
+    // generated names (default titles, suffixes, seed content) follow the
+    // active locale (issue #63)
+    setGeneratedNamesLocale(next);
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, next);
     } catch {
@@ -74,6 +78,7 @@ export function AppI18nProvider({ children }: { children: React.ReactNode }) {
       ? stored
       : detectLocale(typeof navigator !== "undefined" ? navigator.languages : []);
     document.documentElement.lang = initial;
+    setGeneratedNamesLocale(initial);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration external-store sync (see above)
     setLocaleState(initial);
   }, []);

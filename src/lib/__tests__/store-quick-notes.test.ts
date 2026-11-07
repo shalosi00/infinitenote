@@ -48,7 +48,7 @@ describe("createQuickNote", () => {
     const page = selectedPage();
     expect(page).not.toBeNull();
     expect(page?.sectionId).toBe(homeSections[0].id);
-    expect(page?.title).toMatch(/^Quick note \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(page?.title).toMatch(/^Quick note \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/); // seconds resolution (issue #95)
 
     // tree state: selection + expansion reveal the new page
     expect(s.selection?.notebookId).toBe(homeNotebooks[0].id);

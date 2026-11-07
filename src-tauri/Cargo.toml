@@ -1,6 +1,6 @@
 [package]
 name = "infinitenote"
-version = "1.7.0"
+version = "1.8.0"
 description = "Local-first OneNote-style notebook with an infinite canvas"
 authors = ["InfiniteNote contributors"]
 license = "MIT"

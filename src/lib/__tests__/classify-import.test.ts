@@ -35,3 +35,28 @@ describe("classifyFile — structured import kinds", () => {
     expect(classifyFile(mkFile("data.dat", "application/octet-stream"))).toBe("unknown");
   });
 });
+
+describe("classifyFile — audio clips (issue #67)", () => {
+  it("classifies audio by MIME regardless of filename", () => {
+    expect(classifyFile(mkFile("clip.bin", "audio/webm"))).toBe("audio");
+    expect(classifyFile(mkFile("take", "audio/mpeg"))).toBe("audio");
+    expect(classifyFile(mkFile("x.dat", "audio/mp4"))).toBe("audio");
+  });
+
+  it("classifies audio by extension when the MIME is empty", () => {
+    expect(classifyFile(mkFile("interview.mp3", ""))).toBe("audio");
+    expect(classifyFile(mkFile("VOICENOTE.WAV", ""))).toBe("audio");
+    expect(classifyFile(mkFile("meeting.m4a", ""))).toBe("audio");
+    expect(classifyFile(mkFile("mixtape.flac", ""))).toBe("audio");
+  });
+
+  it("treats .webm as audio only with an audio MIME (recordings, not videos)", () => {
+    expect(classifyFile(mkFile("clip.webm", "audio/webm"))).toBe("audio"); // MediaRecorder
+    expect(classifyFile(mkFile("clip.webm", ""))).toBe("unknown"); // probably video
+    expect(classifyFile(mkFile("clip.webm", "video/webm"))).toBe("unknown");
+  });
+
+  it("audio beats the generic text bucket", () => {
+    expect(classifyFile(mkFile("notes.mp3", "application/octet-stream"))).toBe("audio");
+  });
+});

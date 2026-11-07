@@ -14,12 +14,14 @@ import {
   Image as ImageIcon,
   LayoutTemplate,
   Menu,
+  Mic,
   Moon,
   NotebookPen,
   PackageOpen,
   PenLine,
   Printer,
   Search,
+  Square,
   Sun,
   Tags,
   Upload,
@@ -45,9 +47,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAppStore } from "@/lib/store";
 import { useTranslations } from "next-intl";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
+import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
-import { addTag, collectTags, removeTag, type TagCount } from "@/lib/tags";
+import { ExportError } from "@/lib/export-errors";
+import { e2eHooksEnabled } from "@/lib/e2e-gate";
+import {
+  addTagWithResult,
+  collectTags,
+  MAX_TAGS_PER_PAGE,
+  removeTag,
+  type TagCount,
+} from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
@@ -60,6 +71,12 @@ import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
 import { readSyncFolder, writeSyncFolder } from "@/lib/sync/fsa";
 import type { SyncFolderFiles } from "@/lib/sync/format";
 import type { SyncSummary } from "@/lib/sync/merge";
+import {
+  buildRecordingFileName,
+  formatDuration,
+  pickRecorderMimeType,
+  recorderExtensionForMime,
+} from "@/lib/audio-notes";
 
 /** Result summary for an export-only round (no merge happened). */
 const NO_CHANGES_SUMMARY: SyncSummary = {
@@ -83,6 +100,7 @@ export default function NoteApp() {
   const formatSummary = useSyncSummaryFormatter();
   const {
     loaded,
+    loadError,
     selection,
     saveIndicator,
     load,
@@ -102,6 +120,139 @@ export default function NoteApp() {
   /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
   const [sceneEpoch, setSceneEpoch] = useState(0);
 
+  /* ------------------------- audio recording (issue #67) --------------- */
+
+  /** Wall-clock ms when the current recording started; null = not recording. */
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  /** Whole seconds elapsed in the current recording (drives the timer label). */
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Stop the timer, release the mic, forget the recorder. Safe to call twice. */
+  const teardownRecording = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+    setRecordingStartedAt(null);
+    setRecordingElapsed(0);
+  }, []);
+
+  // release the mic if the app unmounts mid-recording
+  useEffect(() => teardownRecording, [teardownRecording]);
+
+  /** Insert a finished take on the current page, as an audio block. */
+  const insertRecording = useCallback(
+    async (blob: Blob, mimeType: string, seconds: number) => {
+      // issue #94: the open page may have been trashed mid-recording — the
+      // canvas is unmounted and a stale api reference would insert into a
+      // detached scene, silently losing the clip
+      if (!useAppStore.getState().selection) {
+        toast.error(t("toastRecordingNoPage"));
+        return;
+      }
+      const name = buildRecordingFileName(recorderExtensionForMime(mimeType));
+      const file = new File([blob], name, { type: mimeType });
+      await canvasApi.current?.importFiles([file]);
+      toast.success(t("toastRecordingInserted", { duration: formatDuration(seconds) }));
+    },
+    [t]
+  );
+
+  const startRecording = useCallback(async () => {
+    if (recordingStartedAt !== null) return;
+    if (!canvasApi.current) {
+      toast.error(t("toastOpenFirstImport"));
+      return;
+    }
+    if (
+      typeof MediaRecorder === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    const mimeType = pickRecorderMimeType((m) => MediaRecorder.isTypeSupported(m));
+    if (!mimeType) {
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        toast.error(t("toastMicDenied"));
+      } else {
+        toast.error(t("toastMicFailed"));
+      }
+      return;
+    }
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      toast.error(t("toastRecorderUnsupported"));
+      return;
+    }
+    const startedAt = Date.now();
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || mimeType;
+      const seconds = (Date.now() - startedAt) / 1000;
+      const blob = new Blob(chunks, { type });
+      teardownRecording();
+      if (blob.size > 0) {
+        void insertRecording(blob, type, seconds);
+      } else {
+        toast.error(t("toastMicFailed"));
+      }
+    };
+    // issue #93: a dead input device (mic unplugged, OS revoke) fires an
+    // error event and may never reach onstop — without this handler the app
+    // stayed in "recording" mode forever with the timer running. Salvage
+    // what was captured when possible, otherwise tear down cleanly.
+    recorder.onerror = () => {
+      try {
+        if (recorder.state !== "inactive") {
+          recorder.stop(); // onstop tears down + salvages the chunks so far
+          return;
+        }
+      } catch {
+        /* recorder already dead */
+      }
+      teardownRecording();
+      toast.error(t("toastMicFailed"));
+    };
+    recorder.start(250); // timeslice: data arrives even on abrupt stops
+    streamRef.current = stream;
+    recorderRef.current = recorder;
+    setRecordingStartedAt(startedAt);
+    setRecordingElapsed(0);
+    timerRef.current = setInterval(() => {
+      setRecordingElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+  }, [recordingStartedAt, t, teardownRecording, insertRecording]);
+
+  const stopRecording = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop(); // onstop inserts the clip + tears down
+    } else {
+      teardownRecording();
+    }
+  }, [teardownRecording]);
+
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
   );
@@ -110,14 +261,18 @@ export default function NoteApp() {
   const allTags = useMemo(() => collectTags(pages), [pages]);
 
   useEffect(() => {
-    void load();
+    // load() resets its single-flight guard on failure (issue #77), so the
+    // error screen's Retry button can simply call it again. The catch keeps
+    // a rejected boot from surfacing as an unhandled rejection.
+    void load().catch(() => undefined);
   }, [load]);
 
   usePWA();
 
-  // Test hook — full data reset for E2E runs (?e2e=1 only)
+  // Test hook — full data reset for E2E runs (?e2e=1 + development only,
+  // issue #102: the destructive backdoor must never ship in prod bundles)
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has("e2e")) return;
+    if (!e2eHooksEnabled(window.location.search, process.env.NEXT_PUBLIC_E2E)) return;
     (window as unknown as Record<string, unknown>).__NOTE_RESET__ = async () => {
       const dbMod = await import("@/lib/notes-db");
       await dbMod.eraseAllData();
@@ -298,12 +453,13 @@ export default function NoteApp() {
   const handleExport = async (kind: "png" | "svg" | "scene" | "pdf-portrait" | "pdf-landscape" | "backup") => {
     if (kind === "backup") {
       const json = await db.buildBackup();
-      const blob = new Blob([json], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `infinitenote-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      // reuse the shared helper (issue #74): it appends the anchor and defers
+      // revoking the object URL, so the download cannot race the revocation
+      // in Safari/Firefox the way a hand-rolled synchronous click could
+      downloadBlob(
+        new Blob([json], { type: "application/json" }),
+        `infinitenote-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      );
       toast.success(t("toastBackupDownloaded"));
       return;
     }
@@ -318,8 +474,15 @@ export default function NoteApp() {
       if (kind === "pdf-portrait") await canvasApi.current.exportPdf("portrait");
       if (kind === "pdf-landscape") await canvasApi.current.exportPdf("landscape");
     } catch (err) {
-      // empty page etc. — surface instead of failing silently
-      toast.error(err instanceof Error ? err.message : t("toastExportFailed"));
+      // issue #85: never surface raw English error internals — typed export
+      // failures map to localized messages, everything else falls back to
+      // the generic toast
+      if (err instanceof ExportError) {
+        toast.error(t(`exportErrors.${err.code}`));
+      } else {
+        console.error(err);
+        toast.error(t("toastExportFailed"));
+      }
     }
   };
 
@@ -334,6 +497,27 @@ export default function NoteApp() {
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
+    // Boot failed (e.g. IndexedDB blocked): offer a retry instead of the
+    // infinite "Opening…" spinner (issue #77). load() cleared its cached
+    // promise on failure, so retrying really re-runs the boot.
+    if (loadError) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex max-w-sm flex-col items-center gap-4 p-6 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+              <NotebookPen className="h-8 w-8 text-destructive" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">{t("loadFailed")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("loadFailedBody")}</p>
+            </div>
+            <Button onClick={() => void load().catch(() => undefined)} className="gap-2">
+              <NotebookPen className="h-4 w-4" /> {t("retry")}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -386,7 +570,7 @@ export default function NoteApp() {
           type="file"
           multiple
           className="hidden"
-          accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json"
+          accept="image/*,.pdf,.docx,.html,.htm,.mht,.mhtml,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,.excalidraw,.excalidraw.json,audio/*,.mp3,.wav,.ogg,.oga,.m4a,.aac,.flac,.weba,.opus"
           aria-label={t("importFiles")}
           onChange={(e) => {
             void handleImportFiles(e.target.files);
@@ -423,6 +607,48 @@ export default function NoteApp() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* audio recording (issue #67) */}
+        {recordingStartedAt === null ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            aria-label={t("recordAudio")}
+            title={t("recordAudio")}
+            data-testid="record-audio"
+            onClick={() => void startRecording()}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div
+            className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 py-1 dark:border-red-900 dark:bg-red-950/60"
+            data-testid="recording-indicator"
+          >
+            <span className="relative flex h-2.5 w-2.5" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+            </span>
+            <span
+              className="min-w-[2.25rem] text-xs font-semibold tabular-nums text-red-700 dark:text-red-300"
+              data-testid="recording-timer"
+            >
+              {formatDuration(recordingElapsed)}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={t("stopRecording")}
+              title={t("stopRecording")}
+              data-testid="stop-recording"
+              onClick={stopRecording}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          </div>
+        )}
 
         {/* export */}
         <DropdownMenu>
@@ -525,6 +751,9 @@ export default function NoteApp() {
                       setTitleDraft(null);
                     }}
                     onKeyDown={(e) => {
+                      // ignore keys while an IME composes (issue #99):
+                      // Enter confirms the composition, not the rename
+                      if (e.nativeEvent.isComposing) return;
                       if (e.key === "Enter") e.currentTarget.blur();
                       if (e.key === "Escape") setTitleDraft(null);
                     }}
@@ -658,8 +887,15 @@ function TagPicker({
   const tags = page.tags ?? [];
 
   const commit = (raw: string) => {
-    const next = addTag(tags, raw);
-    if (next !== tags) onSetTags(next);
+    // report WHY nothing happened instead of silently dropping input (#100)
+    const { tags: next, status } = addTagWithResult(tags, raw);
+    if (status === "added") {
+      onSetTags(next);
+    } else if (status === "capped") {
+      toast.error(t("tooManyTags", { count: MAX_TAGS_PER_PAGE }));
+    } else if (status === "duplicate") {
+      toast(t("duplicateTag", { tag: raw.trim() }));
+    }
     setDraft("");
   };
 
@@ -709,6 +945,9 @@ function TagPicker({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
+            // ignore Enter while an IME composes (issue #99) — Chinese tag
+            // input would otherwise commit half-composed text
+            if (e.nativeEvent.isComposing) return;
             if (e.key === "Enter" && draft.trim()) {
               e.preventDefault();
               commit(draft);

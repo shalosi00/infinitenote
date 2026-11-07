@@ -13,9 +13,8 @@ const nextConfig: NextConfig = {
   output: isDesktopExport ? "export" : "standalone",
   // Static export has no image-optimization server available.
   images: isDesktopExport ? { unoptimized: true } : undefined,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // type errors FAIL the build (issue #104): the standalone tsc gate covers
+  // PRs, but `next build` must never pass with broken types on its own
   reactStrictMode: false,
 };
 

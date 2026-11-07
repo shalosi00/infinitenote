@@ -190,8 +190,10 @@ function runsText(pXml: string): string {
   const out: string[] = [];
   const re = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:br\s*\/>|<w:tab\s*\/>/g;
   for (const m of pXml.matchAll(re)) {
-    if (m[0] === "<w:br/>") out.push("\n");
-    else if (m[0] === "<w:tab/>") out.push("\t");
+    // issue #90: self-closing tags may carry a space before the slash
+    // ("<w:br />") — compare by pattern, not by exact string
+    if (/^<w:br\s*\/>$/.test(m[0])) out.push("\n");
+    else if (/^<w:tab\s*\/>$/.test(m[0])) out.push("\t");
     else out.push(decodeEntities(m[1] ?? ""));
   }
   return normalizeBlockText(out.join(""));

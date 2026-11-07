@@ -8,12 +8,8 @@
 import { create } from "zustand";
 import * as db from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
-import {
-  QUICK_NOTES_NOTEBOOK_NAME,
-  QUICK_NOTES_SECTION_NAME,
-  quickNoteTitle,
-  todayKey,
-} from "./quick-notes";
+import { quickNoteTitle, todayKey } from "./quick-notes";
+import { generatedNames } from "./generated-names";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
 
@@ -21,6 +17,8 @@ export type SaveIndicator = "idle" | "saving" | "saved" | "error";
 
 interface AppStore {
   loaded: boolean;
+  /** "loadFailed" after a rejected boot load; cleared once a retry succeeds. */
+  loadError: string | null;
   notebooks: Notebook[];
   sections: Section[];
   pages: PageMeta[];
@@ -35,6 +33,8 @@ interface AppStore {
   refresh: () => Promise<void>;
 
   selectPage: (sel: Selection) => void;
+  /** Select AND expand the containing notebook + section (search / tag jumps). */
+  revealSelection: (sel: Selection) => void;
   toggleExpanded: (id: string) => void;
 
   addNotebook: (name?: string) => Promise<void>;
@@ -89,6 +89,7 @@ let initialLoadPromise: Promise<void> | null = null;
 
 export const useAppStore = create<AppStore>((set, get) => ({
   loaded: false,
+  loadError: null,
   notebooks: [],
   sections: [],
   pages: [],
@@ -103,7 +104,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   load: () => {
     if (!initialLoadPromise) {
-      initialLoadPromise = (async () => {
+      const run = (async () => {
         await get().refresh();
         const s = get();
         // First run → seed a small welcome notebook so the app is never empty.
@@ -111,7 +112,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
           await seedWelcomeData();
           await get().refresh();
         }
+        set({ loadError: null });
       })();
+      // A rejected boot promise must never be cached (issue #77): a transient
+      // IndexedDB failure would otherwise brick the session with an infinite
+      // spinner. Clear the single-flight guard so the next load() retries, and
+      // record the failure so the shell can offer a Retry button.
+      initialLoadPromise = run.catch((err: unknown) => {
+        initialLoadPromise = null;
+        set({ loadError: "loadFailed" });
+        throw err;
+      });
     }
     return initialLoadPromise;
   },
@@ -138,6 +149,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   selectPage: (sel) => set({ selection: sel }),
+
+  /** Programmatic jumps (search, tag filter) must make the sidebar show
+   *  where the user landed — expand the ancestors of the target page. */
+  revealSelection: (sel) =>
+    set((s) => ({
+      selection: sel,
+      expanded: new Set([...s.expanded, sel.notebookId, sel.sectionId]),
+    })),
   toggleExpanded: (id) =>
     set((s) => {
       const next = new Set(s.expanded);
@@ -148,7 +167,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   addNotebook: async (name) => {
     const n = get().notebooks.length;
-    const nb = await db.createNotebook(name?.trim() || `Notebook ${n + 1}`, nextColor(n));
+    const nb = await db.createNotebook(
+      name?.trim() || generatedNames().notebook(n + 1),
+      nextColor(n),
+    );
     await get().refresh();
     set((s) => ({ expanded: new Set([...s.expanded, nb.id]) }));
   },
@@ -172,7 +194,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   addSection: async (notebookId, name) => {
     const nb = get().notebooks.find((n) => n.id === notebookId);
     const count = get().sections.filter((s) => s.notebookId === notebookId).length;
-    const sec = await db.createSection(notebookId, name?.trim() || `Section ${count + 1}`);
+    const sec = await db.createSection(
+      notebookId,
+      name?.trim() || generatedNames().section(count + 1),
+    );
     await get().refresh();
     set((s) => ({ expanded: new Set([...s.expanded, nb ? nb.id : "", sec.id]) }));
   },
@@ -191,7 +216,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   addPage: async (sectionId, title) => {
     const count = get().pages.filter((p) => p.sectionId === sectionId).length;
-    const page = await db.createPage(sectionId, title?.trim() || `Page ${count + 1}`);
+    const page = await db.createPage(
+      sectionId,
+      title?.trim() || generatedNames().page(count + 1),
+    );
     await get().refresh();
     const sec = get().sections.find((s) => s.id === sectionId);
     set((s) => ({
@@ -201,6 +229,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         pageId: page.id,
       },
       expanded: new Set([...s.expanded, sectionId]),
+      // a freshly created page must grab keyboard focus (issue #81): the
+      // canvas focuses itself whenever this counter moves — same mechanism
+      // as quick capture, so typing works immediately after "+ Page"
+      canvasFocus: s.canvasFocus + 1,
     }));
   },
   renamePage: async (id, title) => {
@@ -224,8 +256,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
    */
   createQuickNote: async () => {
     const home = await db.ensureQuickNotesHome(
-      QUICK_NOTES_NOTEBOOK_NAME,
-      QUICK_NOTES_SECTION_NAME
+      generatedNames().quickNotesNotebook,
+      generatedNames().quickNotesSection
     );
     const page = await db.createPage(home.section.id, quickNoteTitle());
     await get().refresh();
@@ -247,8 +279,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
    */
   openTodayPage: async () => {
     const home = await db.ensureQuickNotesHome(
-      QUICK_NOTES_NOTEBOOK_NAME,
-      QUICK_NOTES_SECTION_NAME
+      generatedNames().quickNotesNotebook,
+      generatedNames().quickNotesSection
     );
     const key = todayKey();
     const existing = await db.findPageByTitle(home.section.id, key);
@@ -283,6 +315,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         pageId: copy.id,
       },
       expanded: new Set([...s.expanded, copy.sectionId]),
+      // focus the duplicated page's canvas too (issue #81)
+      canvasFocus: s.canvasFocus + 1,
     }));
   },
   deletePage: async (id) => {
@@ -385,10 +419,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 }));
 
-/** Welcome content shown on first launch (also makes E2E deterministic). */
+/** Welcome content shown on first launch (also makes E2E deterministic).
+ * Localized via the generated-names registry (issue #63): the default
+ * locale is English, which keeps the E2E seed byte-stable. */
 async function seedWelcomeData(): Promise<void> {
-  const nb = await db.createNotebook("Welcome Notebook", "violet");
-  const sec = await db.createSection(nb.id, "Getting Started");
+  const names = generatedNames().welcome;
+  const nb = await db.createNotebook(names.notebook, "violet");
+  const sec = await db.createSection(nb.id, names.section);
   const scene = JSON.stringify({
     elements: [
       {
@@ -397,7 +434,7 @@ async function seedWelcomeData(): Promise<void> {
         x: 80,
         y: 60,
         width: 640,
-        text: "Welcome to InfiniteNote",
+        text: names.title,
         fontSize: 44,
         fontFamily: 5,
         textAlign: "left",
@@ -424,7 +461,7 @@ async function seedWelcomeData(): Promise<void> {
         baseline: 40,
         lineHeight: 1.25,
         containerId: null,
-        originalText: "Welcome to InfiniteNote",
+        originalText: names.title,
         autoResize: true,
       },
       {
@@ -433,7 +470,7 @@ async function seedWelcomeData(): Promise<void> {
         x: 80,
         y: 160,
         width: 560,
-        text: "An open-source notebook with an infinite canvas.\n\nLeft: your Notebooks, Sections and Pages — like OneNote.\nHere: draw anywhere with pen, highlighter, shapes and text.\n\nImport (top right): images, text, Markdown and PDF printouts.\nEverything is saved locally in your browser — offline first.",
+        text: names.body,
         fontSize: 22,
         fontFamily: 1,
         textAlign: "left",
@@ -466,10 +503,10 @@ async function seedWelcomeData(): Promise<void> {
     ],
     files: {},
   });
-  await db.createPage(sec.id, "Start here", scene);
-  const sec2 = await db.createSection(nb.id, "Ideas");
-  await db.createPage(sec2.id, "Brainstorm", null);
-  const nb2 = await db.createNotebook("My Notebook", "teal");
-  const sec3 = await db.createSection(nb2.id, "New Section");
-  await db.createPage(sec3.id, "Page 1", null);
+  await db.createPage(sec.id, names.startHere, scene);
+  const sec2 = await db.createSection(nb.id, names.ideasSection);
+  await db.createPage(sec2.id, names.brainstorm, null);
+  const nb2 = await db.createNotebook(names.myNotebook, "teal");
+  const sec3 = await db.createSection(nb2.id, names.mySection);
+  await db.createPage(sec3.id, names.pageOne, null);
 }

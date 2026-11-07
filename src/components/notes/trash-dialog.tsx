@@ -31,9 +31,15 @@ export function TrashDialog() {
   const purge = useAppStore((s) => s.purgeFromTrash);
   const [snapshot, setSnapshot] = useState<TrashSnapshot>({ notebooks: [], sections: [], pages: [] });
 
+  /** Re-list the trash — run on open AND after every restore/purge so the
+   *  dialog never shows rows that were just handled (issue #80). */
+  const refreshSnapshot = () => {
+    void db.listTrash().then(setSnapshot);
+  };
+
   useEffect(() => {
     if (!open) return;
-    void db.listTrash().then(setSnapshot);
+    refreshSnapshot();
   }, [open]);
 
   const empty =
@@ -62,8 +68,8 @@ export function TrashDialog() {
                 icon={<NotebookPen className="h-4 w-4" />}
                 iconColor={NOTEBOOK_COLOR_HEX[nb.color]}
                 label={`${nb.name} (${tCommon("notebookWord")})`}
-                onRestore={() => void restore("notebook", nb.id)}
-                onPurge={() => void purge("notebook", nb.id)}
+                onRestore={() => void restore("notebook", nb.id).then(refreshSnapshot)}
+                onPurge={() => void purge("notebook", nb.id).then(refreshSnapshot)}
               />
             ))}
             {snapshot.sections.map((s) => (
@@ -71,8 +77,8 @@ export function TrashDialog() {
                 key={s.id}
                 icon={<FolderClosed className="h-4 w-4" />}
                 label={`${s.name} (${tCommon("sectionWord")})`}
-                onRestore={() => void restore("section", s.id)}
-                onPurge={() => void purge("section", s.id)}
+                onRestore={() => void restore("section", s.id).then(refreshSnapshot)}
+                onPurge={() => void purge("section", s.id).then(refreshSnapshot)}
               />
             ))}
             {snapshot.pages.map((p) => (
@@ -80,8 +86,8 @@ export function TrashDialog() {
                 key={p.id}
                 icon={<FileText className="h-4 w-4" />}
                 label={`${p.title} (${tCommon("pageWord")})`}
-                onRestore={() => void restore("page", p.id)}
-                onPurge={() => void purge("page", p.id)}
+                onRestore={() => void restore("page", p.id).then(refreshSnapshot)}
+                onPurge={() => void purge("page", p.id).then(refreshSnapshot)}
               />
             ))}
           </div>

@@ -10,9 +10,12 @@
 export const MAX_TAGS_PER_PAGE = 12;
 export const MAX_TAG_LENGTH = 24;
 
-/** Normalize one raw tag: trim, collapse whitespace, cap length. null = invalid. */
+/** Normalize one raw tag: trim, collapse whitespace, cap length. null = invalid.
+ * The cap slices by CODE POINTS (issue #101): a UTF-16 .slice could split a
+ * surrogate pair and leave a lone half rendering as U+FFFD. */
 export function normalizeTag(raw: string): string | null {
-  const t = raw.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH).trim();
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  const t = Array.from(collapsed).slice(0, MAX_TAG_LENGTH).join("").trim();
   return t.length ? t : null;
 }
 
@@ -34,10 +37,32 @@ export function normalizeTags(raw: string[]): string[] {
 
 /** Append a tag; returns the SAME array reference when nothing changed. */
 export function addTag(tags: string[], raw: string): string[] {
+  return addTagWithResult(tags, raw).tags;
+}
+
+/** Outcome of adding a tag — why nothing changed, for user feedback (#100). */
+export type AddTagStatus = "added" | "duplicate" | "invalid" | "capped";
+
+/**
+ * Add a tag and REPORT what happened (issue #100): the silent 12-tag cap
+ * previously swallowed further tags without any feedback, and duplicates
+ * were indistinguishable from successes.
+ */
+export function addTagWithResult(
+  tags: string[],
+  raw: string
+): { tags: string[]; status: AddTagStatus } {
   const t = normalizeTag(raw);
-  if (!t) return tags;
-  if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) return tags;
-  return normalizeTags([...tags, t]);
+  if (!t) return { tags, status: "invalid" };
+  if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) {
+    return { tags, status: "duplicate" };
+  }
+  const next = normalizeTags([...tags, t]);
+  if (next.length === tags.length) {
+    // the cap consumed the new entry — the page was already at the maximum
+    return { tags, status: "capped" };
+  }
+  return { tags: next, status: "added" };
 }
 
 /** Remove a tag case-insensitively. */

@@ -13,6 +13,7 @@
  *   manifest. Both are additive stores — no data migration needed.
  */
 import Dexie, { type Table } from "dexie";
+import { generatedNames } from "./generated-names";
 import { byOrder } from "./types";
 import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
 
@@ -380,7 +381,7 @@ export async function duplicatePage(id: string): Promise<PageMeta | null> {
   const copy: PageRow = {
     ...page,
     id: newId(),
-    title: `${page.title} (copy)`,
+    title: generatedNames().copy(page.title), // localized suffix (issue #63)
     order: maxOrder + 1,
     createdAt: now(),
     updatedAt: now(),
@@ -518,7 +519,17 @@ export async function getPageContent(id: string): Promise<ScenePayload | null> {
 }
 
 export async function savePageContent(id: string, payload: ScenePayload): Promise<void> {
-  await db.pages.update(id, { content: JSON.stringify(payload), updatedAt: now() });
+  const updated = await db.pages.update(id, {
+    content: JSON.stringify(payload),
+    updatedAt: now(),
+  });
+  // Dexie's update() is a silent no-op when the key is missing (issue #78):
+  // the page row can vanish under an open canvas (purged in another tab, or
+  // removed by a sync round). Reporting success then would be a lie — throw
+  // so the autosave indicator shows the error instead of "Saved".
+  if (updated === 0) {
+    throw new Error(`savePageContent: page row "${id}" no longer exists`);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -658,7 +669,7 @@ export async function restoreBackup(json: string): Promise<number> {
       maxOrder += 1;
       await db.notebooks.add({
         id: nbId,
-        name: nb.name?.trim() || "Restored notebook",
+        name: nb.name?.trim() || generatedNames().restoredNotebook,
         color: nb.color ?? "violet",
         order: maxOrder,
         createdAt: ts,
@@ -672,7 +683,7 @@ export async function restoreBackup(json: string): Promise<number> {
         await db.sections.add({
           id: secId,
           notebookId: nbId,
-          name: sec.name?.trim() || "Restored section",
+          name: sec.name?.trim() || generatedNames().restoredSection,
           order: secOrder,
           createdAt: ts,
           updatedAt: ts,
@@ -685,7 +696,7 @@ export async function restoreBackup(json: string): Promise<number> {
           await db.pages.add({
             id: newId(),
             sectionId: secId,
-            title: page.title?.trim() || "Restored page",
+            title: page.title?.trim() || generatedNames().restoredPage,
             order: pageOrder,
             createdAt: ts,
             updatedAt: ts,

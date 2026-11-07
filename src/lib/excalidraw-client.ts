@@ -32,9 +32,17 @@ import {
 import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
-import { headingFontSize, type ImportedBlock } from "./import-blocks";
+import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
 import { parseMht, resolveMhtResource } from "./mht-import";
+import {
+  AUDIO_BLOCK_HEIGHT,
+  AUDIO_BLOCK_WIDTH,
+  AUDIO_LINK_SCHEME,
+  isAudioImportTooLarge,
+  withAudioMime,
+} from "./audio-notes";
 import type { ScenePayload } from "./types";
+import { printoutViewportScale } from "./pdf-layout";
 
 const now = () => Date.now();
 
@@ -78,12 +86,18 @@ export async function importImageFiles(
   const skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }> = [];
   for (const file of files) {
     const dataURL = await fileToDataUrl(file);
-    const { width: w, height: h } = await imageSize(dataURL);
+    const intrinsic = await imageSize(dataURL);
+    // issue #89: SVGs without intrinsic dimensions report 0×0 — fall back
+    // to a sane default instead of collapsing to a 16px sliver
+    const { width: iw, height: ih } = withIntrinsicFallback(
+      intrinsic.width,
+      intrinsic.height,
+    );
     // cap enormous images so they stay usable on canvas
     const maxDim = 1600;
-    const scale = Math.min(1, maxDim / Math.max(w, h));
-    const width = Math.max(16, Math.round(w * scale));
-    const height = Math.max(16, Math.round(h * scale));
+    const scale = Math.min(1, maxDim / Math.max(iw, ih));
+    const width = Math.max(16, Math.round(iw * scale));
+    const height = Math.max(16, Math.round(ih * scale));
     const fileId = crypto.randomUUID() as FileId;
     newFiles[fileId] = {
       id: fileId,
@@ -109,9 +123,15 @@ export async function importTextFiles(
 ): Promise<number> {
   const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
   let y = anchor.y;
+  let imported = 0;
+  // issue #92: batch ALL created elements into ONE scene update — an
+  // update per file re-rendered the canvas and restarted the autosave
+  // debounce once per dropped file
+  const created: ExcalidrawElement[] = [];
   for (const file of files) {
     const text = (await file.text()).slice(0, 60_000); // hard cap for sanity
     if (!text.trim()) continue;
+    imported += 1;
     const skeletons = [
       {
         type: "text" as const,
@@ -123,15 +143,22 @@ export async function importTextFiles(
         id: crypto.randomUUID(),
       },
     ];
-    const created = convertToExcalidrawElements(skeletons, { regenerateIds: false });
-    api.updateScene({
-      elements: [...api.getSceneElements(), ...(created as unknown as ExcalidrawElement[])],
-    });
-    // rough height estimate for stacking: chars per wrapped line
-    const estHeight = Math.max(1, Math.ceil(text.length / 70)) * 26 + 60;
+    created.push(
+      ...(convertToExcalidrawElements(skeletons, {
+        regenerateIds: false,
+      }) as unknown as ExcalidrawElement[]),
+    );
+    // stacking estimate, CJK-aware (issue #88): wide characters wrap at
+    // ~1em, not the 0.52em a flat chars-per-line division assumes
+    const estHeight = estimateLineCount(text, 20, 720) * 26 + 60;
     y += estHeight;
   }
-  return files.length;
+  if (created.length) {
+    api.updateScene({ elements: [...api.getSceneElements(), ...created] });
+  }
+  // count only files that produced content (issue #75): blank files must
+  // not be reported as imported
+  return imported;
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,9 +201,8 @@ function blocksToSkeletons(
     const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
     const text = `${prefix}${block.text}`;
     const width = 720;
-    // rough wrap estimate: chars per line shrinks as the font grows
-    const charsPerLine = Math.max(16, Math.floor(width / (fontSize * 0.52)));
-    const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+    // CJK-aware wrap estimate (issue #88)
+    const lines = estimateLineCount(text, fontSize, width);
     skeletons.push({
       type: "text",
       text,
@@ -196,8 +222,8 @@ function blockAdvance(block: ImportedBlock): number {
   const fontSize = block.kind === "heading" ? headingFontSize(block.level) : 20;
   const prefix = `${"    ".repeat(block.indent)}${block.marker ? `${block.marker} ` : ""}`;
   const text = `${prefix}${block.text}`;
-  const charsPerLine = Math.max(16, Math.floor(720 / (fontSize * 0.52)));
-  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  // CJK-aware wrap estimate (issue #88)
+  const lines = estimateLineCount(text, fontSize, 720);
   return lines * fontSize * 1.35 + 14;
 }
 
@@ -347,19 +373,133 @@ export async function importMhtFile(
 }
 
 /* ------------------------------------------------------------------ */
+/* audio import (issue #67)                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Build a complete Excalidraw embeddable element for one audio clip.
+ *
+ * The payload rides in `customData` (audioData + audioName): scene restore
+ * rewrites every `data:` `link` to about:blank (sanitizeUrl), but passes
+ * customData through untouched, while `link` carries the AUDIO_LINK_SCHEME
+ * marker that (a) survives sanitization and (b) lets the canvas's
+ * `validateEmbeddable` gate mount only our audio players. The name also
+ * feeds full-text search (lib/search.ts).
+ */
+export function makeAudioEmbeddable(
+  name: string,
+  dataUrl: string,
+  x: number,
+  y: number
+): ExcalidrawElement {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  return {
+    id: crypto.randomUUID(),
+    type: "embeddable",
+    x,
+    y,
+    width: AUDIO_BLOCK_WIDTH,
+    height: AUDIO_BLOCK_HEIGHT,
+    angle: 0,
+    strokeColor: "#8b8b9e",
+    backgroundColor: "#f3f3f7",
+    fillStyle: "solid",
+    strokeWidth: 1,
+    strokeStyle: "solid",
+    roughness: 0,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed,
+    version: 1,
+    versionNonce: seed,
+    isDeleted: false,
+    boundElements: null,
+    updated: now(),
+    link: AUDIO_LINK_SCHEME,
+    locked: false,
+    customData: { audioName: name, audioData: dataUrl },
+  } as unknown as ExcalidrawElement;
+}
+
+/** Outcome of an audio import batch: what landed, what was refused. */
+export interface AudioImportResult {
+  /** clips placed on the canvas */
+  added: number;
+  /** clips skipped for exceeding MAX_AUDIO_IMPORT_BYTES (issue #91) */
+  skippedLarge: number;
+}
+
+/**
+ * Import audio files as embeddable audio blocks, stacked below existing
+ * content. Each clip keeps its filename for search + the aria label.
+ * Clips larger than the cap are skipped BEFORE any scene mutation (issue
+ * #91): a multi-hundred-MB base64 payload would blow the IndexedDB quota
+ * after the block is already placed, losing the take on the next save.
+ */
+export async function importAudioFiles(
+  api: ExcalidrawImperativeAPI,
+  files: File[],
+  insertAt?: { x: number; y: number }
+): Promise<AudioImportResult> {
+  if (!files.length) return { added: 0, skippedLarge: 0 };
+  const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
+  let y = anchor.y;
+  let x = anchor.x;
+  let added = 0;
+  let skippedLarge = 0;
+  const created: ExcalidrawElement[] = [];
+  for (const file of files) {
+    if (isAudioImportTooLarge(file.size)) {
+      skippedLarge += 1;
+      continue;
+    }
+    // normalize the MIME (drag-dropped files often arrive with an empty
+    // type, which readAsDataURL stamps as application/octet-stream)
+    const dataUrl = withAudioMime(await fileToDataUrl(file), file.name);
+    if (!dataUrl) {
+      // defensive: classifyFile already vetted these — anything still
+      // unmappable would render a broken player, so skip it.
+      continue;
+    }
+    created.push(makeAudioEmbeddable(file.name, dataUrl, x, y));
+    y += AUDIO_BLOCK_HEIGHT + 24;
+    added += 1;
+  }
+  if (created.length) {
+    api.updateScene({ elements: [...api.getSceneElements(), ...created] });
+  }
+  return { added, skippedLarge };
+}
+
+/* ------------------------------------------------------------------ */
 /* PDF printout (OneNote-style: each page rendered onto the canvas)    */
 /* ------------------------------------------------------------------ */
+
+/** How much of a PDF actually made it onto the canvas (issue #75). */
+export interface PdfPrintoutResult {
+  /** pages rendered as canvas images (capped by MAX_PRINTOUT_PAGES) */
+  rendered: number;
+  /** pages the document actually contains — larger than `rendered` means
+   *  the import was truncated and the user must be told */
+  total: number;
+}
+
+/** Render cap per imported PDF — keeps monster documents usable on canvas. */
+const MAX_PRINTOUT_PAGES = 20;
 
 export async function importPdfAsPrintout(
   api: ExcalidrawImperativeAPI,
   file: File,
   onProgress?: (done: number, total: number) => void
-): Promise<number> {
+): Promise<PdfPrintoutResult> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   const buf = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-  const maxPages = Math.min(doc.numPages, 20); // guard against monsters
+  const total = doc.numPages;
+  const maxPages = Math.min(total, MAX_PRINTOUT_PAGES); // guard against monsters
   const anchor = nextInsertPosition(api.getSceneElements());
   const newFiles: NonNullable<ScenePayload["files"]> = {};
   const skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }> = [];
@@ -367,7 +507,12 @@ export async function importPdfAsPrintout(
   const canvas = document.createElement("canvas");
   for (let i = 1; i <= maxPages; i++) {
     const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale: 1.5 });
+    // issue #87: cap the render size like image imports — a huge page (A0
+    // poster) at scale 1.5 would otherwise become a multi-MB dataURL
+    const base = page.getViewport({ scale: 1.5 });
+    const viewport = page.getViewport({
+      scale: printoutViewportScale(base.width, base.height),
+    });
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext("2d");
@@ -395,7 +540,7 @@ export async function importPdfAsPrintout(
     onProgress?.(i, maxPages);
   }
   applySkeletons(api, skeletons, newFiles);
-  return skeletons.length;
+  return { rendered: skeletons.length, total };
 }
 
 /* ------------------------------------------------------------------ */

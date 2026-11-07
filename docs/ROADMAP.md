@@ -60,21 +60,37 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Flatpak packaging — AppStream metainfo, flatpak-builder manifest
       (extra-data AppImage), Flathub runbook (issue #46)
 
-## v1.7 — Internationalization & polish (current)
+## v1.8 — Offline-first Android & canvas depth (current)
+
+- [x] Audio on pages: import audio files + record in-app (issue #67) —
+      playable `<audio>` blocks on the canvas (embeddable elements, payload in
+      customData + `infinitenote:audio` link marker), draw over clips,
+      clip names in full-text search
+- [x] Import-matrix overlay E2E: every file type on one canvas, then write &
+      draw on top (issue #68) — 36 imported elements in one batch, freedraw
+      stroke + text annotation over everything, reload persistence
+- [ ] Localized first-run seed content + generated page/notebook names
+      (issue #63) — needs a stable quick-notes marker (Dexie v3)
+- [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
+      compliance (issue #64) — follow-up to the F-Droid policy notes
+- [ ] Drawing shape library beyond Excalidraw defaults (issue #65)
+
+## v1.7 — Internationalization & polish (shipped in v1.7.0)
 
 - [x] i18n with next-intl — English + 简体中文 UI, persisted locale switch
-      (issue #54) — full chrome catalogs with ICU plurals, sidebar Language
-      toggle, catalog-parity unit tests, 5 E2E locale checks
-- [x] Themes gallery beyond dark/light (issue #55) — six accent themes
-      (violet default, ocean, forest, sunset, rose, graphite) layered over
-      light/dark via `data-theme` on <html>, sidebar gallery with live
+      (issue #54, PR #58) — full chrome catalogs with ICU plurals, sidebar
+      Language toggle, catalog-parity unit tests, 5 E2E locale checks
+- [x] Themes gallery beyond dark/light (issue #55, PR #59) — six accent
+      themes (violet default, ocean, forest, sunset, rose, graphite) layered
+      over light/dark via `data-theme` on <html>, sidebar gallery with live
       swatches, pre-hydration restore script, persisted choice, i18n-parity
       unit tests, 4 E2E checks
-- [x] F-Droid build recipe + runbook (issue #56) — `packaging/fdroid/`
-      metadata with the repo-wide versionCode scheme (major×100+minor×10+patch),
-      `scripts/fdroid-check.mjs` validator (Bun.YAML parse + invariants),
-      cross-file version parity with the TWA scaffold, docs/fdroid.md runbook
-      (fdroidserver test-build, fdroiddata submission, policy notes), 21 unit tests
+- [x] F-Droid build recipe + runbook (issue #56, PR #60) —
+      `packaging/fdroid/` metadata with the repo-wide versionCode scheme
+      (major×100+minor×10+patch), `scripts/fdroid-check.mjs` validator
+      (Bun.YAML parse + invariants), cross-file version parity with the TWA
+      scaffold, docs/fdroid.md runbook (fdroidserver test-build, fdroiddata
+      submission, policy notes), 21 unit tests
 
 ## Backlog (unscheduled)
 

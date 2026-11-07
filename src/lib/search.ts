@@ -3,7 +3,8 @@
  *
  * Extracts searchable text from serialized Excalidraw scenes without loading
  * them into the editor: text element bodies (raw + label), arrow labels, and
- * frame names. Matching = all query terms must appear (AND), case-insensitive.
+ * audio clip filenames (embeddable customData, issue #67). Matching = all
+ * query terms must appear (AND), case-insensitive.
  */
 import type { Notebook, PageMeta, Section } from "./types";
 
@@ -11,6 +12,7 @@ interface SceneElementLike {
   type?: string;
   text?: string;
   id?: string;
+  customData?: { audioName?: unknown } | null;
 }
 
 /** Extract searchable strings from a serialized page content payload. */
@@ -25,6 +27,12 @@ export function extractSearchableText(contentJson: string | null | undefined): s
   const out: string[] = [];
   for (const el of parsed.elements ?? []) {
     if (typeof el?.text === "string" && el.text.trim()) out.push(el.text);
+    // audio blocks (issue #67) carry their clip filename in customData —
+    // searching "interview" should find the page holding interview.mp3
+    if (el?.type === "embeddable" && typeof el.customData?.audioName === "string") {
+      const name = el.customData.audioName.trim();
+      if (name) out.push(name);
+    }
   }
   return out;
 }
@@ -94,7 +102,13 @@ export function searchIndex(
       notebookId: entry.notebookId,
       pagePath: entry.pagePath,
       title: entry.title,
-      snippet: (firstContentWithTerm ?? entry.contents[0] ?? "").replace(/\s+/g, " ").trim().slice(0, 140),
+      // snippet capped by CODE POINTS (issue #101) — never split an astral
+      // character (emoji, rare CJK) into a broken half
+      snippet: Array.from(
+        (firstContentWithTerm ?? entry.contents[0] ?? "").replace(/\s+/g, " ").trim(),
+      )
+        .slice(0, 140)
+        .join(""),
       score,
     });
   }

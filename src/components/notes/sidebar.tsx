@@ -915,7 +915,10 @@ function TagFilterView({
                 className="flex min-h-9 flex-col items-start justify-center gap-0.5 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent"
                 onClick={() => {
                   if (sec && nb) {
-                    useAppStore.getState().selectPage({
+                    // reveal, not just select (issue #82): the target page may
+                    // live in a collapsed section — expand its ancestors so
+                    // the sidebar shows where the user landed
+                    useAppStore.getState().revealSelection({
                       notebookId: nb.id,
                       sectionId: sec.id,
                       pageId: p.id,
@@ -965,6 +968,10 @@ function RenameInput({
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => onCommit(value)}
       onKeyDown={(e) => {
+        // ignore Enter/Escape while an IME composes (issue #99): Enter
+        // confirms the composition, Escape cancels it — neither should
+        // commit or abort the rename itself
+        if (e.nativeEvent.isComposing) return;
         if (e.key === "Enter") onCommit(value);
         if (e.key === "Escape") onCancel();
         e.stopPropagation();

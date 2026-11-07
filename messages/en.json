@@ -28,7 +28,7 @@
     "importFiles": "Import files",
     "restoreBackupFile": "Restore backup file",
     "insertInto": "Insert into current page",
-    "importItems": "Images, PDF, Word, HTML, text…",
+    "importItems": "Images, PDF, Word, HTML, text, audio…",
     "library": "Library",
     "restoreBackup": "Restore backup (.json)",
     "export": "Export",
@@ -42,17 +42,45 @@
     "exportEverything": "Everything",
     "exportBackup": "Full backup (.json)",
     "toggleTheme": "Toggle theme",
+    "recordAudio": "Record audio",
+    "stopRecording": "Stop recording",
+    "toastMicDenied": "Microphone access was denied.",
+    "toastMicFailed": "Could not start or finish the recording.",
+    "toastRecorderUnsupported": "Audio recording is not supported in this browser.",
+    "toastRecordingInserted": "Inserted recording ({duration}).",
     "navigation": "Navigation",
     "pageTitle": "Page title",
     "clickToRename": "Click to rename this page",
     "dropTitle": "Drop files to insert them",
-    "dropBody": "Images, PDF printouts, Word & HTML pages, OneNote .mht, text, .excalidraw scenes",
+    "dropBody": "Images, PDF printouts, Word & HTML pages, OneNote .mht, text, audio clips, .excalidraw scenes",
     "toastOpenFirstImport": "Open a page first, then import files.",
     "toastRestored": "Restored backup — {count, plural, =1 {1 page} other {# pages}} imported.",
     "toastRestoreFailed": "Could not restore that backup file.",
     "toastBackupDownloaded": "Backup downloaded.",
     "toastOpenFirstExport": "Open a page first, then export.",
-    "toastExportFailed": "Export failed."
+    "toastExportFailed": "Export failed.",
+    "exportErrors": {
+      "emptyPage": "Nothing to export — this page is empty."
+    },
+    "loadFailed": "Could not open your notes",
+    "loadFailedBody": "The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again.",
+    "retry": "Try again",
+    "loadingCanvas": "Loading canvas…"
+  },
+  "canvas": {
+    "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",
+    "importedTexts": "Imported {count, plural, =1 {1 text file} other {# text files}}",
+    "emptyFiles": "Some files had no importable content",
+    "pdfPrintout": "Inserted PDF printout ({pages, plural, =1 {1 page} other {# pages}})",
+    "pdfTruncated": "Inserted PDF printout (first {shown} of {total} pages) — the render cap is 20 pages",
+    "importedStructured": "Imported \"{name}\" — {blocks, plural, =1 {1 text block} other {# text blocks}}",
+    "plusImages": "+ {count, plural, =1 {1 image} other {# images}}",
+    "importedAudio": "Imported {count, plural, =1 {1 audio clip} other {# audio clips}}",
+    "importedScene": "Imported scene \"{name}\"",
+    "skipped": "Some files were skipped (unsupported type)",
+    "importFailed": "Import failed — see console for details",
+    "audioTooLarge": "Skipped {count, plural, =1 {1 audio file} other {# audio files}} — larger than 30 MB, too big to store reliably",
+    "audioClipAria": "audio clip"
   },
   "paper": {
     "background": "Page background",
@@ -68,7 +96,9 @@
     "addTagAria": "Add tag",
     "existing": "Existing tags",
     "removeTag": "Remove tag {tag}",
-    "quickAddTitle": "Add \"{tag}\" (used by {count, plural, =1 {1 page} other {# pages}})"
+    "quickAddTitle": "Add \"{tag}\" (used by {count, plural, =1 {1 page} other {# pages}})",
+    "tooManyTags": "A page can carry at most {count} tags",
+    "duplicateTag": "Already tagged \"{tag}\""
   },
   "sidebar": {
     "notebooks": "Notebooks",
@@ -196,7 +226,14 @@
     "wConflicts": "{count, plural, =1 {1 conflict copy} other {# conflict copies}}",
     "wTrashed": "{count, plural, =1 {1 item moved to trash} other {# items moved to trash}}",
     "wTreeUpdated": "{count, plural, =1 {1 notebook/section updated} other {# notebooks/sections updated}}",
-    "wPurged": "{count, plural, =1 {1 item purged} other {# items purged}}"
+    "wPurged": "{count, plural, =1 {1 item purged} other {# items purged}}",
+    "errors": {
+      "noManifest": "This folder is not set up for InfiniteNote sync yet — it will be initialized on the next sync.",
+      "badManifest": "The sync folder manifest (manifest.json) is invalid. Restore it from a backup or pick another folder.",
+      "badVersion": "The sync folder was written by a newer, incompatible InfiniteNote version. Update the app on all devices.",
+      "badPageFile": "A page file in the sync folder is corrupt. Restore it from a backup or pick another folder.",
+      "badTrash": "The sync folder trash log (trash.jsonl) is corrupt. Restore it from a backup or pick another folder."
+    }
   },
   "empty": {
     "title": "No page open",
@@ -215,5 +252,32 @@
     "themeSunset": "Sunset",
     "themeRose": "Rose",
     "themeSlate": "Graphite"
+  },
+  "generated": {
+    "notebook": "Notebook {n}",
+    "section": "Section {n}",
+    "page": "Page {n}",
+    "copy": "{title} (copy)",
+    "conflict": "{title} (conflict {date})",
+    "restoredNotebook": "Restored notebook",
+    "restoredSection": "Restored section",
+    "restoredPage": "Restored page",
+    "untitled": "Untitled",
+    "quickNotesNotebook": "Quick Notes",
+    "quickNotesSection": "Quick Notes",
+    "quickNotePrefix": "Quick note ",
+    "recordingPrefix": "Recording ",
+    "welcome": {
+      "notebook": "Welcome Notebook",
+      "section": "Getting Started",
+      "ideasSection": "Ideas",
+      "myNotebook": "My Notebook",
+      "mySection": "New Section",
+      "startHere": "Start here",
+      "brainstorm": "Brainstorm",
+      "pageOne": "Page 1",
+      "title": "Welcome to InfiniteNote",
+      "body": "An open-source notebook with an infinite canvas.\n\nLeft: your Notebooks, Sections and Pages — like OneNote.\nHere: draw anywhere with pen, highlighter, shapes and text.\n\nImport (top right): images, text, Markdown and PDF printouts.\nEverything is saved locally in your browser — offline first."
+    }
   }
 }

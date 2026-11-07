@@ -37,7 +37,9 @@ test.describe.serial("locale switching (issue #54)", () => {
   test("the Language toggle switches the chrome to Simplified Chinese", async () => {
     await page.locator('[data-testid="locale-toggle"]').click();
 
-    await expect(page.locator(SIDEBAR_HEADER + "笔记本")).toBeVisible();
+    // quoted text = exact match — the localized seed ("我的笔记本") also
+    // contains the substring 笔记本 now (issue #63)
+    await expect(page.locator(SIDEBAR_HEADER + '"笔记本"')).toBeVisible();
     await expect(page.locator('[data-testid="quick-note-button"]')).toHaveText(/快速笔记/);
     await expect(page.locator('[data-testid="today-button"]')).toHaveText(/今天/);
     await expect(page.locator('[data-testid="sync-button"]')).toHaveText(/同步/);
@@ -72,7 +74,9 @@ test.describe.serial("locale switching (issue #54)", () => {
   test("the locale choice survives a reload", async () => {
     await page.reload();
     await resetToSeed(page);
-    await expect(page.locator(SIDEBAR_HEADER + "笔记本")).toBeVisible();
+    // quoted text = exact match — the localized seed ("我的笔记本") also
+    // contains the substring 笔记本 now (issue #63)
+    await expect(page.locator(SIDEBAR_HEADER + '"笔记本"')).toBeVisible();
     await expect(page.locator('[data-testid="quick-note-button"]')).toHaveText(/快速笔记/);
   });
 

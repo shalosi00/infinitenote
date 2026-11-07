@@ -32,6 +32,7 @@ import type { SyncSummary } from "@/lib/sync/merge";
 import type { SyncFolderFiles } from "@/lib/sync/format";
 import { summaryParts } from "@/lib/sync/summary";
 import { parseSyncZip, zipSyncFolder } from "@/lib/sync/zip";
+import { MANIFEST_PATH, SyncFormatError } from "@/lib/sync/format";
 import {
   ensurePermission,
   isFsaSupported,
@@ -172,8 +173,11 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
     setBusy("sync");
     try {
       const files = await readSyncFolder(folderHandle);
-      if (!files["manifest.json"] && Object.keys(files).length === 0) {
-        // first sync into an empty folder: export-only round trip
+      if (!files[MANIFEST_PATH]) {
+        // No manifest = nothing mergeable. This covers the truly empty
+        // folder AND the partially-written one that still holds stray
+        // files (e.g. only trash.jsonl): initialize instead of erroring
+        // with a raw "manifest.json is missing" (issue #105).
         const outcome = await onRunSync(null);
         await writeSyncFolder(folderHandle, outcome.folder);
         setSummary(t("summaryInitialized"));
@@ -184,8 +188,14 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
       setSummary(formatSummary(outcome.summary));
       toast.success(formatSummary(outcome.summary));
     } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : t("toastSyncFailed"));
+      // issue #86: never surface raw English SyncFormatError internals —
+      // map the stable code to a localized message
+      if (err instanceof SyncFormatError) {
+        toast.error(t(`errors.${err.code}`));
+      } else {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : t("toastSyncFailed"));
+      }
     } finally {
       setBusy(null);
     }
@@ -201,8 +211,12 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
         setSummary(formatSummary(outcome.summary));
         toast.success(formatSummary(outcome.summary));
       } catch (err) {
-        console.error(err);
-        toast.error(err instanceof Error ? err.message : t("toastZipFailed"));
+        if (err instanceof SyncFormatError) {
+          toast.error(t(`errors.${err.code}`)); // issue #86
+        } else {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : t("toastZipFailed"));
+        }
       } finally {
         setBusy(null);
       }

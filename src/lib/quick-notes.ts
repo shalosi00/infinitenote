@@ -10,6 +10,8 @@
 export const QUICK_NOTES_NOTEBOOK_NAME = "Quick Notes";
 export const QUICK_NOTES_SECTION_NAME = "Quick Notes";
 
+import { generatedNames } from "./generated-names";
+
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /** Local calendar date key, e.g. "2026-10-19" — the daily page title. */
@@ -17,9 +19,12 @@ export function todayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-/** Title for a fresh quick note: "Quick note 2026-10-19 14:32" (24h clock). */
+/** Title for a fresh quick note: "Quick note 2026-10-19 14:32:07" (24h clock).
+ * Seconds resolution (issue #95): two quick notes inside one minute must
+ * not collide into identical titles. The prefix is localized (issue #63). */
 export function quickNoteTitle(d: Date = new Date()): string {
-  return `Quick note ${todayKey(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const prefix = generatedNames().quickNotePrefix;
+  return `${prefix}${todayKey(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
 /** Matches titles that are exactly a daily page key ("YYYY-MM-DD"). */

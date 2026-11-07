@@ -7,6 +7,7 @@
  * `next/dynamic` with `ssr: false` (see canvas-editor.tsx).
  */
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
@@ -29,12 +30,18 @@ import {
   importMhtFile,
   importPdfAsPrintout,
   importTextFiles,
+  importAudioFiles,
   exportPng,
   exportSvg,
   exportSceneFile,
   appendScene,
 } from "@/lib/excalidraw-client";
 import { exportPagePdf } from "@/lib/pdf-export";
+import { audioPayloadOf, isAudioBlockLink } from "@/lib/audio-notes";
+import { e2eHooksEnabled } from "@/lib/e2e-gate";
+import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
+import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types";
 
 // Self-host canvas fonts/assets so the app works fully offline.
 if (typeof window !== "undefined") {
@@ -44,6 +51,46 @@ if (typeof window !== "undefined") {
 
 const AUTOSAVE_DEBOUNCE_MS = 700;
 const LIBRARY_STORAGE_KEY = "infinitenote.library";
+
+/**
+ * Read the persisted shape library back (issue #96): onLibraryChange
+ * saves it on every change; this restores it into the editor on mount.
+ * Corrupt/absent data → null (no library items to restore). Runs in the
+ * browser only — the canvas never mounts on the server.
+ */
+function loadSavedLibrary(): LibraryItems | null {
+  try {
+    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LibraryItems;
+    if (!Array.isArray(parsed)) return null;
+    // light shape guard: every entry must be an object with an id
+    if (!parsed.every((item) => item && typeof item === "object" && "id" in item)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Translator for the canvas message namespace (next-intl). */
+type CanvasTranslator = ReturnType<typeof useTranslations<"canvas">>;
+
+/**
+ * Compose the .docx / HTML / .mht import toast: text blocks plus an optional
+ * "+ N images" tail. Shared by all three structured importers so they read
+ * alike and stay localized (issue #73).
+ */
+function structuredImportToast(
+  t: CanvasTranslator,
+  name: string,
+  blocks: number,
+  images: number,
+): string {
+  const base = t("importedStructured", { name, blocks });
+  return images > 0 ? `${base} ${t("plusImages", { count: images })}` : base;
+}
 
 /** World-space distance between ruled-paper lines (≈ a text line at 100%). */
 const RULED_GAP = 40;
@@ -59,6 +106,60 @@ export interface ExcalidrawCanvasProps {
   onToast: (message: string) => void;
 }
 
+/**
+ * Native `<audio controls>` player for one audio embeddable (issue #67).
+ *
+ * Rendered via Excalidraw's `renderEmbeddable` prop instead of the default
+ * iframe: browsers show no UI for a bare audio document, and data: iframes
+ * are blocked in several contexts. The clip stays a first-class scene
+ * element — select it, move it, draw over it — while this component only
+ * owns playback. Pointer events are enabled only while the element is
+ * "active" (selected/double-clicked), which is Excalidraw's own rule for
+ * interactive embeds; the wrapper honors it for us.
+ */
+function AudioEmbeddablePlayer({
+  element,
+  theme,
+}: {
+  element: ExcalidrawEmbeddableElement;
+  theme: "light" | "dark";
+}) {
+  const t = useTranslations("canvas");
+  const payload = audioPayloadOf(element.customData);
+  if (!payload) return null; // corrupted block — let Excalidraw render its default
+  const name =
+    typeof element.customData?.audioName === "string" ? element.customData.audioName : "";
+  const dark = theme === "dark";
+  return (
+    <div
+      className="flex h-full w-full flex-col justify-center gap-1 px-2"
+      style={{
+        background: dark ? "#2a2a33" : "#f3f3f7",
+        color: dark ? "#d8d8e2" : "#3f3f4a",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      {name && (
+        <span
+          data-testid="audio-clip-name"
+          className="truncate text-[10px] leading-tight opacity-80"
+          title={name}
+        >
+          ♪ {name}
+        </span>
+      )}
+      <audio
+        controls
+        preload="metadata"
+        src={payload}
+        className="h-7 w-full"
+        aria-label={name || t("audioClipAria")} // localized fallback (issue #98)
+        data-testid="audio-player"
+      />
+    </div>
+  );
+}
+
 export default function ExcalidrawCanvas({
   pageId,
   title,
@@ -72,6 +173,28 @@ export default function ExcalidrawCanvas({
   const latestScene = useRef<ScenePayload | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ruledLayerRef = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * Latest-value refs (issue #72): Excalidraw invokes the `excalidrawAPI`
+   * callback exactly once per mounted editor instance, and the canvas only
+   * remounts when `pageId` changes — so anything the imperative surface
+   * closes over would freeze at mount time. The export surface therefore
+   * reads title / paper style / translator through refs that are re-assigned
+   * on every render, keeping exports and toasts correct after an in-place
+   * rename, paper switch or locale switch.
+   */
+  const t = useTranslations("canvas");
+  const tRef = useRef(t);
+  const titleRef = useRef(title);
+  const backgroundRef = useRef(background);
+  // Refs may only be written outside render (react-hooks/refs) — refresh them
+  // in an effect after every commit. The export surface reads them at
+  // interaction time (menu click), long after the effect has settled.
+  useEffect(() => {
+    tRef.current = t;
+    titleRef.current = title;
+    backgroundRef.current = background;
+  }, [t, title, background]);
 
   /** Write the latest stashed scene into IndexedDB. */
   const doSave = useCallback(async (): Promise<void> => {
@@ -154,50 +277,69 @@ export default function ExcalidrawCanvas({
         const docxFiles = files.filter((f) => classifyFile(f) === "docx");
         const htmlFiles = files.filter((f) => classifyFile(f) === "html");
         const mhtFiles = files.filter((f) => classifyFile(f) === "mht");
+        const audioFiles = files.filter((f) => classifyFile(f) === "audio");
+        // always the active locale's translator (issue #73): a locale switch
+        // must not leave the canvas toasting in a stale language
+        const tt = () => tRef.current;
         let touched = false;
         try {
           if (images.length) {
             await importImageFiles(api, images);
             touched = true;
-            onToast(`Imported ${images.length} image${images.length > 1 ? "s" : ""}`);
+            onToast(tt()("importedImages", { count: images.length }));
           }
           if (texts.length) {
-            await importTextFiles(api, texts);
-            touched = true;
-            onToast(`Imported ${texts.length} text file${texts.length > 1 ? "s" : ""}`);
+            const n = await importTextFiles(api, texts);
+            if (n) {
+              touched = true;
+              onToast(tt()("importedTexts", { count: n }));
+            }
+            if (n < texts.length) {
+              // blank / whitespace-only text files produced no content
+              onToast(tt()("emptyFiles"));
+            }
           }
           if (pdfs.length) {
             for (const pdf of pdfs) {
-              const n = await importPdfAsPrintout(api, pdf);
+              const { rendered, total }: PdfPrintoutResult =
+                await importPdfAsPrintout(api, pdf);
               touched = true;
-              onToast(`Inserted PDF printout (${n} page${n > 1 ? "s" : ""})`);
+              onToast(
+                total > rendered
+                  ? tt()("pdfTruncated", { shown: rendered, total })
+                  : tt()("pdfPrintout", { pages: rendered }),
+              );
             }
           }
           if (docxFiles.length) {
             for (const file of docxFiles) {
               const n = await importDocxFile(api, file);
               touched = true;
-              onToast(`Imported "${file.name}" — ${n} text block${n === 1 ? "" : "s"}`);
+              onToast(tt()("importedStructured", { name: file.name, blocks: n }));
             }
           }
           if (htmlFiles.length) {
             for (const file of htmlFiles) {
               const { blocks, images: n } = await importHtmlFile(api, file);
               touched = true;
-              onToast(
-                `Imported "${file.name}" — ${blocks} text block${blocks === 1 ? "" : "s"}` +
-                  (n ? ` + ${n} image${n > 1 ? "s" : ""}` : ""),
-              );
+              onToast(structuredImportToast(tt(), file.name, blocks, n));
             }
           }
           if (mhtFiles.length) {
             for (const file of mhtFiles) {
               const { blocks, images: n } = await importMhtFile(api, file);
               touched = true;
-              onToast(
-                `Imported "${file.name}" — ${blocks} text block${blocks === 1 ? "" : "s"}` +
-                  (n ? ` + ${n} image${n > 1 ? "s" : ""}` : ""),
-              );
+              onToast(structuredImportToast(tt(), file.name, blocks, n));
+            }
+          }
+          if (audioFiles.length) {
+            const { added, skippedLarge } = await importAudioFiles(api, audioFiles);
+            if (added) {
+              touched = true;
+              onToast(tt()("importedAudio", { count: added }));
+            }
+            if (skippedLarge) {
+              onToast(tt()("audioTooLarge", { count: skippedLarge }));
             }
           }
           if (scenes.length) {
@@ -205,7 +347,7 @@ export default function ExcalidrawCanvas({
               const scene = await importExcalidrawFile(sceneFile);
               appendScene(api, scene);
               touched = true;
-              onToast(`Imported scene "${sceneFile.name}"`);
+              onToast(tt()("importedScene", { name: sceneFile.name }));
             }
           }
           const known =
@@ -215,9 +357,10 @@ export default function ExcalidrawCanvas({
             scenes.length +
             docxFiles.length +
             htmlFiles.length +
-            mhtFiles.length;
+            mhtFiles.length +
+            audioFiles.length;
           if (files.length > known) {
-            onToast("Some files were skipped (unsupported type)");
+            onToast(tRef.current("skipped"));
           }
           if (touched) {
             latestScene.current = getScenePayload(api);
@@ -225,16 +368,19 @@ export default function ExcalidrawCanvas({
           }
         } catch (err) {
           console.error(err);
-          onToast("Import failed — see console for details");
+          onToast(tRef.current("importFailed"));
         }
       };
 
       const apiSurface: CanvasApi = {
         importFiles,
-        exportPng: () => exportPng(api, title),
-        exportSvg: () => exportSvg(api, title),
-        exportSceneFile: () => exportSceneFile(api, title),
-        exportPdf: (orientation) => exportPagePdf(api, title, orientation, background),
+        // latest-value refs (issue #72): a rename or paper-style switch must
+        // be reflected in the very next export, without remounting the canvas
+        exportPng: () => exportPng(api, titleRef.current),
+        exportSvg: () => exportSvg(api, titleRef.current),
+        exportSceneFile: () => exportSceneFile(api, titleRef.current),
+        exportPdf: (orientation) =>
+          exportPagePdf(api, titleRef.current, orientation, backgroundRef.current),
         focusContent: () => api.scrollToContent(),
         flushSave,
         hasPendingEdits,
@@ -246,8 +392,9 @@ export default function ExcalidrawCanvas({
       // the first pan/zoom would show an un-tiled gradient until interaction
       if (background === "ruled") syncRuledLayer(api.getAppState());
 
-      // Test hook — only when explicitly requested via ?e2e=1
-      if (new URLSearchParams(window.location.search).has("e2e")) {
+      // Test hook — ?e2e=1 AND development only (issue #102): Next inlines
+      // NODE_ENV, so the whole block compiles away in production builds
+      if (e2eHooksEnabled(window.location.search, process.env.NEXT_PUBLIC_E2E)) {
         (window as unknown as Record<string, unknown>).__NOTE_E2E__ = {
           excalidraw: api,
           saveNow: flushSave,
@@ -256,7 +403,7 @@ export default function ExcalidrawCanvas({
         };
       }
     },
-    [title, onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer, hasPendingEdits, discardPendingEdits]
+    [onApiReady, flushSave, scheduleSave, onToast, background, syncRuledLayer, hasPendingEdits, discardPendingEdits]
   );
 
   /* ----------------------------- lifecycle ----------------------------- */
@@ -308,6 +455,19 @@ export default function ExcalidrawCanvas({
     }
   }, []);
 
+  /**
+   * Custom renderer for embeddable elements (issue #67): audio clips get a
+   * native `<audio controls>` player; everything else falls back to
+   * Excalidraw's default iframe (returning null/undefined does that).
+   */
+  const renderEmbeddable = useCallback(
+    (element: ExcalidrawEmbeddableElement, _appState: AppState) => {
+      if (!isAudioBlockLink(element.link)) return null;
+      return <AudioEmbeddablePlayer element={element} theme={theme} />;
+    },
+    [theme]
+  );
+
   const viewBackgroundColor = theme === "dark" ? "#1e1e1e" : "#ffffff";
   const ruledColor = theme === "dark" ? "rgba(120, 120, 128, 0.35)" : "rgba(82, 82, 91, 0.25)";
 
@@ -319,6 +479,7 @@ export default function ExcalidrawCanvas({
         onChange={handleChange}
         theme={theme}
         name={title}
+        renderEmbeddable={renderEmbeddable}
         initialData={async () => {
           const payload = await db.getPageContent(pageId);
           return {
@@ -328,6 +489,10 @@ export default function ExcalidrawCanvas({
               viewBackgroundColor,
               gridModeEnabled: background === "grid",
             },
+            // restore the saved shape library (issue #96): it is persisted
+            // on every onLibraryChange and was previously never read back,
+            // so saved items vanished on every reload
+            libraryItems: loadSavedLibrary() ?? undefined,
           };
         }}
         onLibraryChange={handleLibraryChange}
@@ -341,7 +506,9 @@ export default function ExcalidrawCanvas({
           },
         }}
         libraryReturnUrl={typeof window !== "undefined" ? window.location.origin : undefined}
-        validateEmbeddable={false}
+        // only our audio blocks (AUDIO_LINK_SCHEME marker) may mount interactive
+        // embeds; every other embeddable stays rejected, exactly as before
+        validateEmbeddable={(url) => isAudioBlockLink(url)}
       />
       {background === "ruled" && (
         <div

@@ -24,6 +24,7 @@ import type {
   Section,
 } from "../types";
 import { byOrder } from "../types";
+import { generatedNames } from "../generated-names";
 
 export const MANIFEST_PATH = "manifest.json";
 export const TRASH_PATH = "trash.jsonl";
@@ -99,11 +100,26 @@ export interface ParsedSyncFolder {
   trash: Map<string, TrashEntry>;
 }
 
+/**
+ * Failure codes for a malformed sync folder — stable + locale-independent
+ * (issue #86): the UI maps them to localized messages instead of showing
+ * the English `message` aimed at the console.
+ */
+export type SyncErrorCode =
+  | "noManifest"
+  | "badManifest"
+  | "badVersion"
+  | "badPageFile"
+  | "badTrash";
+
 /** Thrown when a folder does not look like an InfiniteNote sync folder. */
 export class SyncFormatError extends Error {
-  constructor(message: string) {
+  readonly code: SyncErrorCode;
+
+  constructor(message: string, code: SyncErrorCode) {
     super(message);
     this.name = "SyncFormatError";
+    this.code = code;
   }
 }
 
@@ -229,25 +245,32 @@ export function reduceTrash(entries: readonly TrashEntry[]): Map<string, TrashEn
 export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
   const manifestRaw = files[MANIFEST_PATH];
   if (manifestRaw === undefined) {
-    throw new SyncFormatError("Not an InfiniteNote sync folder: manifest.json is missing");
+    throw new SyncFormatError(
+      "Not an InfiniteNote sync folder: manifest.json is missing",
+      "noManifest"
+    );
   }
   let manifest: SyncManifest;
   try {
     manifest = JSON.parse(manifestRaw) as SyncManifest;
   } catch {
-    throw new SyncFormatError("manifest.json is not valid JSON");
+    throw new SyncFormatError("manifest.json is not valid JSON", "badManifest");
   }
   if (manifest?.app !== "infinitenote" || manifest?.format !== SYNC_FORMAT) {
-    throw new SyncFormatError("Not an InfiniteNote sync folder: unexpected app/format");
+    throw new SyncFormatError(
+      "Not an InfiniteNote sync folder: unexpected app/format",
+      "badManifest"
+    );
   }
   if (manifest.version !== SYNC_VERSION) {
     throw new SyncFormatError(
-      `Unsupported sync-folder version ${String(manifest.version)} (expected ${String(SYNC_VERSION)})`
+      `Unsupported sync-folder version ${String(manifest.version)} (expected ${String(SYNC_VERSION)})`,
+      "badVersion"
     );
   }
   for (const key of ["notebooks", "sections", "pages"] as const) {
     if (!Array.isArray(manifest[key])) {
-      throw new SyncFormatError(`manifest.json: "${key}" must be an array`);
+      throw new SyncFormatError(`manifest.json: "${key}" must be an array`, "badManifest");
     }
   }
 
@@ -258,15 +281,15 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
     try {
       file = JSON.parse(raw) as SyncPageFile;
     } catch {
-      throw new SyncFormatError(`${path} is not valid JSON`);
+      throw new SyncFormatError(`${path} is not valid JSON`, "badPageFile");
     }
     if (typeof file?.id !== "string" || typeof file?.sectionId !== "string") {
-      throw new SyncFormatError(`${path} is missing id/sectionId`);
+      throw new SyncFormatError(`${path} is missing id/sectionId`, "badPageFile");
     }
     pages.set(file.id, {
       id: file.id,
       sectionId: file.sectionId,
-      title: typeof file.title === "string" ? file.title : "Untitled",
+      title: typeof file.title === "string" ? file.title : generatedNames().untitled,
       order: typeof file.order === "number" ? file.order : 0,
       createdAt: typeof file.createdAt === "number" ? file.createdAt : 0,
       updatedAt: typeof file.updatedAt === "number" ? file.updatedAt : 0,
@@ -295,7 +318,10 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
         title: typeof e.title === "string" ? e.title : undefined,
       });
     } catch {
-      throw new SyncFormatError(`trash.jsonl line ${i + 1} is not a valid tombstone`);
+      throw new SyncFormatError(
+        `trash.jsonl line ${i + 1} is not a valid tombstone`,
+        "badTrash"
+      );
     }
   }
 

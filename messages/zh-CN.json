@@ -28,7 +28,7 @@
     "importFiles": "导入文件",
     "restoreBackupFile": "还原备份文件",
     "insertInto": "插入当前页面",
-    "importItems": "图片、PDF、Word、HTML、文本…",
+    "importItems": "图片、PDF、Word、HTML、文本、音频…",
     "library": "资料库",
     "restoreBackup": "还原备份（.json）",
     "export": "导出",
@@ -42,17 +42,45 @@
     "exportEverything": "全部内容",
     "exportBackup": "完整备份（.json）",
     "toggleTheme": "切换主题",
+    "recordAudio": "录制音频",
+    "stopRecording": "停止录音",
+    "toastMicDenied": "未获得麦克风权限。",
+    "toastMicFailed": "录音启动或保存失败。",
+    "toastRecorderUnsupported": "当前浏览器不支持录音。",
+    "toastRecordingInserted": "已插入录音（{duration}）。",
     "navigation": "导航",
     "pageTitle": "页面标题",
     "clickToRename": "点击重命名此页面",
     "dropTitle": "拖放文件以插入",
-    "dropBody": "图片、PDF 打印件、Word 和 HTML 页面、OneNote .mht、文本、.excalidraw 场景",
+    "dropBody": "图片、PDF 打印件、Word 和 HTML 页面、OneNote .mht、文本、音频、.excalidraw 场景",
     "toastOpenFirstImport": "请先打开一个页面，再导入文件。",
     "toastRestored": "已还原备份——导入 {count, plural, other {# 个页面}}。",
     "toastRestoreFailed": "无法还原该备份文件。",
     "toastBackupDownloaded": "备份已下载。",
     "toastOpenFirstExport": "请先打开一个页面，再导出。",
-    "toastExportFailed": "导出失败。"
+    "toastExportFailed": "导出失败。",
+    "exportErrors": {
+      "emptyPage": "没有可导出的内容——此页面为空。"
+    },
+    "loadFailed": "无法打开你的笔记",
+    "loadFailedBody": "本地数据库无法打开（可能被占用或暂不可用）。数据不会丢失——请重试。",
+    "retry": "重试",
+    "loadingCanvas": "正在加载画布…"
+  },
+  "canvas": {
+    "importedImages": "已导入 {count} 张图片",
+    "importedTexts": "已导入 {count} 个文本文件",
+    "emptyFiles": "部分文件没有可导入的内容",
+    "pdfPrintout": "已插入 PDF 打印件（{pages} 页）",
+    "pdfTruncated": "已插入 PDF 打印件（共 {total} 页，仅前 {shown} 页——单文件渲染上限为 20 页）",
+    "importedStructured": "已导入“{name}”——{blocks} 个文本块",
+    "plusImages": "另含 {count} 张图片",
+    "importedAudio": "已导入 {count} 段音频",
+    "importedScene": "已导入场景“{name}”",
+    "skipped": "部分文件已跳过（不支持的类型）",
+    "importFailed": "导入失败——详情见控制台",
+    "audioTooLarge": "已跳过 {count} 个音频文件——超过 30 MB，无法可靠保存",
+    "audioClipAria": "音频剪辑"
   },
   "paper": {
     "background": "页面背景",
@@ -68,7 +96,9 @@
     "addTagAria": "添加标签",
     "existing": "已有标签",
     "removeTag": "移除标签 {tag}",
-    "quickAddTitle": "添加“{tag}”（{count, plural, other {# 个页面}}在使用）"
+    "quickAddTitle": "添加“{tag}”（{count, plural, other {# 个页面}}在使用）",
+    "tooManyTags": "一个页面最多只能添加 {count} 个标签",
+    "duplicateTag": "已有标签“{tag}”"
   },
   "sidebar": {
     "notebooks": "笔记本",
@@ -196,7 +226,14 @@
     "wConflicts": "{count, plural, other {# 个冲突副本}}",
     "wTrashed": "{count, plural, other {# 项已移入回收站}}",
     "wTreeUpdated": "{count, plural, other {# 个笔记本/分区已更新}}",
-    "wPurged": "{count, plural, other {# 项已彻底清除}}"
+    "wPurged": "{count, plural, other {# 项已彻底清除}}",
+    "errors": {
+      "noManifest": "此文件夹尚未配置 InfiniteNote 同步——下次同步时将自动初始化。",
+      "badManifest": "同步文件夹的清单（manifest.json）无效。请从备份恢复或选择其他文件夹。",
+      "badVersion": "同步文件夹由更新且不兼容的 InfiniteNote 版本写入。请在所有设备上更新应用。",
+      "badPageFile": "同步文件夹中的某个页面文件已损坏。请从备份恢复或选择其他文件夹。",
+      "badTrash": "同步文件夹的回收站日志（trash.jsonl）已损坏。请从备份恢复或选择其他文件夹。"
+    }
   },
   "empty": {
     "title": "未打开页面",
@@ -215,5 +252,32 @@
     "themeSunset": "日落",
     "themeRose": "玫瑰",
     "themeSlate": "石墨"
+  },
+  "generated": {
+    "notebook": "笔记本 {n}",
+    "section": "分区 {n}",
+    "page": "页面 {n}",
+    "copy": "{title}（副本）",
+    "conflict": "{title}（冲突 {date}）",
+    "restoredNotebook": "恢复的笔记本",
+    "restoredSection": "恢复的分区",
+    "restoredPage": "恢复的页面",
+    "untitled": "无标题",
+    "quickNotesNotebook": "快速笔记",
+    "quickNotesSection": "快速笔记",
+    "quickNotePrefix": "快速笔记 ",
+    "recordingPrefix": "录音 ",
+    "welcome": {
+      "notebook": "欢迎使用",
+      "section": "快速上手",
+      "ideasSection": "灵感",
+      "myNotebook": "我的笔记本",
+      "mySection": "新建分区",
+      "startHere": "从这里开始",
+      "brainstorm": "头脑风暴",
+      "pageOne": "页面 1",
+      "title": "欢迎使用 InfiniteNote",
+      "body": "一个带无限画布的开源笔记本。\n\n左侧：你的笔记本、分区和页面——就像 OneNote。\n这里：用画笔、荧光笔、形状和文字随心书写。\n\n导入（右上角）：图片、文本、Markdown、PDF 打印件、音频等。\n所有内容都保存在浏览器本地——离线优先。"
+    }
   }
 }
