@@ -38,6 +38,40 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-07 — v1.8.0 + v1.9.0 releases: English-only interface
+
+- Cycle-start audit: working tree clean, local develop = origin/develop at
+  1e44ba1 (wave 2 merged); develop 13 commits ahead of main; v1.8.0
+  milestone 33/35 closed with only features #64/#65 open. Auth fix: the
+  token in the remote URL is `user:token` — cut on the colon for the API.
+- **v1.8.0 released**: bump PR #114 → release PR #115 (merge commit
+  2cea610) → annotated tag v1.8.0 → GitHub Release; v1.8.0 milestone
+  closed (33 issues), #64/#65 moved forward.
+- **English-only interface (#117, PR #116)** — product decision: the app
+  ships one language. Removed the v1.7 next-intl layer end to end
+  (net −1,607 lines): message catalogs, provider, sidebar Language toggle,
+  locale-aware generated names. Every UI string is a plain English literal
+  at its call site; ICU plurals became `plural()` (src/lib/plural.ts);
+  shortcuts/themes data modules carry their labels; export/sync error
+  codes map to English messages next to the codes; sync summaries render
+  via `formatSyncSummary()`. CJK CONTENT support kept (IME #99, layout
+  #88, PDF footers #84, filenames #74, truncation #101). Also fixed the
+  #94 no-page recording toast that referenced a catalog key that never
+  existed in any locale. Built as a codemod staged under
+  `examples/staging/remove-chinese/` that reads messages/en.json and
+  rewrites all 10 components, failing loudly on anything it cannot
+  resolve — doubling as a full code↔catalog audit.
+- **v1.9.0 released**: bump PR #118 → release PR #119 (merge 1797bb2) →
+  annotated tag v1.9.0 + Release; v1.9.0 milestone closed (#117), v1.10.0
+  opened with #64/#65.
+- Verified counts (real runs): 401 unit + 86 E2E green.
+- Environment lessons this cycle: intermediate pipe output can garble file
+  reads across resets (a dep array read as `}, andleRunSync,` while od
+  showed `}, [handleRunSync,`) — when a read looks impossible, verify with
+  od/an AST probe before acting on it. Playwright's browser cache can
+  vanish on sandbox recycle — `bunx playwright install chromium` (without
+  --with-deps; there is no sudo).
+
 ## 2026-11-07 — bug-hunt wave 1: audit + four fixes (#72–#75)
 
 - Cycle-start audit against `origin/develop` (bbfc8cb): lint / tsc / 358 unit
