@@ -7,6 +7,7 @@
  * dynamically inside beforeAll.
  */
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { RestoreError } from "../restore-error";
 
 let notes: typeof import("../notes-db");
 
@@ -288,6 +289,21 @@ describe("backup / restore", () => {
 
   it("rejects foreign files", async () => {
     expect(notes.restoreBackup('{"app":"other","notebooks":[]}')).rejects.toThrow("Not an InfiniteNote");
+  });
+
+  it("rejects foreign files with the TYPED error (issue #85 parity — the UI toasts without console noise)", async () => {
+    // found by the import/export round-trip E2E pass: expected restore
+    // failures must be distinguishable from real errors so the app shell
+    // can skip console.error for them, exactly like ExportError
+    try {
+      await notes.restoreBackup('{"app":"other","notebooks":[]}');
+      expect.unreachable("restoreBackup must throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(RestoreError);
+      const typed = err as RestoreError;
+      expect(typed.code).toBe("notABackup");
+      expect(typed.name).toBe("RestoreError");
+    }
   });
 
   it("eraseAllData wipes everything", async () => {

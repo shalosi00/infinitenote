@@ -9,7 +9,7 @@
 | **Last updated** | 2026-11-08 |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 433 unit + 99 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Overall state** | 434 unit + 107 E2E green; 0 known bugs; full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError, e2e helper flake fix); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -61,7 +61,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
 | Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
-| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts |
+| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts; the full backup restores into a wiped app through the UI | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts + e2e/import-export-roundtrip.spec.ts (PNG magic/IHDR bytes, SVG markup content, scene export → re-import round-trip, backup export → wipe → UI restore round-trip, 8 checks) |
 | Cross-page search (Ctrl+K — content index reloads on every open), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
@@ -144,6 +144,18 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-08 — full import/export verification pass**: every transfer
+  surface now has content-level E2E. New e2e/import-export-roundtrip.spec.ts
+  (8 checks): PNG export bytes (magic + IHDR + non-stub size), SVG export
+  markup (typed text survives as vector text), .excalidraw scene export →
+  re-import round-trip (elements, typed text, image dataURL, persistence),
+  full-backup export → wiped app → UI restore round-trip (tree + content
+  intact), and the wrong-file restore error toast. Two fixes fell out of the
+  pass: restoreBackup now throws a typed RestoreError (code `notABackup`,
+  issue #85 parity — expected failures toast without console.error noise),
+  and the shared createTextElement e2e helper clicks right of the Shapes
+  island, killing a full-suite flake in state-freshness.spec. 434 unit +
+  107 E2E green.
 - **2026-11-08 — v1.10.0 released**: release PR #131 merge-committed to main
   (9ee3809), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)
   and published; v1.10.0 milestone closed (#64/#65/#122/#123), v1.11.0 opened
