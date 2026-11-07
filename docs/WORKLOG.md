@@ -38,6 +38,38 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-08 — full import/export verification pass (#137, PR #138)
+
+- **Task**: "FULLY test importing and exporting." Audit first: the import
+  side was already covered E2E per format (imports/import-overlay/audio/
+  import-pdf-truncation specs) and PDF export content too (pdf-export,
+  pdf-wave2) — but every OTHER export payload was only ever asserted by
+  suggested FILENAME, and neither archive round-trip had end-to-end
+  coverage (backup/restore was unit-only).
+- **New spec `e2e/import-export-roundtrip.spec.ts`** (8 checks, serial,
+  real user actions only): PNG export bytes (magic + IHDR + non-stub size),
+  SVG export markup (typed text survives as vector text), .excalidraw
+  scene export → re-import round-trip (elements, typed text, image dataURL,
+  persistence across reload), full-backup export → wiped app → restore
+  through the real file-chooser UI (tree + content intact), wrong-file
+  restore error toast.
+- **Fix 1 — typed `RestoreError`** (`src/lib/restore-error.ts`): the restore
+  path console.error'd the EXPECTED wrong-file failure, unlike the export
+  path (issue #85 parity). restoreBackup now throws a typed error (code
+  `notABackup`); the shell toasts without console noise, real errors still
+  log. Unit test added for the type.
+- **Fix 2 — `createTextElement` helper flake**: the helper clicked at 0.35
+  canvas x where the Shapes island swallows pointer events under full-suite
+  load — state-freshness.spec flaked there in two consecutive full runs
+  (passed standalone). Now clicks at 0.6 x (import-overlay.spec had already
+  documented this hazard inline for its own clicks).
+- **E2E gotcha learned**: `setInputFiles(path)`/`setFiles(path)` expose only
+  Playwright's extension-less artifact basename as `File.name` — the app's
+  classification keys on the extension, so downloaded-file round-trips must
+  pass `{name, mimeType, buffer}` with the REAL filename.
+- **Result**: 434 unit + 107 E2E green (was 433 + 99), lint/typecheck clean,
+  3/3 CI checks green, PR #138 squash-merged (6e3beb5), issue #137 closed.
+
 ## 2026-11-08 — v1.10.0 cycle: shape library (#65), manual-pass fixes (#122/#123), release
 
 - **Cycle-start audit** (git is the truth): the task brief described a stale
