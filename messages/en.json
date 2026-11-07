@@ -96,7 +96,9 @@
     "addTagAria": "Add tag",
     "existing": "Existing tags",
     "removeTag": "Remove tag {tag}",
-    "quickAddTitle": "Add \"{tag}\" (used by {count, plural, =1 {1 page} other {# pages}})"
+    "quickAddTitle": "Add \"{tag}\" (used by {count, plural, =1 {1 page} other {# pages}})",
+    "tooManyTags": "A page can carry at most {count} tags",
+    "duplicateTag": "Already tagged \"{tag}\""
   },
   "sidebar": {
     "notebooks": "Notebooks",
@@ -224,7 +226,14 @@
     "wConflicts": "{count, plural, =1 {1 conflict copy} other {# conflict copies}}",
     "wTrashed": "{count, plural, =1 {1 item moved to trash} other {# items moved to trash}}",
     "wTreeUpdated": "{count, plural, =1 {1 notebook/section updated} other {# notebooks/sections updated}}",
-    "wPurged": "{count, plural, =1 {1 item purged} other {# items purged}}"
+    "wPurged": "{count, plural, =1 {1 item purged} other {# items purged}}",
+    "errors": {
+      "noManifest": "This folder is not set up for InfiniteNote sync yet — it will be initialized on the next sync.",
+      "badManifest": "The sync folder manifest (manifest.json) is invalid. Restore it from a backup or pick another folder.",
+      "badVersion": "The sync folder was written by a newer, incompatible InfiniteNote version. Update the app on all devices.",
+      "badPageFile": "A page file in the sync folder is corrupt. Restore it from a backup or pick another folder.",
+      "badTrash": "The sync folder trash log (trash.jsonl) is corrupt. Restore it from a backup or pick another folder."
+    }
   },
   "empty": {
     "title": "No page open",

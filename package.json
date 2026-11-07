@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "dev:e2e": "next dev -p 3000",
+    "dev:e2e": "NEXT_PUBLIC_E2E=1 next dev -p 3000",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "build:desktop": "NEXT_OUTPUT_MODE=export next build",
     "tauri": "bunx @tauri-apps/cli@^2",
@@ -65,7 +65,7 @@
     "next-auth": "^4.24.11",
     "next-intl": "^4.3.4",
     "next-themes": "^0.4.6",
-    "pdfjs-dist": "4",
+    "pdfjs-dist": "4.10.38",
     "react": "^19.0.0",
     "react-day-picker": "^9.8.0",
     "react-dom": "^19.0.0",

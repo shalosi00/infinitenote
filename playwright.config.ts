@@ -38,7 +38,9 @@ export default defineConfig({
   ],
   webServer: {
     command: isCI
-      ? "bun run build && bun .next/standalone/server.js"
+      ? // NEXT_PUBLIC_E2E=1 compiles the test hooks into this build only —
+        // ordinary production builds never ship them (issue #102)
+        "NEXT_PUBLIC_E2E=1 bun run build && bun .next/standalone/server.js"
       : "bun run dev:e2e",
     url: BASE_URL,
     reuseExistingServer: !isCI,
