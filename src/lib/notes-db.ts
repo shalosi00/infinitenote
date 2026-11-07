@@ -518,7 +518,17 @@ export async function getPageContent(id: string): Promise<ScenePayload | null> {
 }
 
 export async function savePageContent(id: string, payload: ScenePayload): Promise<void> {
-  await db.pages.update(id, { content: JSON.stringify(payload), updatedAt: now() });
+  const updated = await db.pages.update(id, {
+    content: JSON.stringify(payload),
+    updatedAt: now(),
+  });
+  // Dexie's update() is a silent no-op when the key is missing (issue #78):
+  // the page row can vanish under an open canvas (purged in another tab, or
+  // removed by a sync round). Reporting success then would be a lie — throw
+  // so the autosave indicator shows the error instead of "Saved".
+  if (updated === 0) {
+    throw new Error(`savePageContent: page row "${id}" no longer exists`);
+  }
 }
 
 /* ------------------------------------------------------------------ */
