@@ -81,7 +81,17 @@ export function classifyFile(file: File): FileImportKind {
   return "unknown";
 }
 
-/** Keep only files actually referenced by image elements (drop orphans). */
+/**
+ * Keep only files actually referenced by image elements (drop orphans), and
+ * enforce the persistence invariant of issue #122: an image element whose
+ * file data is being kept must never persist with status "pending".
+ *
+ * Why: Excalidraw's native image insertion (paste, canvas drop, some import
+ * paths) adds the element as "pending" and flips it to "saved" only after the
+ * file data decodes asynchronously. An autosave that races that decode would
+ * otherwise freeze the stale flag into the persisted scene forever — the data
+ * is right there in the same payload, so the flag is provably wrong.
+ */
 export function sanitizeScene(payload: ScenePayload): ScenePayload {
   const usedFileIds = new Set<string>();
   for (const el of payload.elements as Array<{ type?: string; fileId?: string | null }>) {
@@ -91,7 +101,14 @@ export function sanitizeScene(payload: ScenePayload): ScenePayload {
   for (const [id, f] of Object.entries(payload.files)) {
     if (usedFileIds.has(id) && f?.dataURL) files[id] = f;
   }
-  return { elements: payload.elements, files };
+  const elements = (
+    payload.elements as Array<{ type?: string; status?: string; fileId?: string | null }>
+  ).map((el) =>
+    el?.type === "image" && el.status === "pending" && !!el.fileId && !!files[el.fileId as string]
+      ? { ...el, status: "saved" }
+      : el,
+  );
+  return { elements: elements as ScenePayload["elements"], files };
 }
 
 /**

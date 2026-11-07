@@ -69,6 +69,48 @@ describe("sanitizeScene", () => {
     const out = sanitizeScene(payload);
     expect(Object.keys(out.files)).toEqual([]);
   });
+
+  it("flips a pending image to saved when its file data is kept (issue #122)", () => {
+    const payload = {
+      elements: [
+        { type: "image", fileId: "f1", status: "pending" },
+        { type: "image", fileId: "f2", status: "pending" },
+      ],
+      files: {
+        // f1: valid data → the element must persist as "saved"
+        f1: { id: "f1", dataURL: "data:...", mimeType: "image/png", created: 1 },
+        // f2: broken record (no dataURL) → the file is dropped, the
+        // element's status must stay untouched (no data ⇒ no flip)
+        f2: { id: "f2", dataURL: "", mimeType: "image/png", created: 1 },
+      },
+    };
+    const out = sanitizeScene(payload) as unknown as {
+      elements: Array<{ type: string; fileId?: string; status?: string }>;
+      files: Record<string, unknown>;
+    };
+    expect(out.elements[0].status).toBe("saved");
+    expect(out.elements[1].status).toBe("pending");
+    expect(Object.keys(out.files)).toEqual(["f1"]);
+  });
+
+  it("never touches non-pending or non-image elements (issue #122)", () => {
+    const payload = {
+      elements: [
+        { type: "image", fileId: "f1", status: "saved" },
+        { type: "image", fileId: "f1", status: "error" },
+        { type: "image", status: "pending", fileId: null },
+        { type: "text", text: "x", status: "pending" },
+        { type: "embeddable", status: "pending", link: "about:blank" },
+      ],
+      files: {
+        f1: { id: "f1", dataURL: "data:...", mimeType: "image/png", created: 1 },
+      },
+    };
+    const out = sanitizeScene(payload) as unknown as {
+      elements: Array<{ type: string; status?: string }>;
+    };
+    expect(out.elements.map((e) => e.status)).toEqual(["saved", "error", "pending", "pending", "pending"]);
+  });
 });
 
 describe("titleToFilename", () => {
