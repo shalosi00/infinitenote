@@ -73,13 +73,18 @@ milestones/issues. This file is the plan; the status file is the reality.
       (issue #63) — shipped by bug-hunt wave 2 (PR #111); the locale layer
       itself was removed again in v1.9 (English-only UI)
 
-## v1.9 — Focus: one language, same depth (current)
+## v1.9 — Focus: one language, same depth (shipped in v1.9.0)
 
 - [x] English-only UI — the v1.7 en/zh-CN i18n layer (next-intl, message
       catalogs, language toggle, locale-aware generated names) is removed;
       every string is a plain English literal. CJK *content* (titles, tags,
       search, IME-safe input, CJK-aware import layout, PDF footers) stays
       fully supported.
+- [x] English-only UI shipped as PR #116 (issue #117) — see the v1.9.0
+      release notes
+
+## v1.10 — Offline-first Android & canvas depth (current)
+
 - [ ] Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline
       compliance (issue #64) — follow-up to the F-Droid policy notes
 - [ ] Drawing shape library beyond Excalidraw defaults (issue #65)
