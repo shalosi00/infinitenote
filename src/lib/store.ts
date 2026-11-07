@@ -21,6 +21,8 @@ export type SaveIndicator = "idle" | "saving" | "saved" | "error";
 
 interface AppStore {
   loaded: boolean;
+  /** "loadFailed" after a rejected boot load; cleared once a retry succeeds. */
+  loadError: string | null;
   notebooks: Notebook[];
   sections: Section[];
   pages: PageMeta[];
@@ -35,6 +37,8 @@ interface AppStore {
   refresh: () => Promise<void>;
 
   selectPage: (sel: Selection) => void;
+  /** Select AND expand the containing notebook + section (search / tag jumps). */
+  revealSelection: (sel: Selection) => void;
   toggleExpanded: (id: string) => void;
 
   addNotebook: (name?: string) => Promise<void>;
@@ -89,6 +93,7 @@ let initialLoadPromise: Promise<void> | null = null;
 
 export const useAppStore = create<AppStore>((set, get) => ({
   loaded: false,
+  loadError: null,
   notebooks: [],
   sections: [],
   pages: [],
@@ -103,7 +108,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   load: () => {
     if (!initialLoadPromise) {
-      initialLoadPromise = (async () => {
+      const run = (async () => {
         await get().refresh();
         const s = get();
         // First run → seed a small welcome notebook so the app is never empty.
@@ -111,7 +116,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
           await seedWelcomeData();
           await get().refresh();
         }
+        set({ loadError: null });
       })();
+      // A rejected boot promise must never be cached (issue #77): a transient
+      // IndexedDB failure would otherwise brick the session with an infinite
+      // spinner. Clear the single-flight guard so the next load() retries, and
+      // record the failure so the shell can offer a Retry button.
+      initialLoadPromise = run.catch((err: unknown) => {
+        initialLoadPromise = null;
+        set({ loadError: "loadFailed" });
+        throw err;
+      });
     }
     return initialLoadPromise;
   },
@@ -138,6 +153,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   selectPage: (sel) => set({ selection: sel }),
+
+  /** Programmatic jumps (search, tag filter) must make the sidebar show
+   *  where the user landed — expand the ancestors of the target page. */
+  revealSelection: (sel) =>
+    set((s) => ({
+      selection: sel,
+      expanded: new Set([...s.expanded, sel.notebookId, sel.sectionId]),
+    })),
   toggleExpanded: (id) =>
     set((s) => {
       const next = new Set(s.expanded);
@@ -201,6 +224,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         pageId: page.id,
       },
       expanded: new Set([...s.expanded, sectionId]),
+      // a freshly created page must grab keyboard focus (issue #81): the
+      // canvas focuses itself whenever this counter moves — same mechanism
+      // as quick capture, so typing works immediately after "+ Page"
+      canvasFocus: s.canvasFocus + 1,
     }));
   },
   renamePage: async (id, title) => {
@@ -283,6 +310,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         pageId: copy.id,
       },
       expanded: new Set([...s.expanded, copy.sectionId]),
+      // focus the duplicated page's canvas too (issue #81)
+      canvasFocus: s.canvasFocus + 1,
     }));
   },
   deletePage: async (id) => {

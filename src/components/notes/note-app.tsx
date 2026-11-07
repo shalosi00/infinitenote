@@ -92,6 +92,7 @@ export default function NoteApp() {
   const formatSummary = useSyncSummaryFormatter();
   const {
     loaded,
+    loadError,
     selection,
     saveIndicator,
     load,
@@ -229,7 +230,10 @@ export default function NoteApp() {
   const allTags = useMemo(() => collectTags(pages), [pages]);
 
   useEffect(() => {
-    void load();
+    // load() resets its single-flight guard on failure (issue #77), so the
+    // error screen's Retry button can simply call it again. The catch keeps
+    // a rejected boot from surfacing as an unhandled rejection.
+    void load().catch(() => undefined);
   }, [load]);
 
   usePWA();
@@ -454,6 +458,27 @@ export default function NoteApp() {
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
+    // Boot failed (e.g. IndexedDB blocked): offer a retry instead of the
+    // infinite "Opening…" spinner (issue #77). load() cleared its cached
+    // promise on failure, so retrying really re-runs the boot.
+    if (loadError) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex max-w-sm flex-col items-center gap-4 p-6 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+              <NotebookPen className="h-8 w-8 text-destructive" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">{t("loadFailed")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("loadFailedBody")}</p>
+            </div>
+            <Button onClick={() => void load().catch(() => undefined)} className="gap-2">
+              <NotebookPen className="h-4 w-4" /> {t("retry")}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">

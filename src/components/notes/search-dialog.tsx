@@ -27,13 +27,16 @@ export function SearchDialog() {
   const notebooks = useAppStore((s) => s.notebooks);
   const sections = useAppStore((s) => s.sections);
   const pages = useAppStore((s) => s.pages);
-  const selectPage = useAppStore((s) => s.selectPage);
+  const selectPage = useAppStore((s) => s.revealSelection);
   const [query, setQuery] = useState("");
   const [contents, setContents] = useState<Record<string, string | null>>({});
 
-  // lazily load all page contents when the dialog opens
+  // reload the content index on EVERY open (issue #79): the first-open-only
+  // cache made search blind to pages created and edits made afterwards
+  // until a full reload. One toArray() per dialog open is cheap for a
+  // personal notes app and keeps results always fresh.
   useEffect(() => {
-    if (!open || Object.keys(contents).length) return;
+    if (!open) return;
     let cancelled = false;
     void (async () => {
       const rows = await db.pages.toArray();
@@ -44,7 +47,7 @@ export function SearchDialog() {
     return () => {
       cancelled = true;
     };
-  }, [open, contents]);
+  }, [open]);
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
