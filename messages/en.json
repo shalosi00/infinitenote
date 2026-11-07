@@ -59,9 +59,9 @@
     "toastBackupDownloaded": "Backup downloaded.",
     "toastOpenFirstExport": "Open a page first, then export.",
     "toastExportFailed": "Export failed.",
-    "loadFailed": "Could not open your notes",
-    "loadFailedBody": "The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again.",
-    "retry": "Try again"
+    "exportErrors": {
+      "emptyPage": "Nothing to export — this page is empty."
+    }
   },
   "canvas": {
     "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",

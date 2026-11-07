@@ -59,9 +59,9 @@
     "toastBackupDownloaded": "备份已下载。",
     "toastOpenFirstExport": "请先打开一个页面，再导出。",
     "toastExportFailed": "导出失败。",
-    "loadFailed": "无法打开你的笔记",
-    "loadFailedBody": "本地数据库无法打开（可能被占用或暂不可用）。数据不会丢失——请重试。",
-    "retry": "重试"
+    "exportErrors": {
+      "emptyPage": "没有可导出的内容——此页面为空。"
+    }
   },
   "canvas": {
     "importedImages": "已导入 {count} 张图片",

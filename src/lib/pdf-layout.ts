@@ -30,6 +30,44 @@ export const MIN_SCALE = 0.1;
 /** Vertical rhythm of ruled/grid paper in the exported PDF (pt). */
 export const PAPER_RULE_PT = 24;
 
+/** Pixel cap for one dimension of a rendered PDF printout page (issue #87). */
+export const MAX_PRINTOUT_DIM_PX = 1600;
+
+/**
+ * Scale for rendering one PDF page onto a canvas (issue #87): start from the
+ * preferred base scale, but never let the larger dimension exceed the cap —
+ * an A0 poster at scale 1.5 would otherwise become a ~3.5k-pixel multi-MB
+ * dataURL, and twenty of them balloon the scene and IndexedDB. Mirrors the
+ * 1600px cap regular image imports already apply.
+ */
+export function printoutViewportScale(
+  baseWidth: number,
+  baseHeight: number,
+  baseScale = 1.5,
+  maxDim = MAX_PRINTOUT_DIM_PX,
+): number {
+  const largest = Math.max(baseWidth, baseHeight);
+  if (!Number.isFinite(largest) || largest <= 0) return baseScale;
+  return baseScale * Math.min(1, maxDim / largest);
+}
+
+/**
+ * Which elements need the PDF raster-snippet fallback (issue #107) — pure,
+ * so the policy is unit-tested. Rasterization exists for elements the
+ * vector renderer cannot keep visually correct:
+ * - text that is rotated or non-Latin (its box is classified "slice"), and
+ * - any non-text element that is rotated.
+ * Unrotated shapes draw as vectors, unrotated images from their payload,
+ * unrotated Latin text through the flowing-text pass.
+ */
+export function needsRasterSnippet(
+  el: { type: string; angle?: number },
+  boxKind: "text" | "slice",
+): boolean {
+  if (el.type === "text") return boxKind === "slice";
+  return (el.angle ?? 0) !== 0;
+}
+
 /** Bounding box of one printable element, in content (scene) space. */
 export interface ElementBox {
   id: string;

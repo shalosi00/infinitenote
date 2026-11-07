@@ -41,6 +41,7 @@ import {
   withAudioMime,
 } from "./audio-notes";
 import type { ScenePayload } from "./types";
+import { printoutViewportScale } from "./pdf-layout";
 
 const now = () => Date.now();
 
@@ -475,7 +476,12 @@ export async function importPdfAsPrintout(
   const canvas = document.createElement("canvas");
   for (let i = 1; i <= maxPages; i++) {
     const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale: 1.5 });
+    // issue #87: cap the render size like image imports — a huge page (A0
+    // poster) at scale 1.5 would otherwise become a multi-MB dataURL
+    const base = page.getViewport({ scale: 1.5 });
+    const viewport = page.getViewport({
+      scale: printoutViewportScale(base.width, base.height),
+    });
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext("2d");

@@ -26,12 +26,17 @@ import {
   bandsForBox,
   computePageBands,
   flowText,
+  needsRasterSnippet,
   type ElementBox,
   type PageSpec,
 } from "./pdf-layout";
 import type { PageBackground } from "./types";
+import { ExportError } from "./export-errors";
 
 export type PdfOrientation = "portrait" | "landscape";
+
+// re-exported for callers that already import from this module
+export { ExportError };
 
 /* ------------------------------------------------------------------ */
 /* loose element shape (Excalidraw's union is hostile to drawing code)  */
@@ -60,6 +65,8 @@ interface LooseElement {
   roundness?: unknown;
   startArrowhead?: string;
   endArrowhead?: string;
+  /** audio blocks (embeddables): the clip's display name */
+  customData?: { audioName?: unknown } | null;
 }
 
 /** Element types that carry printable ink (frames/containers are structural). */
@@ -72,6 +79,10 @@ const INK_TYPES = new Set([
   "draw",
   "image",
   "text",
+  // audio blocks are printable ink too (issue #83): they render as a
+  // labeled player strip so an audio-only page exports instead of failing
+  // with "Nothing to export"
+  "embeddable",
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -137,6 +148,39 @@ async function toAddableImage(dataUrl: string): Promise<{ data: string; format: 
 /** Latin-1 text can be encoded by jsPDF's built-in fonts; the rest rasterizes. */
 function isPdfEncodableText(text: string): boolean {
   return /^[\u0000-\u00ff]*$/.test(text);
+}
+
+/** Rasterized footer title (issue #84) — a small transparent PNG. */
+interface FooterTitleImage {
+  dataUrl: string;
+  wPx: number;
+  hPx: number;
+}
+
+/**
+ * Render a non-Latin page title with the system font on a canvas (issue #84):
+ * jsPDF's built-in Helvetica simply cannot encode 简体中文 — the glyphs would
+ * print as mojibake. Returns null when the DOM is unavailable.
+ */
+export function rasterizeFooterTitle(title: string): FooterTitleImage | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const font = "500 32px system-ui, -apple-system, sans-serif";
+  ctx.font = font;
+  const textW = Math.ceil(ctx.measureText(title).width) + 8;
+  const h = 44;
+  canvas.width = Math.max(1, Math.min(4000, textW));
+  canvas.height = h;
+  // resizing the canvas resets all state — re-arm the context
+  ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.font = font;
+  ctx.fillStyle = "rgb(150, 155, 165)";
+  ctx.textBaseline = "middle";
+  ctx.fillText(title.slice(0, 90), 4, h / 2);
+  return { dataUrl: canvas.toDataURL("image/png"), wPx: canvas.width, hPx: h };
 }
 
 /* ------------------------------------------------------------------ */
@@ -291,6 +335,46 @@ function drawSliceElement(doc: Doc, el: LooseElement, mx: PageMapping): void {
       // images are placed by the caller (async dataURL resolution)
       return;
     }
+    case "embeddable": {
+      // audio block (issue #83): print as a labeled player strip so clips
+      // appear in the PDF instead of being dropped (and an audio-only page
+      // exports at all)
+      const [x, y] = map(mx, el.x, el.y);
+      const w = el.width * s;
+      const h = el.height * s;
+      doc.setFillColor(243, 243, 247);
+      doc.setDrawColor(139, 139, 158);
+      doc.setLineWidth(Math.max(0.4, el.strokeWidth * s));
+      const r = Math.min(w, h) * 0.12;
+      doc.roundedRect(x, y, w, h, r, r, "FD");
+      // vector music-note glyph: filled head + stem + flag
+      const [nr, ng, nb] = hexToRgb(el.strokeColor);
+      const headX = x + h * 0.30;
+      const headY = y + h * 0.62;
+      const headR = Math.max(0.8, h * 0.09);
+      doc.setFillColor(nr, ng, nb);
+      doc.circle(headX, headY, headR, "F");
+      doc.line(headX + headR, headY, headX + headR, headY - h * 0.30);
+      doc.line(headX + headR, headY - h * 0.30, headX + headR + h * 0.12, headY - h * 0.22);
+      // clip label — vector text only when jsPDF can encode it ("…" is not
+      // Latin-1; use plain dots so the check stays honest)
+      const name =
+        typeof el.customData?.audioName === "string" ? el.customData.audioName : "";
+      if (name && isPdfEncodableText(name)) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(Math.max(5, 9 * s));
+        doc.setTextColor(nr, ng, nb);
+        const maxW = w - h * 0.5;
+        let label = name;
+        while (label.length > 4 && doc.getTextWidth(label) > maxW) {
+          label = label.slice(0, -4) + "...";
+        }
+        if (doc.getTextWidth(label) <= maxW) {
+          doc.text(label, x + h * 0.48, y + h * 0.5, { baseline: "middle" });
+        }
+      }
+      return;
+    }
     default:
       return;
   }
@@ -315,13 +399,28 @@ function drawPaper(doc: Doc, page: PageSpec, background: PageBackground, margin:
   }
 }
 
-function drawFooter(doc: Doc, page: PageSpec, title: string, index: number, count: number): void {
+function drawFooter(
+  doc: Doc,
+  page: PageSpec,
+  title: string,
+  titleImage: FooterTitleImage | null,
+  index: number,
+  count: number,
+): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(150, 155, 165);
   doc.setLineDashPattern([], 0);
   const y = page.h - PRINT_MARGIN_PT + 16;
-  doc.text(title.replace(/[\u0000-\u001f]/g, " ").slice(0, 90), PRINT_MARGIN_PT, y);
+  if (titleImage) {
+    // non-Latin title (issue #84): the pre-rendered system-font image keeps
+    // 简体中文 (and any other script) legible where Helvetica cannot encode it
+    const imgH = 9;
+    const imgW = (imgH * titleImage.wPx) / titleImage.hPx;
+    doc.addImage(titleImage.dataUrl, "PNG", PRINT_MARGIN_PT, y - 6.5, imgW, imgH);
+  } else {
+    doc.text(title.replace(/[\u0000-\u001f]/g, " ").slice(0, 90), PRINT_MARGIN_PT, y);
+  }
   doc.text(`${index + 1} / ${count}`, page.w - PRINT_MARGIN_PT, y, { align: "right" });
 }
 
@@ -339,7 +438,7 @@ export async function exportPagePdf(
     .getSceneElements()
     .filter((e) => !e.isDeleted && INK_TYPES.has(e.type)) as unknown as LooseElement[];
   if (!elements.length) {
-    throw new Error("Nothing to export — the page is empty.");
+    throw new ExportError("Nothing to export — the page is empty.");
   }
 
   const boxes: ElementBox[] = elements.map((el) => {
@@ -359,7 +458,7 @@ export async function exportPagePdf(
   const page: PageSpec = orientation === "landscape" ? A4_LANDSCAPE : A4_PORTRAIT;
   const margin = PRINT_MARGIN_PT;
   const bands = computePageBands(boxes, page, margin);
-  if (!bands) throw new Error("Nothing to export — the page is empty.");
+  if (!bands) throw new ExportError("Nothing to export — the page is empty.");
 
   const files = api.getFiles();
   const { jsPDF } = await import("jspdf");
@@ -369,8 +468,11 @@ export async function exportPagePdf(
   const rasterSnippets = new Map<string, string>();
   for (const el of elements) {
     const box = boxes.find((b) => b.id === el.id)!;
-    if (box.kind !== "slice" && el.type !== "image") continue;
-    if (el.type === "image" && (el.angle ?? 0) === 0) continue; // drawn natively
+    // issue #107: rasterize ONLY what the vector renderer cannot keep
+    // visually correct (rotated shapes/images, rotated or non-Latin text).
+    // Unrotated shapes stay vector, unrotated images use their payload,
+    // unrotated Latin text flows — no more PNG snippet per rectangle.
+    if (!needsRasterSnippet(el, box.kind)) continue;
     try {
       const blob = await exportToBlob({
         elements: [el as unknown as Parameters<typeof exportToBlob>[0]["elements"][number]],
@@ -405,6 +507,17 @@ export async function exportPagePdf(
 
   const usableW = page.w - 2 * margin;
   const usableH = page.h - 2 * margin;
+
+  // Footer title (issue #84): rasterize non-Latin titles once — jsPDF's
+  // standard fonts cannot encode them, the footer must not print mojibake.
+  let footerTitleImage: FooterTitleImage | null = null;
+  if (!isPdfEncodableText(title)) {
+    try {
+      footerTitleImage = rasterizeFooterTitle(title);
+    } catch {
+      footerTitleImage = null; // fall back to the (mangled) vector text
+    }
+  }
 
   for (let pageIndex = 0; pageIndex < bands.pageCount; pageIndex++) {
     if (pageIndex > 0) doc.addPage("a4", orientation);
@@ -487,7 +600,7 @@ export async function exportPagePdf(
       }
     }
 
-    drawFooter(doc, page, title, pageIndex, bands.pageCount);
+    drawFooter(doc, page, title, footerTitleImage, pageIndex, bands.pageCount);
   }
 
   downloadBlob(doc.output("blob"), titleToFilename(title, "pdf"));
