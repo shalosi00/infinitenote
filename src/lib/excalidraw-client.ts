@@ -29,7 +29,7 @@ import {
   getDataURL,
   MIME_TYPES,
 } from "@excalidraw/excalidraw";
-import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { classifyFile, downloadBlob, normalizeImageStatuses, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
@@ -565,7 +565,13 @@ export function appendScene(api: ExcalidrawImperativeAPI, scene: ImportedScene):
   if (fileValues.length) api.addFiles(fileValues as BinaryFileData[]);
   const current = api.getSceneElements();
   if (!current.length) {
-    api.updateScene({ elements: [...scene.elements] });
+    // normalize image statuses at import (issue #122): restored scenes can
+    // carry "pending" images whose data is present — flip them up front
+    const normalized = normalizeImageStatuses({
+      elements: [...scene.elements],
+      files: scene.files as NonNullable<ScenePayload["files"]>,
+    });
+    api.updateScene({ elements: [...(normalized.elements as ExcalidrawElement[])] });
     return;
   }
   const anchor = nextInsertPosition(current);
@@ -575,7 +581,11 @@ export function appendScene(api: ExcalidrawImperativeAPI, scene: ImportedScene):
     x: e.x - ix1 + anchor.x,
     y: e.y - iy1 + anchor.y,
   }));
-  api.updateScene({ elements: [...current, ...shifted] });
+  const normalized = normalizeImageStatuses({
+    elements: shifted,
+    files: scene.files as NonNullable<ScenePayload["files"]>,
+  });
+  api.updateScene({ elements: [...current, ...(normalized.elements as ExcalidrawElement[])] });
 }
 
 /* ------------------------------------------------------------------ */
