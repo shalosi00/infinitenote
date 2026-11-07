@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslations } from "next-intl";
 import { byOrder, type Notebook, type PageMeta, type Section } from "@/lib/types";
 
 export function MovePagesDialog({
@@ -33,6 +34,7 @@ export function MovePagesDialog({
   selectedIds: ReadonlySet<string>;
   onMove: (targetSectionId: string) => void;
 }) {
+  const t = useTranslations("moveDialog");
   const selectedSectionIds = new Set(
     pages.filter((p) => selectedIds.has(p.id)).map((p) => p.sectionId)
   );
@@ -43,10 +45,10 @@ export function MovePagesDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderClosed className="h-4 w-4" /> Move {count} page{count === 1 ? "" : "s"} to…
+            <FolderClosed className="h-4 w-4" /> {t("title", { count })}
           </DialogTitle>
           <DialogDescription>
-            Pages are appended to the end of the target section. Cross-notebook moves are allowed.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-80">
@@ -70,7 +72,7 @@ export function MovePagesDialog({
                           type="button"
                           data-testid="move-target"
                           data-section-id={sec.id}
-                          aria-label={`Move to ${nb.name} / ${sec.name}`}
+                          aria-label={t("moveTo", { path: `${nb.name} / ${sec.name}` })}
                           disabled={!wouldMove}
                           className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-accent focus-visible:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                           onClick={() => onMove(sec.id)}
@@ -79,7 +81,7 @@ export function MovePagesDialog({
                           <span className="min-w-0 flex-1 truncate">{sec.name}</span>
                           {selectedSectionIds.has(sec.id) && (
                             <span className="shrink-0 text-[10px] text-muted-foreground">
-                              {selectedSectionIds.size === 1 ? "already here" : "partly here"}
+                              {selectedSectionIds.size === 1 ? t("alreadyHere") : t("partlyHere")}
                             </span>
                           )}
                         </button>

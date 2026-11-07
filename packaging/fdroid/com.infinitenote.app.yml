@@ -1,0 +1,53 @@
+# F-Droid package metadata for InfiniteNote (issue #56).
+#
+# Validated by `bun scripts/fdroid-check.mjs` (structure, version scheme,
+# cross-file version parity) and pinned by
+# src/lib/__tests__/fdroid-config.test.ts. When the release flow bumps the
+# app version, a NEW Builds entry is appended here — previous entries are
+# kept so older releases stay buildable.
+#
+# Field reference: https://f-droid.org/docs/Build_Metadata_Reference/
+Categories:
+  - Office
+License: MIT
+AuthorName: InfiniteNote contributors
+AuthorEmail: shalosi00@users.noreply.github.com
+SourceCode: https://github.com/shalosi00/infinitenote
+IssueTracker: https://github.com/shalosi00/infinitenote/issues
+Changelog: https://github.com/shalosi00/infinitenote/releases
+WebSite: https://shalosi00.github.io/infinitenote/
+Name: InfiniteNote
+AutoName: InfiniteNote
+Summary: Local-first infinite-canvas notebook with OneNote import
+Description: |-
+  Open-source OneNote-style notebook for Linux and Android: notebooks,
+  sections and pages on an infinite canvas you can draw and type on.
+
+  Features:
+  * Infinite canvas (draw/write on anything, Excalidraw-based)
+  * Notebook → Section → Page hierarchy with colors and reordering
+  * Import from OneNote (.mht single-file pages, exported HTML, .docx),
+    Markdown, PDF printouts, images and .excalidraw scenes
+  * Export to PNG, SVG, paginated PDF and full notebook backups
+  * Full-text search, page tags with a filter view, soft-delete trash
+  * File-based sync (folder or ZIP) with page-granular merge
+  * Per-page paper styles (plain / ruled / grid) and dark mode
+  * Works fully offline; all data stays on the device (IndexedDB)
+  * English and 简体中文 UI
+
+RepoType: git
+Repo: https://github.com/shalosi00/infinitenote.git
+
+Builds:
+  - versionName: 1.6.0
+    versionCode: 160
+    commit: v1.6.0
+    subdir: android-twa
+    gradle:
+      - yes
+  - versionName: 1.7.0
+    versionCode: 170
+    commit: v1.7.0
+    subdir: android-twa
+    gradle:
+      - yes

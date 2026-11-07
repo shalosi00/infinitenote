@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { FolderSync, Loader2, RefreshCw, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import type { SyncSummary } from "@/lib/sync/merge";
 import type { SyncFolderFiles } from "@/lib/sync/format";
+import { summaryParts } from "@/lib/sync/summary";
 import { parseSyncZip, zipSyncFolder } from "@/lib/sync/zip";
 import {
   ensurePermission,
@@ -58,21 +60,21 @@ export const useSyncDialog = create<SyncDialogState>((set) => ({
 
 /* ------------------------------ summary text ----------------------------- */
 
-/** Human one-liner of what a sync changed on this device. */
-export function describeSummary(s: SyncSummary): string {
-  const parts: string[] = [];
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  if (s.notebooksAdded) parts.push(plural(s.notebooksAdded, "notebook"));
-  if (s.sectionsAdded) parts.push(plural(s.sectionsAdded, "section"));
-  if (s.pagesAdded) parts.push(plural(s.pagesAdded, "page pulled"));
-  if (s.pagesUpdated) parts.push(plural(s.pagesUpdated, "page updated"));
-  if (s.pagesConflicted) parts.push(plural(s.pagesConflicted, "conflict copy"));
-  const deleted = s.pagesDeleted + s.treeDeleted;
-  if (deleted) parts.push(plural(deleted, "item moved to trash"));
-  if (s.treeUpdated) parts.push(plural(s.treeUpdated, "notebook/section updated"));
-  const purged = s.pagesPurged + s.treePurged;
-  if (purged) parts.push(plural(purged, "item purged"));
-  return parts.length ? `${parts.join(" · ")}.` : "Everything already in sync.";
+/**
+ * Hook returning a locale-aware one-liner of what a sync changed on this
+ * device. Parts come from the pure summaryParts(); each renders through the
+ * active catalog's sync.w* ICU plural message.
+ */
+export function useSyncSummaryFormatter(): (s: SyncSummary) => string {
+  const t = useTranslations("sync");
+  return useCallback(
+    (s: SyncSummary) => {
+      const parts = summaryParts(s);
+      if (parts.length === 0) return t("upToDate");
+      return `${parts.map((p) => t(p.key, { count: p.count })).join(" · ")}.`;
+    },
+    [t]
+  );
 }
 
 /* -------------------------------- component ------------------------------ */
@@ -94,6 +96,8 @@ export interface SyncDialogProps {
 export function SyncDialog({ onRunSync }: SyncDialogProps) {
   const open = useSyncDialog((s) => s.open);
   const setOpen = useSyncDialog((s) => s.setOpen);
+  const t = useTranslations("sync");
+  const formatSummary = useSyncSummaryFormatter();
   const [fsaSupported] = useState(() => typeof window !== "undefined" && isFsaSupported());
   const [folderHandle, setFolderHandle] = useState<FsaDirectoryHandle | null>(null);
   const [needsGrant, setNeedsGrant] = useState(false);
@@ -130,17 +134,17 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
       const handle = await pickSyncFolder();
       if (!handle) return; // cancelled or unsupported
       if (!(await ensurePermission(handle, "readwrite"))) {
-        toast.error("Folder permission denied.");
+        toast.error(t("toastDenied"));
         return;
       }
       await saveSyncFolderHandle(handle);
       setFolderHandle(handle);
       setNeedsGrant(false);
-      toast.success(`Syncing with “${handle.name}”.`);
+      toast.success(t("toastConnected", { name: handle.name }));
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [t]);
 
   const handleRegrant = useCallback(async () => {
     if (!folderHandle) return;
@@ -149,19 +153,19 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
       if (await ensurePermission(folderHandle, "readwrite")) {
         setNeedsGrant(false);
       } else {
-        toast.error("Folder permission denied.");
+        toast.error(t("toastDenied"));
       }
     } finally {
       setBusy(null);
     }
-  }, [folderHandle]);
+  }, [folderHandle, t]);
 
   const handleDisconnect = useCallback(async () => {
     await clearSyncFolderHandle();
     setFolderHandle(null);
     setNeedsGrant(false);
-    toast("Sync folder disconnected.");
-  }, []);
+    toast(t("toastDisconnected"));
+  }, [t]);
 
   const handleSyncNow = useCallback(async () => {
     if (!folderHandle) return;
@@ -172,20 +176,20 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
         // first sync into an empty folder: export-only round trip
         const outcome = await onRunSync(null);
         await writeSyncFolder(folderHandle, outcome.folder);
-        setSummary("Folder initialized with this device's notes.");
+        setSummary(t("summaryInitialized"));
         return;
       }
       const outcome = await onRunSync(files);
       await writeSyncFolder(folderHandle, outcome.folder);
-      setSummary(describeSummary(outcome.summary));
-      toast.success(describeSummary(outcome.summary));
+      setSummary(formatSummary(outcome.summary));
+      toast.success(formatSummary(outcome.summary));
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Sync failed.");
+      toast.error(err instanceof Error ? err.message : t("toastSyncFailed"));
     } finally {
       setBusy(null);
     }
-  }, [folderHandle, onRunSync]);
+  }, [folderHandle, onRunSync, t, formatSummary]);
 
   const handleImportZip = useCallback(
     async (file: File | null) => {
@@ -194,16 +198,16 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
       try {
         const files = await parseSyncZip(await file.arrayBuffer());
         const outcome = await onRunSync(files);
-        setSummary(describeSummary(outcome.summary));
-        toast.success(describeSummary(outcome.summary));
+        setSummary(formatSummary(outcome.summary));
+        toast.success(formatSummary(outcome.summary));
       } catch (err) {
         console.error(err);
-        toast.error(err instanceof Error ? err.message : "Could not merge that sync ZIP.");
+        toast.error(err instanceof Error ? err.message : t("toastZipFailed"));
       } finally {
         setBusy(null);
       }
     },
-    [onRunSync]
+    [onRunSync, t, formatSummary]
   );
 
   const handleExportZip = useCallback(async () => {
@@ -212,26 +216,25 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
       const outcome = await onRunSync(null);
       const blob = await zipSyncFolder(outcome.folder);
       downloadBlob(blob, `infinitenote-sync-${new Date().toISOString().slice(0, 10)}.zip`);
-      setSummary("Sync ZIP downloaded — open it on your other device and import it there.");
-      toast.success("Sync ZIP downloaded.");
+      setSummary(t("summaryZipDownloaded"));
+      toast.success(t("toastZipDownloaded"));
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Export failed.");
+      toast.error(err instanceof Error ? err.message : t("toastExportFailed"));
     } finally {
       setBusy(null);
     }
-  }, [onRunSync]);
+  }, [onRunSync, t]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-md" data-testid="sync-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderSync className="h-4 w-4" /> Sync your notes
+            <FolderSync className="h-4 w-4" /> {t("title")}
           </DialogTitle>
           <DialogDescription>
-            Keep devices in sync through a folder your file-sync tool replicates, or a
-            ZIP you carry over. Everything merges locally — nothing leaves your devices.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -239,17 +242,17 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
           {fsaSupported ? (
             <section>
               <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Sync folder (Chromium desktop)
+                {t("folderSection")}
               </h3>
               {folderHandle ? (
                 <div className="flex flex-col gap-2" data-testid="sync-folder-connected">
                   <p className="text-sm text-muted-foreground" data-testid="sync-folder-name">
-                    Folder: <span className="font-medium text-foreground">{folderHandle.name}</span>
+                    {t("folderLabel", { name: folderHandle.name })}
                   </p>
                   {needsGrant ? (
                     <Button size="sm" onClick={handleRegrant} disabled={busy !== null}>
                       {busy === "connect" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                      Grant access again
+                      {t("grant")}
                     </Button>
                   ) : (
                     <div className="flex gap-2">
@@ -265,10 +268,10 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
                         ) : (
                           <RefreshCw className="h-4 w-4" />
                         )}
-                        Sync now
+                        {t("syncNow")}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={busy !== null}>
-                        Disconnect
+                        {t("disconnect")}
                       </Button>
                     </div>
                   )}
@@ -282,24 +285,22 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
                   disabled={busy !== null}
                 >
                   {busy === "connect" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderSync className="h-4 w-4" />}
-                  Connect folder…
+                  {t("connect")}
                 </Button>
               )}
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Point it at a folder Syncthing, Nextcloud or Dropbox replicates. The app
-                re-scans it in the background when the window regains focus.
+                {t("folderHint")}
               </p>
             </section>
           ) : (
             <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-              This browser can&apos;t connect a live folder (File System Access API). Use the
-              ZIP flow below — on Chromium desktop you get folder mode.
+              {t("noFsa")}
             </p>
           )}
 
           <section>
             <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Via ZIP (any device)
+              {t("zipSection")}
             </h3>
             <div className="flex flex-wrap gap-2">
               <input
@@ -322,7 +323,7 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
                 disabled={busy !== null}
               >
                 {busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Merge sync ZIP…
+                {t("importZip")}
               </Button>
               <Button
                 size="sm"
@@ -333,12 +334,11 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
                 disabled={busy !== null}
               >
                 {busy === "export" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderSync className="h-4 w-4" />}
-                Download sync ZIP
+                {t("exportZip")}
               </Button>
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Merging pulls in new pages and updates; when both devices edited a page, the
-              newer one wins and the other survives as a “(conflict …)” copy.
+              {t("zipHint")}
             </p>
           </section>
 

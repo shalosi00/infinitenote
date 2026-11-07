@@ -37,7 +37,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Multi-select in the sidebar (bulk move/delete) (issue #27) — shipped in v1.4.0
 - [x] Keyboard shortcut cheatsheet in-app (issue #28) — shipped in v1.4.0
 
-## v1.3 — Sync & collaboration (research)
+## Sync & collaboration — research (v1.3–v1.5 planning)
 
 - [x] File-based sync option (export/import with conflict-free merge via CRDT study) — researched in [docs/sync-research.md](sync-research.md); phased plan: page-granular merge with conflict copies (v1.5) → Yjs merge core (v2.0)
 - [x] Optional end-to-end encrypted sync backend (self-hostable, opt-in) — design outline in [docs/sync-research.md](sync-research.md) §5; implementation post-2.0
@@ -51,13 +51,33 @@ milestones/issues. This file is the plan; the status file is the reality.
       "Sync now", foreground re-scan, change summaries (issue #37)
 - [ ] Yjs CRDT merge core + optional E2EE server (v2.0+ — docs/sync-research.md §8)
 
-## v1.4 — Distribution
+## v1.6 — Distribution (shipped in v1.6.0)
 
-- [ ] Tauri wrapper for a native Linux desktop launcher/installer
-- [ ] Android Trusted Web Activity build for direct APK distribution
-- [ ] Publish to Flathub (Linux) once the Tauri shell lands
+- [x] Tauri 2 desktop shell — static-export build path, `src-tauri/` config
+      + icons, Linux artifact workflow (issue #44)
+- [x] Android TWA project scaffold + tested assetlinks.json generator
+      (issue #45)
+- [x] Flatpak packaging — AppStream metainfo, flatpak-builder manifest
+      (extra-data AppImage), Flathub runbook (issue #46)
+
+## v1.7 — Internationalization & polish (current)
+
+- [x] i18n with next-intl — English + 简体中文 UI, persisted locale switch
+      (issue #54) — full chrome catalogs with ICU plurals, sidebar Language
+      toggle, catalog-parity unit tests, 5 E2E locale checks
+- [x] Themes gallery beyond dark/light (issue #55) — six accent themes
+      (violet default, ocean, forest, sunset, rose, graphite) layered over
+      light/dark via `data-theme` on <html>, sidebar gallery with live
+      swatches, pre-hydration restore script, persisted choice, i18n-parity
+      unit tests, 4 E2E checks
+- [x] F-Droid build recipe + runbook (issue #56) — `packaging/fdroid/`
+      metadata with the repo-wide versionCode scheme (major×100+minor×10+patch),
+      `scripts/fdroid-check.mjs` validator (Bun.YAML parse + invariants),
+      cross-file version parity with the TWA scaffold, docs/fdroid.md runbook
+      (fdroidserver test-build, fdroiddata submission, policy notes), 21 unit tests
 
 ## Backlog (unscheduled)
 
-- i18n (next-intl), themes gallery, drawing shape library beyond Excalidraw defaults,
-  handwriting recognition (research), F-Droid packaging.
+- Drawing shape library beyond Excalidraw defaults, handwriting recognition
+  (research), localized first-run seed content + generated page/notebook names
+  (needs a stable quick-notes marker, Dexie v3).

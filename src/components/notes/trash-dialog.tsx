@@ -17,11 +17,14 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAppStore } from "@/lib/store";
+import { useTranslations } from "next-intl";
 import * as db from "@/lib/notes-db";
 import type { TrashSnapshot } from "@/lib/notes-db";
 import { NOTEBOOK_COLOR_HEX } from "@/lib/types";
 
 export function TrashDialog() {
+  const t = useTranslations("trash");
+  const tCommon = useTranslations("common");
   const open = useAppStore((s) => s.trashOpen);
   const setOpen = useAppStore((s) => s.setTrashOpen);
   const restore = useAppStore((s) => s.restoreFromTrash);
@@ -41,16 +44,16 @@ export function TrashDialog() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="h-4 w-4" /> Trash
+            <Trash2 className="h-4 w-4" /> {t("title")}
           </DialogTitle>
           <DialogDescription>
-            Deleted items stay here until you restore or permanently remove them.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-96 rounded-md border p-2">
           {empty && (
-            <p className="py-8 text-center text-sm text-muted-foreground">Trash is empty.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t("empty")}</p>
           )}
           <div className="flex flex-col gap-1">
             {snapshot.notebooks.map((nb) => (
@@ -58,7 +61,7 @@ export function TrashDialog() {
                 key={nb.id}
                 icon={<NotebookPen className="h-4 w-4" />}
                 iconColor={NOTEBOOK_COLOR_HEX[nb.color]}
-                label={`${nb.name} (notebook)`}
+                label={`${nb.name} (${tCommon("notebookWord")})`}
                 onRestore={() => void restore("notebook", nb.id)}
                 onPurge={() => void purge("notebook", nb.id)}
               />
@@ -67,7 +70,7 @@ export function TrashDialog() {
               <TrashRow
                 key={s.id}
                 icon={<FolderClosed className="h-4 w-4" />}
-                label={`${s.name} (section)`}
+                label={`${s.name} (${tCommon("sectionWord")})`}
                 onRestore={() => void restore("section", s.id)}
                 onPurge={() => void purge("section", s.id)}
               />
@@ -76,7 +79,7 @@ export function TrashDialog() {
               <TrashRow
                 key={p.id}
                 icon={<FileText className="h-4 w-4" />}
-                label={`${p.title} (page)`}
+                label={`${p.title} (${tCommon("pageWord")})`}
                 onRestore={() => void restore("page", p.id)}
                 onPurge={() => void purge("page", p.id)}
               />
@@ -86,7 +89,7 @@ export function TrashDialog() {
 
         <Separator />
         <DialogFooter className="text-xs text-muted-foreground">
-          Restoring a parent also restores the children that were deleted with it.
+          {t("footer")}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -106,6 +109,8 @@ function TrashRow({
   onRestore: () => void;
   onPurge: () => void;
 }) {
+  const t = useTranslations("trash");
+  const tCommon = useTranslations("common");
   const [confirmPurge, setConfirmPurge] = useState(false);
   return (
     <div className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60">
@@ -114,11 +119,11 @@ function TrashRow({
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
       <Button variant="ghost" size="sm" className="h-8 gap-1.5" onClick={onRestore}>
-        <RotateCcw className="h-3.5 w-3.5" /> Restore
+        <RotateCcw className="h-3.5 w-3.5" /> {tCommon("restore")}
       </Button>
       {confirmPurge ? (
         <Button variant="destructive" size="sm" className="h-8" onClick={onPurge}>
-          Delete forever
+          {t("deleteForever")}
         </Button>
       ) : (
         <Button

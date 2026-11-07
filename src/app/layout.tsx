@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
+import { AppI18nProvider } from "@/i18n/provider";
+import { themePreloadScript } from "@/lib/themes";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,9 +53,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
+        {/* Restores the persisted accent theme before first paint (issue #55). */}
+        <script
+          id="theme-preload"
+          dangerouslySetInnerHTML={{ __html: themePreloadScript() }}
+        />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
-          <Toaster />
+          <AppI18nProvider>
+            {children}
+            <Toaster />
+          </AppI18nProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -7,9 +7,9 @@
 | | |
 |---|---|
 | **Last updated** | 2026-11-07 |
-| **Current version** | v1.5.0 (tagged, GitHub Release published) |
-| **Phase** | v1.6 feature-complete — all three distribution items landed; release next |
-| **Overall state** | v1.5.0 released; v1.6.0 pipeline running — see In flight |
+| **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) — v1.7.0 in progress on `develop` |
+| **Phase** | v1.7 complete (i18n + themes + F-Droid) — release flow next |
+| **Overall state** | 326 unit + 65 E2E green; 0 open issues — v1.7 complete, release flow next |
 
 ## TL;DR
 
@@ -20,8 +20,14 @@ Word documents, OneNote-exported HTML and OneNote `.mht` single-file pages
 (embedded images included), export PNG / SVG / scenes / full backups, full-text
 search, soft-delete trash, dark mode, per-page paper styles (plain / ruled /
 grid), page tags with a tag filter view, and a fully offline installable PWA.
-All data is local (IndexedDB). v1.5 adds file-based sync phase 1: a sync folder
-(or ZIP) with page-granular merge and conflict copies.
+All data is local (IndexedDB). The UI is bilingual (English / 简体中文, switchable per device). v1.5 adds file-based sync phase 1: a sync folder
+(or ZIP) with page-granular merge and conflict copies. v1.6 adds distribution:
+a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
+Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
+Flatpak/Flathub packaging recipe. v1.7 so far adds UI internationalization
+(English + 简体中文), a themes gallery — six accent themes layered over
+light/dark via a sidebar gallery with live swatches — and the F-Droid build
+recipe with its validation tooling.
 v1.1 added the duplicate-page action, Playwright E2E as a required CI check and
 OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
 single-file pages with embedded images + Graph export runbook) and page paper
@@ -43,9 +49,11 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Cross-page search (Ctrl+K), trash restore/purge | Working | Unit + E2E |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
+| Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
 | Dark mode, mobile drawer navigation | Working | E2E + visual review |
+| UI i18n (issue #54): English + 简体中文 chrome, sidebar Language toggle, persisted locale, browser detection | Working | 20 i18n/sync-summary unit tests + 5 E2E checks (e2e/locale.spec.ts) |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
@@ -54,22 +62,23 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Desktop shell (Tauri 2): static-export build path, `src-tauri/` config + icons, Linux artifact workflow | Working — export build verified; binaries built by CI on `main`/tags | desktop-config unit tests + `.github/workflows/desktop.yml` (docs/desktop.md) |
 | Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
+| F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 266 unit tests, 56 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 326 unit tests, 65 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- v1.6.0 release: all three distribution items (Tauri shell #44, Android TWA #45, Flatpak #46) are merged on `develop`; version bump → release PR → tag/artifacts → docs are next.
+- Nothing — the v1.7.0 milestone is complete (i18n #54, themes #55,
+  F-Droid #56); the release flow (version bump → release PR → tag) is next.
 
-## Next up — v1.4 highlights (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.8 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-All three v1.4 items shipped. Next up — v1.5 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+The full v1.7 milestone shipped. v1.8 planning happens at release time; backlog
+candidates:
 
-All v1.5 items shipped. Next up — v1.6 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
-
-1. Tauri wrapper for a native Linux desktop launcher/installer
-2. Android Trusted Web Activity build for direct APK distribution
-3. Publish to Flathub once the Tauri shell lands
+1. Localized first-run seed content + generated page/notebook names
+2. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance
+3. Drawing shape library beyond Excalidraw defaults
 
 ## Repo map (30 seconds)
 
@@ -90,6 +99,7 @@ All v1.5 items shipped. Next up — v1.6 candidates (see [docs/ROADMAP.md](docs/
 | `src/lib/sync/` | File-based sync phase 1: folder format, merge engine (LWW + conflict copies), runSync, ZIP + File System Access adapters, folder-handle state |
 | `src/components/notes/sync-dialog.tsx` | Sync UI: connect folder / Sync now / merge or download sync ZIP, change summary |
 | `scripts/graph-export.mjs` | Microsoft Graph OneNote export → self-contained HTML per page |
+| `messages/` + `src/lib/i18n.ts` + `src/i18n/provider.tsx` | UI i18n: en/zh-CN catalogs, locale logic, persisted client provider (issue #54) |
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
@@ -108,6 +118,22 @@ make status                          # quick status snapshot (this file's head +
 ```
 
 ## Recent history
+
+- **2026-11-07 — housekeeping (#57)** — development journal is now a tracked
+  file (`docs/WORKLOG.md`); gitignore/AGENTS updated so working state can
+  never silently live in untracked files; roadmap v1.6/v1.7 sections
+  refreshed with issue ties.
+- **2026-11-07 — UI i18n (issue #54)** — the whole app chrome speaks English
+  and 简体中文: message catalogs with ICU plurals for both locales, a client
+  AppI18nProvider (localStorage-persisted locale + browser detection + `<html
+  lang>` sync, no i18n routing — works in the static Tauri export), a
+  Language toggle in the sidebar footer, localized shortcuts cheatsheet
+  (data now carries stable ids) and localized sync change summaries
+  (describeSummary → pure summaryParts + formatter hook). Catalog parity
+  (key sets, non-empty values, placeholder sets) is enforced by unit tests.
+  Generated data names ("Quick Notes" notebook, dated quick-note titles)
+  stay English until a stable quick-notes marker exists — tracked in the
+  backlog. 286 unit tests (+20), 61 E2E checks (+5).
 
 - **2026-11-07 — v1.5.0 live**: release PR #42 merge-committed to main (c70513f),
   tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.5.0);

@@ -7,7 +7,7 @@
 [![CI](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-111%20unit%20%2B%2038%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-266%20unit%20%2B%2056%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 </div>
 
@@ -39,6 +39,8 @@ data. No account, no cloud, no lock-in.
   a dated page into an auto-created *Quick Notes* notebook; the pinned **Today**
   entry opens (or creates) today's daily page and reuses it all day.
 - **Dark mode** and responsive layout with a mobile drawer.
+- **Bilingual UI** — English and 简体中文, switchable in the sidebar and remembered
+  per device (more locales welcome: add a catalog in `messages/`).
 - **Local-first** — data lives in your browser's IndexedDB; works fully offline.
 - **Installable PWA** — one tap / one click to install on Linux and Android.
 
@@ -56,8 +58,15 @@ InfiniteNote is a Progressive Web App, so no app store is needed.
 
 1. **Self-host or use a deployment** — `make build` produces a standalone server
    (or deploy to any static/Node host).
-2. **Linux** — open the app in Chrome/Chromium/Edge, then menu → *Install app*.
-3. **Android** — open the app in Chrome, then menu → *Add to Home screen*.
+2. **Linux** — open the app in Chrome/Chromium/Edge, then menu → *Install app*,
+   or grab the desktop `.AppImage`/`.deb`/`.rpm` from the
+   [latest release](https://github.com/shalosi00/infinitenote/releases/latest)
+   (Tauri shell — see [docs/desktop.md](docs/desktop.md)).
+3. **Android** — open the app in Chrome, then menu → *Add to Home screen*; a
+   wrapper APK via the Trusted Web Activity scaffold is documented in
+   [docs/android-twa.md](docs/android-twa.md).
+4. **Flatpak** — Flathub-ready recipe in
+   [docs/flathub.md](docs/flathub.md).
 
 Your notes are stored on-device and keep working offline.
 

@@ -8,15 +8,18 @@ Follow this guide to work effectively without wasting context reading the whole 
 1. `PROJECT_STATUS.md` — where the project stands right now (~2 min)
 2. `docs/ARCHITECTURE.md` — module map and data flow
 3. `docs/PIPELINE.md` — branching, PR rules, required checks
-4. Only then read the specific `src/` files you need (see repo map in PROJECT_STATUS.md)
+4. `docs/WORKLOG.md` — session journal: latest entry says what is in flight
+5. Only then read the specific `src/` files you need (see repo map in PROJECT_STATUS.md)
 
 ## Hard rules
 
 - **Never commit secrets.** `.env` is gitignored and must stay that way. CI greps for
   leaked token patterns (`ghp_`, `github_pat_`, `sk-`) and fails the build on a match.
-- **Never commit local-only paths**: `db/`, `download/`, `worklog.md`, `examples/`,
-  `tests/` (the shell scripts), `skills/`, `Caddyfile`, `e2e-artifacts/` — all gitignored;
-  they belong to the dev sandbox, not the app.
+- **Never commit local-only paths**: `db/`, `download/`, `examples/`,
+  `tests/` (the shell scripts), `skills/`, `Caddyfile`, `e2e-artifacts/` — all
+  gitignored; they belong to the dev sandbox, not the app. The development
+  journal is [`docs/WORKLOG.md`](docs/WORKLOG.md) and **is** tracked — keep it
+  updated and pushed; working state must never live only in untracked files.
 - **Every PR updates `PROJECT_STATUS.md`** (status rows, `In flight`, or `Next up`).
 - `main` and `develop` are protected: PRs only, required checks
   `lint-typecheck-test` and `build-smoke` must be green before merge.

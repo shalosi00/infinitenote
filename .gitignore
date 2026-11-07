@@ -24,7 +24,6 @@ dev.log
 # local runtime data (not part of the app)
 /db/
 /download/
-/worklog.md
 /.secrets/
 /e2e-artifacts/
 
