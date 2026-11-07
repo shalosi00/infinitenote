@@ -8,8 +8,8 @@
 |---|---|
 | **Last updated** | 2026-11-07 |
 | **Current version** | v1.6.0 (tagged, GitHub Release published, Linux artifacts attached) — v1.7.0 in progress on `develop` |
-| **Phase** | v1.7 in progress — i18n (#54) + themes gallery (#55) merged; F-Droid (#56) next |
-| **Overall state** | 305 unit + 65 E2E green; 1 open issue (#56) |
+| **Phase** | v1.7 complete (i18n + themes + F-Droid) — release flow next |
+| **Overall state** | 326 unit + 65 E2E green; 0 open issues — v1.7 complete, release flow next |
 
 ## TL;DR
 
@@ -25,8 +25,9 @@ All data is local (IndexedDB). The UI is bilingual (English / 简体中文, swit
 a Tauri 2 Linux desktop shell (deb/rpm/AppImage artifacts on releases), an
 Android TWA wrapper scaffold with tested Digital Asset Links tooling, and a
 Flatpak/Flathub packaging recipe. v1.7 so far adds UI internationalization
-(English + 简体中文) and a themes gallery: six accent themes layered over
-light/dark via a sidebar gallery with live swatches.
+(English + 简体中文), a themes gallery — six accent themes layered over
+light/dark via a sidebar gallery with live swatches — and the F-Droid build
+recipe with its validation tooling.
 v1.1 added the duplicate-page action, Playwright E2E as a required CI check and
 OneNote import phase 1 (.docx + HTML). v1.2 adds OneNote import phase 2 (`.mht`
 single-file pages with embedded images + Graph export runbook) and page paper
@@ -61,19 +62,23 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Desktop shell (Tauri 2): static-export build path, `src-tauri/` config + icons, Linux artifact workflow | Working — export build verified; binaries built by CI on `main`/tags | desktop-config unit tests + `.github/workflows/desktop.yml` (docs/desktop.md) |
 | Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
+| F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 305 unit tests, 65 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 326 unit tests, 65 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing — themes gallery (#55) merged; next: the F-Droid build recipe
-  (#56), then the v1.7.0 release flow.
+- Nothing — the v1.7.0 milestone is complete (i18n #54, themes #55,
+  F-Droid #56); the release flow (version bump → release PR → tag) is next.
 
-## Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.8 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-i18n (#54) and the themes gallery (#55) shipped. Next up — v1.7 candidates (see [docs/ROADMAP.md](docs/ROADMAP.md)):
+The full v1.7 milestone shipped. v1.8 planning happens at release time; backlog
+candidates:
 
-1. F-Droid packaging (reproducible build recipe from the Tauri source)
+1. Localized first-run seed content + generated page/notebook names
+2. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance
+3. Drawing shape library beyond Excalidraw defaults
 
 ## Repo map (30 seconds)
 
