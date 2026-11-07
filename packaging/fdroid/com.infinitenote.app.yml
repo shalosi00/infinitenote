@@ -57,3 +57,9 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+  - versionName: 1.9.0
+    versionCode: 190
+    commit: v1.9.0
+    subdir: android-twa
+    gradle:
+      - yes
