@@ -22,8 +22,8 @@ android {
         targetSdk = 35
         // Kept in lockstep with the web app version (package.json) — the
         // release bump PR updates both, unit tests pin the parity.
-        versionCode = 160
-        versionName = "1.6.0"
+        versionCode = 170
+        versionName = "1.7.0"
     }
 
     signingConfigs {
