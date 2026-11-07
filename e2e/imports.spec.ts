@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import {
@@ -114,10 +115,39 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
     await expectCount(page, 38); // + 3 text blocks + 1 image
   });
 
+  test("drag-dropping an image inserts it exactly once, saved (issue #122)", async () => {
+    // Synthetic drag-drop onto the canvas: Excalidraw's own drop handler
+    // must not ALSO insert the first file natively — that duplicate used
+    // to persist with status "pending" forever.
+    const b64 = readFileSync(path.join(FX, "test-image.png"), "base64");
+    await page.evaluate((data) => {
+      const buf = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([buf], "dropped.png", { type: "image/png" }));
+      const target = document.querySelector(".excalidraw") || document.body;
+      target.dispatchEvent(
+        new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }),
+      );
+      target.dispatchEvent(
+        new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }),
+      );
+    }, b64);
+    await expectCount(page, 39); // + 1 image — exactly ONE insert
+    const serialized = JSON.parse(await serializeCurrentPage(page)) as {
+      elements: Array<{ type: string; status?: string }>;
+    };
+    const images = serialized.elements.filter((e) => e.type === "image");
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    // every persisted image is "saved" once its file data is registered
+    for (const img of images) {
+      expect(img.status, "imported images must not persist as pending").toBe("saved");
+    }
+  });
+
   test("imported content persists across a reload", async () => {
     await saveNow(page);
     await page.reload();
     await openPage(page, "Page 2");
-    await expectCount(page, 38);
+    await expectCount(page, 39);
   });
 });

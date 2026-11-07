@@ -492,6 +492,23 @@ export default function NoteApp() {
 
   /* --------------------------- drag & drop ----------------------------- */
 
+  /*
+   * OS file drops are intercepted in the CAPTURE phase (issue #122): left
+   * to bubble, Excalidraw's own drop handler ALSO inserts the first image
+   * file natively — a duplicate element that persists with status
+   * "pending" forever (the 0.18 library never flips it to "saved").
+   * Stopping propagation before the canvas sees the event keeps imports
+   * single-sourced in our importer. Drops that carry no files (Excalidraw
+   * library items, dragged text) pass through untouched.
+   */
+  const onDropCapture = (e: React.DragEvent) => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropActive(false);
+    void handleImportFiles(e.dataTransfer.files);
+  };
+
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDropActive(false);
@@ -736,6 +753,7 @@ export default function NoteApp() {
             setDropActive(true);
           }}
           onDragLeave={() => setDropActive(false)}
+          onDropCapture={onDropCapture}
           onDrop={onDrop}
         >
           {currentPage ? (

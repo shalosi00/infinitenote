@@ -101,14 +101,34 @@ export function sanitizeScene(payload: ScenePayload): ScenePayload {
   for (const [id, f] of Object.entries(payload.files)) {
     if (usedFileIds.has(id) && f?.dataURL) files[id] = f;
   }
-  const elements = (
-    payload.elements as Array<{ type?: string; status?: string; fileId?: string | null }>
-  ).map((el) =>
-    el?.type === "image" && el.status === "pending" && !!el.fileId && !!files[el.fileId as string]
-      ? { ...el, status: "saved" }
-      : el,
-  );
-  return { elements: elements as ScenePayload["elements"], files };
+  return normalizeImageStatuses({ elements: payload.elements, files });
+}
+
+/**
+ * Flip image elements from "pending" to "saved" once their file data is
+ * registered (issue #122).
+ *
+ * Excalidraw 0.18 inserts images with status "pending" and only its hosted
+ * app (not the library) ever flips them to "saved" — elements created by
+ * the library's own paths (pasting an image, the image tool, dropping a
+ * file straight onto the canvas) would otherwise persist as "pending"
+ * forever, even though their binary data is present and renders/exports
+ * fine. Elements whose file is genuinely missing keep "pending" — that is
+ * the honest state (the data really is not there).
+ */
+export function normalizeImageStatuses(payload: ScenePayload): ScenePayload {
+  let changed = false;
+  const elements = payload.elements.map((el) => {
+    const e = el as { type?: string; fileId?: string | null; status?: string };
+    if (e?.type === "image" && e.status === "pending" && e.fileId) {
+      if (payload.files[e.fileId]?.dataURL) {
+        changed = true;
+        return { ...e, status: "saved" };
+      }
+    }
+    return el;
+  });
+  return changed ? { ...payload, elements } : payload;
 }
 
 /**

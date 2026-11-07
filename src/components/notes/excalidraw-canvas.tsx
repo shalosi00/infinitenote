@@ -20,6 +20,7 @@ import * as db from "@/lib/notes-db";
 import type { ScenePayload } from "@/lib/types";
 import type { PageBackground } from "@/lib/types";
 import type { CanvasApi } from "@/lib/excalidraw-utils";
+import { sanitizeScene } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
   getScenePayload,
@@ -429,7 +430,11 @@ export default function ExcalidrawCanvas({
       },
       files: Record<string, BinaryFileData>,
     ) => {
-      latestScene.current = { elements: [...elements], files };
+      // sanitize at the persistence boundary: orphan files are dropped and
+      // image elements whose file data is registered flip "pending" →
+      // "saved" (issue #122) — Excalidraw 0.18's own insert paths (paste,
+      // image tool) never do that flip themselves.
+      latestScene.current = sanitizeScene({ elements: [...elements], files });
       if (ruledLayerRef.current) syncRuledLayer(appState);
       scheduleSave();
     },
