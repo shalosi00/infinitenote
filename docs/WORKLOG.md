@@ -38,6 +38,101 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-08 — vendored mattpocock agent skills into the repo
+
+- Direct user request: install the helpful skills from
+  github.com/mattpocock/skills so future development/fix cycles run with
+  stronger engineering discipline.
+- Cycle-start audit: v1.9.0 released (main 1797bb2, develop f1f1d72), 0 open
+  PRs, v1.10.0 open with #64/#65. All 16 stale local branches were
+  patch-equivalent merged WIP (audio content shipped via the wave-2 squash
+  PRs) and were deleted; local main/develop fast-forwarded to origin.
+- Installed the upstream **promoted** set only (exactly what their plugin
+  ships): 20 engineering + 7 productivity skills → `.agents/skills/`
+  (82 files, 688K), MIT © Matt Pocock, LICENSE + attribution README pinned
+  to upstream commit 4ae2317 (2026-10-31). Excluded deliberately:
+  in-progress (beta), misc (frozen), deprecated.
+- Highest-leverage for this repo: `tdd` (red-green at pre-agreed seams),
+  `diagnosing-bugs` (feedback-loop-first diagnosis), `code-review`
+  (standards + spec axes in parallel subagents), `codebase-design` (deep
+  modules), `pr` (PR-body shape). AGENTS.md now routes agents to the right
+  SKILL.md; PROJECT_STATUS repo map lists the directory.
+- Deliberately tracked in git — NOT the gitignored sandbox `skills/` dir —
+  so the set survives sandbox restores and ships with the repo; top-level
+  `skills/` stays environment-only.
+- Next: v1.10.0 in roadmap order — #64 bundled-asset TWA, then #65 shape
+  library, developed under the new skills' discipline.
+
+## 2026-11-07 — full human-style manual test pass: every feature green
+
+- Direct user request: "Test every feature like a human." Drove the real
+  UI in headless Chromium (agent-browser CLI): real clicks, real mouse
+  drawing (pixel-verified ink placement), real drag-drops, real downloads,
+  IndexedDB ground-truth checks. Full report with the per-feature matrix:
+  docs/manual-test-2026-11-07.md.
+- Coverage: first-run seed; hierarchy CRUD (create/rename/color/duplicate/
+  reorder/trash via menus, double-click and header paths); canvas (rect,
+  freehand, text, move, paper styles); ALL NINE import types dropped in
+  one batch onto one canvas (41 elements; parsed docx lists/tables,
+  OneNote HTML, mht text+embedded image, markdown, txt, PDF printout
+  images, scene merge, audio embeddable) then ink+text annotated on top
+  (43); every export validated on disk (PNG 2049x12498, SVG with embedded
+  images, scene 43 els/6 files, A4 PDFs 5pp portrait + 10pp landscape
+  with vector text and paper ruling, backup JSON nested+trash-excluded,
+  sync ZIP manifest+pages); Ctrl+K content search (found a keyword buried
+  in imported txt, breadcrumb + jump); trash restore + purge-with-
+  tombstone; tags add/chips/filter/jump/clear; quick note button +
+  Ctrl+Alt+N + Today daily page; shortcuts cheatsheet; themes gallery
+  (Forest applied + persisted), dark mode, mobile drawer; multi-select
+  bulk move (source section correctly disabled, DB-verified); sync
+  dialog + ZIP; audio playback on canvas (double-click activate, play
+  advanced currentTime) and graceful no-mic record failure (#93);
+  full-reload persistence (notebooks/sections/pages/scene/tags/paper/
+  theme/mode/tombstone all intact).
+- Result: 0 user-facing bugs. Two findings filed: #122 (cosmetic: mht
+  image element persists status "pending" though data saved + rendering
+  verified) and #123 (feat: restore last-opened page on reload).
+- Console-error triage: only harness artifacts (synthetic file-upload
+  NotReadableError — drag-drop + CI setInputFiles both work) and a
+  dev-only Excalidraw worker fallback; nothing app-attributable.
+- Tooling note: two test helpers added under scripts/ (shot-check.py
+  screenshot sanity, fixture-server.py CORS fixtures) — dev-sandbox
+  utilities, not shipped.
+
+## 2026-11-07 — v1.8.0 + v1.9.0 releases: English-only interface
+
+- Cycle-start audit: working tree clean, local develop = origin/develop at
+  1e44ba1 (wave 2 merged); develop 13 commits ahead of main; v1.8.0
+  milestone 33/35 closed with only features #64/#65 open. Auth fix: the
+  token in the remote URL is `user:token` — cut on the colon for the API.
+- **v1.8.0 released**: bump PR #114 → release PR #115 (merge commit
+  2cea610) → annotated tag v1.8.0 → GitHub Release; v1.8.0 milestone
+  closed (33 issues), #64/#65 moved forward.
+- **English-only interface (#117, PR #116)** — product decision: the app
+  ships one language. Removed the v1.7 next-intl layer end to end
+  (net −1,607 lines): message catalogs, provider, sidebar Language toggle,
+  locale-aware generated names. Every UI string is a plain English literal
+  at its call site; ICU plurals became `plural()` (src/lib/plural.ts);
+  shortcuts/themes data modules carry their labels; export/sync error
+  codes map to English messages next to the codes; sync summaries render
+  via `formatSyncSummary()`. CJK CONTENT support kept (IME #99, layout
+  #88, PDF footers #84, filenames #74, truncation #101). Also fixed the
+  #94 no-page recording toast that referenced a catalog key that never
+  existed in any locale. Built as a codemod staged under
+  `examples/staging/remove-chinese/` that reads messages/en.json and
+  rewrites all 10 components, failing loudly on anything it cannot
+  resolve — doubling as a full code↔catalog audit.
+- **v1.9.0 released**: bump PR #118 → release PR #119 (merge 1797bb2) →
+  annotated tag v1.9.0 + Release; v1.9.0 milestone closed (#117), v1.10.0
+  opened with #64/#65.
+- Verified counts (real runs): 401 unit + 86 E2E green.
+- Environment lessons this cycle: intermediate pipe output can garble file
+  reads across resets (a dep array read as `}, andleRunSync,` while od
+  showed `}, [handleRunSync,`) — when a read looks impossible, verify with
+  od/an AST probe before acting on it. Playwright's browser cache can
+  vanish on sandbox recycle — `bunx playwright install chromium` (without
+  --with-deps; there is no sudo).
+
 ## 2026-11-07 — bug-hunt wave 1: audit + four fixes (#72–#75)
 
 - Cycle-start audit against `origin/develop` (bbfc8cb): lint / tsc / 358 unit
@@ -226,3 +321,38 @@
     build flag rather than NODE_ENV.
 - Verified end state: 419 unit tests + 96 E2E checks green in CI on every
   required job; 0 open bugs; v1.8.0 continues with #64/#65.
+
+## 2026-11-07 — #122 completed, #64 bundled-asset Android wrapper
+
+- Resumed post-v1.9.0: wiped stale local state, synced to GitHub, picked up
+  the open v1.10 tracker (#64/#65 + manual-pass findings #122/#123).
+- **#122 root cause was NOT the mht path.** Deep-dive: Excalidraw 0.18's own
+  drop handler (`handleAppOnDrop`) also inserts the first dropped image
+  natively, and the library NEVER flips an image element from "pending" to
+  "saved" (only the hosted app does). A dropped image therefore landed
+  TWICE — our importer's "saved" copy plus a native duplicate persisting as
+  "pending" forever; reproduced with a synthetic DataTransfer drop (4
+  elements where 3 belong). PR #125 (merged concurrently) had fixed only the
+  persisted-flag invariant; PR #126 completed it: capture-phase interception
+  of OS file drops on `<main>` (single-sourced imports), autosave stash
+  routed through `sanitizeScene` (paste/image-tool images can no longer
+  persist as "pending"), `normalizeImageStatuses` extracted + reused in
+  `appendScene`, synthetic drag-drop E2E regression. Squash-merged with all
+  three required checks green.
+- **#64 shipped on `feat/64-bundled-twa`**: a TWA cannot serve APK assets
+  (Custom Tabs run in the browser process), so the scaffold's launcher is
+  now `BundledSiteActivity` — a WebView + `WebViewAssetLoader` serving the
+  static export (`bun run build:desktop` → `out/`, synced by a Gradle
+  `syncWebAssets` task) on the reserved `appassets.androidplatform.net`
+  origin. Airplane-mode first run renders; `assets/www` missing → live PWA
+  fallback; deep links stay assetlinks-verified on the same host;
+  androidbrowserhelper/LauncherActivity retired from the scaffold
+  (bubblewrap path still documented); IndexedDB lives in the app's WebView
+  sandbox. 7 new android-config pins (launcher identity, webkit dep,
+  sync task wiring, asset origin, fallback URL parity, storage locality);
+  F-Droid policy notes + description updated (English UI with CJK content).
+- **Environment note**: a second agent session is concurrently active in
+  this sandbox (its work landed as #125/#127 and it is building #65). Tree
+  state flapped between sessions — every commit now stages an explicit
+  file list, and PRs avoid the other session's in-flight files.
+- Next: #65 review when its PR opens; v1.10.0 release when #64+#65 merge.

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from "bun:test";
-import { classifyFile, sanitizeScene, titleToFilename } from "../excalidraw-utils";
+import { classifyFile, normalizeImageStatuses, sanitizeScene, titleToFilename } from "../excalidraw-utils";
 
 const mkFile = (name: string, type: string): File =>
   new File(["x"], name, { type });
@@ -68,6 +68,72 @@ describe("sanitizeScene", () => {
     };
     const out = sanitizeScene(payload);
     expect(Object.keys(out.files)).toEqual([]);
+  });
+
+  it("flips a pending image to saved when its file data is kept (issue #122)", () => {
+    const payload = {
+      elements: [
+        { type: "image", fileId: "f1", status: "pending" },
+        { type: "image", fileId: "f2", status: "pending" },
+      ],
+      files: {
+        // f1: valid data → the element must persist as "saved"
+        f1: { id: "f1", dataURL: "data:...", mimeType: "image/png", created: 1 },
+        // f2: broken record (no dataURL) → the file is dropped, the
+        // element's status must stay untouched (no data ⇒ no flip)
+        f2: { id: "f2", dataURL: "", mimeType: "image/png", created: 1 },
+      },
+    };
+    const out = sanitizeScene(payload) as unknown as {
+      elements: Array<{ type: string; fileId?: string; status?: string }>;
+      files: Record<string, unknown>;
+    };
+    expect(out.elements[0].status).toBe("saved");
+    expect(out.elements[1].status).toBe("pending");
+    expect(Object.keys(out.files)).toEqual(["f1"]);
+  });
+
+  it("never touches non-pending or non-image elements (issue #122)", () => {
+    const payload = {
+      elements: [
+        { type: "image", fileId: "f1", status: "saved" },
+        { type: "image", fileId: "f1", status: "error" },
+        { type: "image", status: "pending", fileId: null },
+        { type: "text", text: "x", status: "pending" },
+        { type: "embeddable", status: "pending", link: "about:blank" },
+      ],
+      files: {
+        f1: { id: "f1", dataURL: "data:...", mimeType: "image/png", created: 1 },
+      },
+    };
+    const out = sanitizeScene(payload) as unknown as {
+      elements: Array<{ type: string; status?: string }>;
+    };
+    expect(out.elements.map((e) => e.status)).toEqual(["saved", "error", "pending", "pending", "pending"]);
+  });
+});
+
+describe("normalizeImageStatuses (issue #122 direct helper)", () => {
+  const file = { id: "f1", dataURL: "data:image/png;base64,xx", mimeType: "image/png", created: 1 };
+
+  it("flips pending images with registered data", () => {
+    const pending = { type: "image", fileId: "f1", status: "pending", id: "e1" };
+    const out = normalizeImageStatuses({ elements: [pending, { type: "text", id: "e2" }], files: { f1: file } });
+    expect(out.elements[0]).toEqual({ ...pending, status: "saved" });
+    expect(out.elements[1]).toEqual({ type: "text", id: "e2" });
+  });
+
+  it("keeps pending when the file data is genuinely missing", () => {
+    const pending = { type: "image", fileId: "gone", status: "pending", id: "e1" };
+    const out = normalizeImageStatuses({ elements: [pending], files: { f1: file } });
+    expect(out.elements[0]).toBe(pending); // untouched (same reference)
+  });
+
+  it("returns the same payload when nothing needs flipping", () => {
+    const saved = { type: "image", fileId: "f1", status: "saved", id: "e1" };
+    const text = { type: "text", id: "e2" };
+    const payload = { elements: [saved, text], files: { f1: file } };
+    expect(normalizeImageStatuses(payload)).toBe(payload); // identity
   });
 });
 

@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-07 |
-| **Current version** | v1.8.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.8.0)) |
-| **Phase** | v1.8.0 shipped — v1.9.0 open: English-only UI (i18n layer removed), features #64/#65 |
-| **Overall state** | 401 unit + 86 E2E green; 0 known bugs |
+| **Last updated** | 2026-11-08 |
+| **Current version** | v1.9.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)) |
+| **Phase** | v1.10.0 milestone complete pending release — #122/#123/#64/#65 all landed |
+| **Overall state** | 433 unit + 98 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -91,9 +91,8 @@ export (A4 portrait/landscape, vector text, sliced images).
   tag feedback, flag-gated e2e hooks, pinned pdf.js, honest build,
   folder-init sync). Every fix carries unit and/or E2E regression coverage.
 
-## Next up — v1.9 (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-0. English-only UI — i18n layer removed (this PR)
 1. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance (#64)
 2. Drawing shape library beyond Excalidraw defaults (#65)
 
@@ -124,6 +123,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | `e2e/` + `playwright.config.ts` | Playwright E2E suite — 34 checks, runs in CI (issue #3) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
+| `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
 
 ## Commands cheat-sheet
 
@@ -136,6 +136,26 @@ make status                          # quick status snapshot (this file's head +
 ```
 
 ## Recent history
+
+- **2026-11-07 — v1.9.0 released**: release PR #119 merge-committed to main
+  (1797bb2), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.9.0)
+  and published; v1.9.0 milestone closed (#117), v1.10.0 opened with
+  #64/#65. The release ships exactly one change — the English-only
+  interface — deliberately small and easy to review.
+- **2026-11-07 — English-only interface (#117, PR #116)**: the v1.7 next-intl
+  layer (en/zh-CN catalogs, provider, sidebar Language toggle, locale-aware
+  generated names) removed end to end, net −1,607 lines. English literals at
+  every call site, a tiny `plural()` helper for ICU plurals, labels moved
+  into the shortcuts/themes data modules, export/sync error codes mapped to
+  English messages, sync summaries via `formatSyncSummary()`. CJK *content*
+  support kept (IME-safe input, CJK layout/footers/filenames,
+  surrogate-safe truncation). Also fixed the #94 no-page toast that
+  referenced a catalog key that never existed. 401 unit + 86 E2E green.
+- **2026-11-07 — v1.8.0 released**: release PR #115 merge-committed to main
+  (2cea610), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.8.0)
+  and published — audio blocks (#67), the full import-overlay matrix (#68),
+  localized seed (#63) and bug-hunt waves 1–2 (35 fixes); v1.8.0 milestone
+  closed (33 issues).
 
 - **2026-11-07 — Bug-hunt wave 1 (issues #72–#75)**: a full audit (gates +
   manual code review of audio/imports/exports/sync/i18n) surfaced four real

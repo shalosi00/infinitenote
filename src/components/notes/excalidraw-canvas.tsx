@@ -20,9 +20,11 @@ import * as db from "@/lib/notes-db";
 import type { ScenePayload } from "@/lib/types";
 import type { PageBackground } from "@/lib/types";
 import type { CanvasApi } from "@/lib/excalidraw-utils";
+import { sanitizeScene } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
   getScenePayload,
+  insertShapeById,
   importExcalidrawFile,
   importDocxFile,
   importHtmlFile,
@@ -363,6 +365,12 @@ export default function ExcalidrawCanvas({
 
       const apiSurface: CanvasApi = {
         importFiles,
+        // issue #65: curated shape library — unknown ids fall back to a toast
+        insertShape: (shapeId) => {
+          if (!insertShapeById(api, shapeId)) {
+            onToast("Unknown shape");
+          }
+        },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),
@@ -429,7 +437,11 @@ export default function ExcalidrawCanvas({
       },
       files: Record<string, BinaryFileData>,
     ) => {
-      latestScene.current = { elements: [...elements], files };
+      // sanitize at the persistence boundary: orphan files are dropped and
+      // image elements whose file data is registered flip "pending" →
+      // "saved" (issue #122) — Excalidraw 0.18's own insert paths (paste,
+      // image tool) never do that flip themselves.
+      latestScene.current = sanitizeScene({ elements: [...elements], files });
       if (ruledLayerRef.current) syncRuledLayer(appState);
       scheduleSave();
     },

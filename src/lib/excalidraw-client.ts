@@ -29,7 +29,13 @@ import {
   getDataURL,
   MIME_TYPES,
 } from "@excalidraw/excalidraw";
-import { classifyFile, downloadBlob, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { classifyFile, downloadBlob, normalizeImageStatuses, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import {
+  INHERIT_FILL,
+  INHERIT_STROKE,
+  getShapeDef,
+  type ShapeSkeleton,
+} from "./shape-library";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
@@ -565,7 +571,13 @@ export function appendScene(api: ExcalidrawImperativeAPI, scene: ImportedScene):
   if (fileValues.length) api.addFiles(fileValues as BinaryFileData[]);
   const current = api.getSceneElements();
   if (!current.length) {
-    api.updateScene({ elements: [...scene.elements] });
+    // normalize image statuses at import (issue #122): restored scenes can
+    // carry "pending" images whose data is present — flip them up front
+    const normalized = normalizeImageStatuses({
+      elements: [...scene.elements],
+      files: scene.files as NonNullable<ScenePayload["files"]>,
+    });
+    api.updateScene({ elements: [...(normalized.elements as ExcalidrawElement[])] });
     return;
   }
   const anchor = nextInsertPosition(current);
@@ -575,7 +587,60 @@ export function appendScene(api: ExcalidrawImperativeAPI, scene: ImportedScene):
     x: e.x - ix1 + anchor.x,
     y: e.y - iy1 + anchor.y,
   }));
-  api.updateScene({ elements: [...current, ...shifted] });
+  const normalized = normalizeImageStatuses({
+    elements: shifted,
+    files: scene.files as NonNullable<ScenePayload["files"]>,
+  });
+  api.updateScene({ elements: [...current, ...(normalized.elements as ExcalidrawElement[])] });
+}
+
+/* ------------------------------------------------------------------ */
+/* curated shape library (issue #65)                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Insert one curated library shape as native Excalidraw elements below the
+ * existing content (or at `insertAt`), auto-selected for immediate editing.
+ *
+ * Colors: INHERIT_* sentinels resolve to the user's current toolbar colors,
+ * so shapes match what they would draw by hand. Everything else — geometry,
+ * arrowheads, the sticky note's pinned yellow + bound label — comes straight
+ * from the pure catalog in lib/shape-library.ts. Native elements mean the
+ * shapes persist with the scene and round-trip through every export path.
+ */
+export function insertShapeById(
+  api: ExcalidrawImperativeAPI,
+  shapeId: string,
+  insertAt?: { x: number; y: number },
+): boolean {
+  const def = getShapeDef(shapeId);
+  if (!def) return false;
+  const anchor = insertAt ?? nextInsertPosition(api.getSceneElements());
+  const appState = api.getAppState();
+  const skeletons = def.skeletons.map((s: ShapeSkeleton) => ({
+    ...s,
+    x: s.x + anchor.x,
+    y: s.y + anchor.y,
+    strokeColor:
+      s.strokeColor === INHERIT_STROKE
+        ? (appState.currentItemStrokeColor ?? "#1e1e1e")
+        : s.strokeColor,
+    backgroundColor:
+      s.backgroundColor === INHERIT_FILL
+        ? (appState.currentItemBackgroundColor ?? "transparent")
+        : s.backgroundColor,
+  }));
+  const created = convertToExcalidrawElements(
+    skeletons as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawElement[];
+  api.updateScene({
+    elements: [...api.getSceneElements(), ...created],
+    appState: {
+      selectedElementIds: Object.fromEntries(created.map((e) => [e.id, true])),
+    },
+  });
+  return true;
 }
 
 /* ------------------------------------------------------------------ */

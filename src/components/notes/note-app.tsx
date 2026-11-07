@@ -22,6 +22,7 @@ import {
   PenLine,
   Printer,
   Search,
+  Shapes,
   Square,
   Sun,
   Tags,
@@ -51,6 +52,7 @@ import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
+import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import {
   addTagWithResult,
@@ -492,6 +494,23 @@ export default function NoteApp() {
 
   /* --------------------------- drag & drop ----------------------------- */
 
+  /*
+   * OS file drops are intercepted in the CAPTURE phase (issue #122): left
+   * to bubble, Excalidraw's own drop handler ALSO inserts the first image
+   * file natively — a duplicate element that persists with status
+   * "pending" forever (the 0.18 library never flips it to "saved").
+   * Stopping propagation before the canvas sees the event keeps imports
+   * single-sourced in our importer. Drops that carry no files (Excalidraw
+   * library items, dragged text) pass through untouched.
+   */
+  const onDropCapture = (e: React.DragEvent) => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropActive(false);
+    void handleImportFiles(e.dataTransfer.files);
+  };
+
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDropActive(false);
@@ -592,6 +611,40 @@ export default function NoteApp() {
             e.target.value = "";
           }}
         />
+        {/* curated shape library (issue #65) — header toolbar, desktop + mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              data-testid="shapes-button"
+              aria-label={"Insert shape"}
+              title={"Insert shape"}
+            >
+              <Shapes className="h-4 w-4" />
+              <span className="hidden sm:inline">{"Shapes"}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-96 w-60 overflow-y-auto" data-testid="shapes-menu">
+            {SHAPE_CATEGORIES.map((category) => (
+              <div key={category}>
+                <DropdownMenuLabel>{category}</DropdownMenuLabel>
+                {shapesByCategory(category).map((shape) => (
+                  <DropdownMenuItem
+                    key={shape.id}
+                    data-testid={`shape-${shape.id}`}
+                    onClick={() => canvasApi.current?.insertShape(shape.id)}
+                  >
+                    {shape.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
@@ -736,6 +789,7 @@ export default function NoteApp() {
             setDropActive(true);
           }}
           onDragLeave={() => setDropActive(false)}
+          onDropCapture={onDropCapture}
           onDrop={onDrop}
         >
           {currentPage ? (

@@ -55,6 +55,23 @@ Follow this guide to work effectively without wasting context reading the whole 
 - Failure artifacts: HTML report in `e2e-report/`, traces/screenshots in
   `test-results/` (gitignored; CI uploads the report on failure).
 
+## Agent skills (installed)
+
+`.agents/skills/` vendors the promoted skill set from
+[mattpocock/skills](https://github.com/mattpocock/skills) (MIT) — reference
+discipline for developing and fixing this repo well. It is repo tooling, not
+app code. Before starting matching work, read the relevant `SKILL.md`:
+
+- Test-first feature/bug work → `.agents/skills/engineering/tdd/SKILL.md`
+- A reported bug → `.agents/skills/engineering/diagnosing-bugs/SKILL.md`
+- Before merging a branch → `.agents/skills/engineering/code-review/SKILL.md`
+- Module design questions → `.agents/skills/engineering/codebase-design/SKILL.md`
+- Anything else → start from `.agents/skills/README.md` (full inventory)
+
+Note: the top-level gitignored `skills/` directory is unrelated dev-sandbox
+scaffolding (environment-provided skills); the tracked, durable copy lives in
+`.agents/skills/`.
+
 ## History note
 
 The initial sandbox scaffolding (`src/lib/db.ts`, `prisma/`, `src/app/api/route.ts`)

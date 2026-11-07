@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- InfiniteNote Trusted Web Activity: a single LauncherActivity that opens
-     the deployed PWA fullscreen in a trusted Chrome Custom Tab. Verification
-     against https://shalosi00.github.io/infinitenote/ happens through
+<!-- InfiniteNote Android wrapper (issue #64): BundledSiteActivity serves the
+     static web export from the APK assets (WebViewAssetLoader) in an offline
+     WebView, with the deployed PWA origin as fallback. Deep links are
+     verified against https://shalosi00.github.io/infinitenote/ through
      public/.well-known/assetlinks.json (docs/android-twa.md). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -15,10 +16,18 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="false">
 
+        <!-- Bundled-site launcher (issue #64): the static web export is served
+             from the APK assets via WebViewAssetLoader on the reserved
+             appassets.androidplatform.net origin — the app renders fully
+             OFFLINE (F-Droid compliance). When assets/www was not synced
+             into the build, BundledSiteActivity falls back to the deployed
+             PWA origin. Storage (IndexedDB) lives in the app's own WebView
+             profile, so note data never leaves the device. -->
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".BundledSiteActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.InfiniteNote.Twa"
             android:windowSoftInputMode="adjustResize">
 
@@ -27,7 +36,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep links into the notebook host are verified via assetlinks.json. -->
+            <!-- Deep links into the notebook host are verified via
+                 assetlinks.json and open the bundled app (same data). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -37,25 +47,10 @@
                     android:host="shalosi00.github.io"
                     android:pathPrefix="/infinitenote/" />
             </intent-filter>
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="https://shalosi00.github.io/infinitenote/" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                android:resource="@color/theme_color" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                android:resource="@color/navigation_color" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                android:resource="@color/background_color" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_EXTRA_METADATA"
-                android:value="{}" />
         </activity>
 
-        <!-- App links verification (Digital Asset Links) is declared by
-             androidbrowserhelper automatically for the autoVerify filter above. -->
+        <!-- App links verification (Digital Asset Links) happens on the
+             browser side against public/.well-known/assetlinks.json; the
+             autoVerify filter above opts this app in. -->
     </application>
 </manifest>

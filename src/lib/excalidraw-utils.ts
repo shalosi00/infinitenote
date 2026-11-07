@@ -22,6 +22,8 @@ export interface CanvasApi {
   exportPdf: (orientation: "portrait" | "landscape") => Promise<void>;
   /** Zoom viewport to fit existing content. */
   focusContent: () => void;
+  /** Insert one curated library shape by id (issue #65). */
+  insertShape: (shapeId: string) => void;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
   /** True while the canvas holds un-saved edits (autosave debounce pending). */
@@ -81,7 +83,17 @@ export function classifyFile(file: File): FileImportKind {
   return "unknown";
 }
 
-/** Keep only files actually referenced by image elements (drop orphans). */
+/**
+ * Keep only files actually referenced by image elements (drop orphans), and
+ * enforce the persistence invariant of issue #122: an image element whose
+ * file data is being kept must never persist with status "pending".
+ *
+ * Why: Excalidraw's native image insertion (paste, canvas drop, some import
+ * paths) adds the element as "pending" and flips it to "saved" only after the
+ * file data decodes asynchronously. An autosave that races that decode would
+ * otherwise freeze the stale flag into the persisted scene forever — the data
+ * is right there in the same payload, so the flag is provably wrong.
+ */
 export function sanitizeScene(payload: ScenePayload): ScenePayload {
   const usedFileIds = new Set<string>();
   for (const el of payload.elements as Array<{ type?: string; fileId?: string | null }>) {
@@ -91,7 +103,34 @@ export function sanitizeScene(payload: ScenePayload): ScenePayload {
   for (const [id, f] of Object.entries(payload.files)) {
     if (usedFileIds.has(id) && f?.dataURL) files[id] = f;
   }
-  return { elements: payload.elements, files };
+  return normalizeImageStatuses({ elements: payload.elements, files });
+}
+
+/**
+ * Flip image elements from "pending" to "saved" once their file data is
+ * registered (issue #122).
+ *
+ * Excalidraw 0.18 inserts images with status "pending" and only its hosted
+ * app (not the library) ever flips them to "saved" — elements created by
+ * the library's own paths (pasting an image, the image tool, dropping a
+ * file straight onto the canvas) would otherwise persist as "pending"
+ * forever, even though their binary data is present and renders/exports
+ * fine. Elements whose file is genuinely missing keep "pending" — that is
+ * the honest state (the data really is not there).
+ */
+export function normalizeImageStatuses(payload: ScenePayload): ScenePayload {
+  let changed = false;
+  const elements = payload.elements.map((el) => {
+    const e = el as { type?: string; fileId?: string | null; status?: string };
+    if (e?.type === "image" && e.status === "pending" && e.fileId) {
+      if (payload.files[e.fileId]?.dataURL) {
+        changed = true;
+        return { ...e, status: "saved" };
+      }
+    }
+    return el;
+  });
+  return changed ? { ...payload, elements } : payload;
 }
 
 /**

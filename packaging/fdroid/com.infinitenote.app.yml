@@ -33,7 +33,7 @@ Description: |-
   * File-based sync (folder or ZIP) with page-granular merge
   * Per-page paper styles (plain / ruled / grid) and dark mode
   * Works fully offline; all data stays on the device (IndexedDB)
-  * English and 简体中文 UI
+  * English UI with full CJK content support (titles, tags, search, IME)
 
 RepoType: git
 Repo: https://github.com/shalosi00/infinitenote.git
@@ -60,6 +60,13 @@ Builds:
   - versionName: 1.9.0
     versionCode: 190
     commit: v1.9.0
+    subdir: android-twa
+    gradle:
+      - yes
+
+  - versionName: 1.10.0
+    versionCode: 200
+    commit: v1.10.0
     subdir: android-twa
     gradle:
       - yes

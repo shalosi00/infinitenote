@@ -1,11 +1,15 @@
 # Android distribution: Trusted Web Activity (TWA)
 
 InfiniteNote reaches Android in two supported ways today: as the installable
-PWA (Chrome → *Install app*), and as a **Trusted Web Activity APK** — a thin
-native wrapper that runs the deployed PWA fullscreen with no browser chrome,
-verified against the web app through Digital Asset Links. This document is the
-complete runbook for the TWA path; the scaffold lives in
-[`android-twa/`](../android-twa).
+PWA (Chrome → *Install app*), and as a **bundled-asset APK** — a thin native
+wrapper whose `BundledSiteActivity` serves the static web export from the APK
+assets through `WebViewAssetLoader` (issue #64), so the app renders fully
+offline; deep links are verified against the web app through Digital Asset
+Links, and the deployed PWA origin stays available as a runtime fallback.
+This document is the complete runbook for the Android path; the scaffold
+lives in [`android-twa/`](../android-twa). The **bubblewrap** flow (classic
+online TWA) remains supported as the quick alternative and is documented in
+Step 2.
 
 ## How the pieces fit
 
@@ -13,8 +17,33 @@ complete runbook for the TWA path; the scaffold lives in
 |---|---|---|
 | bubblewrap template | `android-twa/twa-manifest.json` | Input for `@bubblewrap/cli init` (package, host, icons, colors, versions) |
 | Gradle scaffold | `android-twa/*.gradle.kts`, `app/build.gradle.kts` | Buildable reference project for Android Studio / manual Gradle builds |
-| Manifest | `android-twa/app/src/main/AndroidManifest.xml` | Single `LauncherActivity` (androidbrowserhelper), deep-link intent filter |
+| Manifest | `android-twa/app/src/main/AndroidManifest.xml` | `BundledSiteActivity` launcher (offline WebView + asset loader) with deep-link intent filter |
+| Bundled launcher | `android-twa/app/src/main/java/com/infinitenote/app/BundledSiteActivity.java` | WebView + `WebViewAssetLoader` on `https://appassets.androidplatform.net/`, live-origin fallback |
 | assetlinks generator | `scripts/generate-assetlinks.mjs` + `src/lib/assetlinks.ts` | Writes `public/.well-known/assetlinks.json` from package + SHA-256 fingerprint |
+
+## Bundled assets (offline-first, issue #64)
+
+The checked-in Gradle scaffold builds an **offline-first** APK:
+
+1. `bun run build:desktop` produces the static export in `out/`
+   (Next.js `output: "export"` — the same bundle the Tauri desktop shell uses).
+2. The Gradle `syncWebAssets` task copies `out/` →
+   `app/src/main/assets/www/` before every build (`preBuild` depends on it).
+   It **skips silently** when `out/` is absent — a source-only build still
+   configures.
+3. `BundledSiteActivity` serves `assets/www/` on the reserved
+   `https://appassets.androidplatform.net/` origin via `WebViewAssetLoader`
+   — JavaScript, IndexedDB and localStorage all work, and everything stays
+   inside the app sandbox. **Airplane-mode first run renders the app.**
+4. When `assets/www/index.html` is missing, the activity falls back to the
+   deployed PWA origin — the classic online-TWA behavior.
+5. External links (anything not on the asset origin) open in the browser;
+   the Android back button walks the WebView history.
+
+The bubblewrap flow below generates a *classic* online TWA (Custom Tabs) —
+still the quickest path to a signed APK, and a good fit when the PWA host is
+the source of truth. The Gradle scaffold is the path for fully-offline
+builds; both verify against the same `assetlinks.json`.
 
 ## Prerequisites
 
@@ -24,8 +53,8 @@ complete runbook for the TWA path; the scaffold lives in
   or install Android Studio / `sdkmanager` manually
 - A deployed PWA host (any static or Node host; the checked-in default is
   `https://shalosi00.github.io/infinitenote/` — change `twa-manifest.json`,
-  the AndroidManifest deep-link filter and the DEFAULT_URL meta-data together
-  if you self-host elsewhere; unit tests pin their consistency)
+  the AndroidManifest deep-link filter and `BundledSiteActivity.LIVE_ORIGIN`
+  together if you self-host elsewhere; unit tests pin their consistency)
 
 ## Step 1 — Deploy the PWA
 
