@@ -70,7 +70,11 @@ milestones/issues. This file is the plan; the status file is the reality.
       light/dark via `data-theme` on <html>, sidebar gallery with live
       swatches, pre-hydration restore script, persisted choice, i18n-parity
       unit tests, 4 E2E checks
-- [ ] F-Droid build recipe + runbook from the Tauri source (issue #56)
+- [x] F-Droid build recipe + runbook (issue #56) — `packaging/fdroid/`
+      metadata with the repo-wide versionCode scheme (major×100+minor×10+patch),
+      `scripts/fdroid-check.mjs` validator (Bun.YAML parse + invariants),
+      cross-file version parity with the TWA scaffold, docs/fdroid.md runbook
+      (fdroidserver test-build, fdroiddata submission, policy notes), 21 unit tests
 
 ## Backlog (unscheduled)
 
