@@ -7,6 +7,8 @@
  * calls the pickers/formatters defined here so the choices stay testable.
  */
 
+import { generatedNames } from "./generated-names";
+
 /**
  * File extensions that unambiguously denote audio.
  *
@@ -110,7 +112,8 @@ export function buildRecordingFileName(
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const time = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
   const ext = extension.replace(/^\.+/, "") || "audio";
-  return `Recording ${date} ${time}.${ext}`;
+  const prefix = generatedNames().recordingPrefix;
+  return `${prefix}${date} ${time}.${ext}`;
 }
 
 /**

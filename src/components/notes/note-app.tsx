@@ -743,6 +743,9 @@ export default function NoteApp() {
                       setTitleDraft(null);
                     }}
                     onKeyDown={(e) => {
+                      // ignore keys while an IME composes (issue #99):
+                      // Enter confirms the composition, not the rename
+                      if (e.nativeEvent.isComposing) return;
                       if (e.key === "Enter") e.currentTarget.blur();
                       if (e.key === "Escape") setTitleDraft(null);
                     }}
@@ -927,6 +930,9 @@ function TagPicker({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
+            // ignore Enter while an IME composes (issue #99) — Chinese tag
+            // input would otherwise commit half-composed text
+            if (e.nativeEvent.isComposing) return;
             if (e.key === "Enter" && draft.trim()) {
               e.preventDefault();
               commit(draft);

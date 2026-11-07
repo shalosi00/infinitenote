@@ -65,7 +65,7 @@
     "loadFailed": "Could not open your notes",
     "loadFailedBody": "The local database could not be opened (it may be blocked or unavailable). Your data is safe — try again.",
     "retry": "Try again",
-    "toastRecordingNoPage": "Recording discarded — no page is open"
+    "loadingCanvas": "Loading canvas…"
   },
   "canvas": {
     "importedImages": "Imported {count, plural, =1 {1 image} other {# images}}",
@@ -79,7 +79,8 @@
     "importedScene": "Imported scene \"{name}\"",
     "skipped": "Some files were skipped (unsupported type)",
     "importFailed": "Import failed — see console for details",
-    "audioTooLarge": "Skipped {count, plural, =1 {1 audio file} other {# audio files}} — larger than 30 MB, too big to store reliably"
+    "audioTooLarge": "Skipped {count, plural, =1 {1 audio file} other {# audio files}} — larger than 30 MB, too big to store reliably",
+    "audioClipAria": "audio clip"
   },
   "paper": {
     "background": "Page background",
@@ -242,5 +243,32 @@
     "themeSunset": "Sunset",
     "themeRose": "Rose",
     "themeSlate": "Graphite"
+  },
+  "generated": {
+    "notebook": "Notebook {n}",
+    "section": "Section {n}",
+    "page": "Page {n}",
+    "copy": "{title} (copy)",
+    "conflict": "{title} (conflict {date})",
+    "restoredNotebook": "Restored notebook",
+    "restoredSection": "Restored section",
+    "restoredPage": "Restored page",
+    "untitled": "Untitled",
+    "quickNotesNotebook": "Quick Notes",
+    "quickNotesSection": "Quick Notes",
+    "quickNotePrefix": "Quick note ",
+    "recordingPrefix": "Recording ",
+    "welcome": {
+      "notebook": "Welcome Notebook",
+      "section": "Getting Started",
+      "ideasSection": "Ideas",
+      "myNotebook": "My Notebook",
+      "mySection": "New Section",
+      "startHere": "Start here",
+      "brainstorm": "Brainstorm",
+      "pageOne": "Page 1",
+      "title": "Welcome to InfiniteNote",
+      "body": "An open-source notebook with an infinite canvas.\n\nLeft: your Notebooks, Sections and Pages — like OneNote.\nHere: draw anywhere with pen, highlighter, shapes and text.\n\nImport (top right): images, text, Markdown and PDF printouts.\nEverything is saved locally in your browser — offline first."
+    }
   }
 }

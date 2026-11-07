@@ -24,6 +24,7 @@ import type {
   Section,
 } from "../types";
 import { byOrder } from "../types";
+import { generatedNames } from "../generated-names";
 
 export const MANIFEST_PATH = "manifest.json";
 export const TRASH_PATH = "trash.jsonl";
@@ -266,7 +267,7 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
     pages.set(file.id, {
       id: file.id,
       sectionId: file.sectionId,
-      title: typeof file.title === "string" ? file.title : "Untitled",
+      title: typeof file.title === "string" ? file.title : generatedNames().untitled,
       order: typeof file.order === "number" ? file.order : 0,
       createdAt: typeof file.createdAt === "number" ? file.createdAt : 0,
       updatedAt: typeof file.updatedAt === "number" ? file.updatedAt : 0,

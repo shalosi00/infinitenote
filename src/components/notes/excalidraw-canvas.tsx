@@ -123,6 +123,7 @@ function AudioEmbeddablePlayer({
   element: ExcalidrawEmbeddableElement;
   theme: "light" | "dark";
 }) {
+  const t = useTranslations("canvas");
   const payload = audioPayloadOf(element.customData);
   if (!payload) return null; // corrupted block — let Excalidraw render its default
   const name =
@@ -151,7 +152,7 @@ function AudioEmbeddablePlayer({
         preload="metadata"
         src={payload}
         className="h-7 w-full"
-        aria-label={name || "audio clip"}
+        aria-label={name || t("audioClipAria")} // localized fallback (issue #98)
         data-testid="audio-player"
       />
     </div>

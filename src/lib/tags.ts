@@ -10,9 +10,12 @@
 export const MAX_TAGS_PER_PAGE = 12;
 export const MAX_TAG_LENGTH = 24;
 
-/** Normalize one raw tag: trim, collapse whitespace, cap length. null = invalid. */
+/** Normalize one raw tag: trim, collapse whitespace, cap length. null = invalid.
+ * The cap slices by CODE POINTS (issue #101): a UTF-16 .slice could split a
+ * surrogate pair and leave a lone half rendering as U+FFFD. */
 export function normalizeTag(raw: string): string | null {
-  const t = raw.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH).trim();
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  const t = Array.from(collapsed).slice(0, MAX_TAG_LENGTH).join("").trim();
   return t.length ? t : null;
 }
 
