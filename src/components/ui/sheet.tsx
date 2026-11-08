@@ -5,6 +5,7 @@ import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { lastOutsideFocus } from "@/lib/focus-return"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -48,6 +49,7 @@ function SheetContent({
   className,
   children,
   side = "right",
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -70,6 +72,19 @@ function SheetContent({
           className
         )}
         {...props}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (event.defaultPrevented) return
+          // The mobile drawer opens from controlled state (a plain button),
+          // never via SheetTrigger — Radix has no trigger to return focus
+          // to, so it falls to <body>. Restore the last element focused
+          // outside the overlay instead (WCAG 2.4.3).
+          const target = lastOutsideFocus()
+          if (target && target.isConnected) {
+            event.preventDefault()
+            target.focus()
+          }
+        }}
       >
         {children}
         <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
