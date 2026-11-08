@@ -95,15 +95,23 @@ export function classifyFile(file: File): FileImportKind {
  * is right there in the same payload, so the flag is provably wrong.
  */
 export function sanitizeScene(payload: ScenePayload): ScenePayload {
+  // Excalidraw's onChange hands over the FULL element array — including
+  // soft-deleted tombstones (isDeleted: true) that undo/redo leave behind.
+  // They never render, so persisting them only bloats the DB, sync folders
+  // and backups with invisible garbage; drop them at the boundary. Their
+  // files drop out too (usedFileIds is collected after the filter).
+  const live = payload.elements.filter(
+    (el) => !(el as { isDeleted?: boolean } | null)?.isDeleted,
+  );
   const usedFileIds = new Set<string>();
-  for (const el of payload.elements as Array<{ type?: string; fileId?: string | null }>) {
+  for (const el of live as Array<{ type?: string; fileId?: string | null }>) {
     if (el?.type === "image" && el.fileId) usedFileIds.add(el.fileId);
   }
   const files: ScenePayload["files"] = {};
   for (const [id, f] of Object.entries(payload.files)) {
     if (usedFileIds.has(id) && f?.dataURL) files[id] = f;
   }
-  return normalizeImageStatuses({ elements: payload.elements, files });
+  return normalizeImageStatuses({ elements: live, files });
 }
 
 /**
@@ -131,6 +139,39 @@ export function normalizeImageStatuses(payload: ScenePayload): ScenePayload {
     return el;
   });
   return changed ? { ...payload, elements } : payload;
+}
+
+/**
+ * Fingerprint of the PERSISTED scene content — elements + files only.
+ *
+ * Excalidraw's `onChange` fires for appState-only updates too (pan, zoom,
+ * selection, tool switches), but those never change what `savePageContent`
+ * stores, so the autosave gate compares this signature against the last
+ * saved one and skips the write (and the "Saving…" indicator blink) when
+ * nothing in the persisted payload moved.
+ *
+ * Precise by construction: every element contributes its stable `id`, its
+ * `version` (Excalidraw bumps `version` on every edit) and its image
+ * `status` (the sanitizer's pending→saved flip must reach the DB, issue
+ * #122); files contribute their id set — sorted, so element order is
+ * irrelevant. Pure viewport / selection changes leave the signature
+ * byte-identical.
+ */
+export function sceneSignature(payload: ScenePayload): string {
+  const parts: string[] = [];
+  for (const el of payload.elements as Array<{
+    id?: unknown;
+    version?: unknown;
+    status?: unknown;
+  }>) {
+    const id = typeof el?.id === "string" ? el.id : "";
+    const version = typeof el?.version === "number" ? el.version : 0;
+    const status = typeof el?.status === "string" ? el.status : "";
+    parts.push(status ? `${id}@${version}:${status}` : `${id}@${version}`);
+  }
+  parts.sort();
+  const fileIds = Object.keys(payload.files).sort();
+  return `${parts.length}|${parts.join(",")}|${fileIds.join(",")}`;
 }
 
 /**
