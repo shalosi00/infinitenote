@@ -130,6 +130,17 @@ export default function NoteApp() {
   const compactLayout = useIsMobile();
   const [dropActive, setDropActive] = useState(false);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const titleButtonRef = useRef<HTMLButtonElement>(null);
+  /** Keyboard-closed rename editors return focus to the title button
+   * (WCAG 2.4.3); click-away closes let focus follow the click. */
+  const focusTitleAfterClose = useRef(false);
+
+  useEffect(() => {
+    if (titleDraft === null && focusTitleAfterClose.current) {
+      focusTitleAfterClose.current = false;
+      titleButtonRef.current?.focus();
+    }
+  }, [titleDraft]);
   /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
   const [sceneEpoch, setSceneEpoch] = useState(0);
 
@@ -868,13 +879,27 @@ export default function NoteApp() {
                       // ignore keys while an IME composes (issue #99):
                       // Enter confirms the composition, not the rename
                       if (e.nativeEvent.isComposing) return;
-                      if (e.key === "Enter") e.currentTarget.blur();
-                      if (e.key === "Escape") setTitleDraft(null);
+                      if (e.key === "Enter") {
+                        // preventDefault: React flushes the blur +
+                        // re-render (and our focus-return effect) inside
+                        // this keydown dispatch — without it the browser
+                        // applies Enter's activation behavior to the
+                        // newly focused title button and the editor
+                        // re-opens with the pre-rename title.
+                        e.preventDefault();
+                        focusTitleAfterClose.current = true;
+                        e.currentTarget.blur();
+                      }
+                      if (e.key === "Escape") {
+                        focusTitleAfterClose.current = true;
+                        setTitleDraft(null);
+                      }
                     }}
                     aria-label={"Page title"}
                   />
                 ) : (
                   <button
+                    ref={titleButtonRef}
                     type="button"
                     className="truncate rounded px-1 py-1 text-left text-sm font-medium hover:bg-muted"
                     title={"Click to rename this page"}
