@@ -48,12 +48,19 @@ export function SearchDialog() {
     };
   }, [open]);
 
+  // The index (which JSON.parses every page's scene) depends ONLY on the
+  // notebook tree and the content snapshot — never on the query. Splitting
+  // the memos keeps per-keystroke work at the ranking pass; rebuilding the
+  // index per keystroke parsed every page's serialized scene on every key.
+  const index = useMemo(() => {
+    const pagesWithContent = pages.map((p) => ({ ...p, content: contents[p.id] ?? null }));
+    return buildSearchIndex(notebooks, sections, pagesWithContent);
+  }, [pages, sections, notebooks, contents]);
+
   const results = useMemo(() => {
     if (!query.trim()) return [];
-    const pagesWithContent = pages.map((p) => ({ ...p, content: contents[p.id] ?? null }));
-    const index = buildSearchIndex(notebooks, sections, pagesWithContent);
     return searchIndex(index, query);
-  }, [query, pages, sections, notebooks, contents]);
+  }, [index, query]);
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>

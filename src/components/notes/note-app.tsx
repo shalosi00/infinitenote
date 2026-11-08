@@ -55,6 +55,7 @@ import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
 import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
 import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   addTagWithResult,
   collectTags,
@@ -122,6 +123,11 @@ export default function NoteApp() {
 
   const canvasApi = useRef<CanvasApi | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Compact screens cannot fit a flyout submenu beside the export menu (the
+  // menu hugs the right edge; the flyout flips left off-screen — the PDF
+  // orientations were unreachable below ~640px, found by the surface sweep).
+  // At mobile widths the two orientations render as plain items instead.
+  const compactLayout = useIsMobile();
   const [dropActive, setDropActive] = useState(false);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
@@ -584,6 +590,8 @@ export default function NoteApp() {
           variant="ghost"
           size="sm"
           className="ml-2 gap-2 text-muted-foreground"
+          aria-label={"Search pages"}
+          title={"Search pages (Ctrl+K)"}
           onClick={() => useAppStore.getState().setSearchOpen(true)}
         >
           <Search className="h-4 w-4" />
@@ -655,7 +663,16 @@ export default function NoteApp() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            {/* aria-label keeps the button named below sm, where the text
+                label is hidden and the trigger would otherwise be an unnamed
+                icon button (screen readers had nothing to announce). */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              aria-label={"Import"}
+              title={"Import"}
+            >
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">{"Import"}</span>
             </Button>
@@ -718,7 +735,13 @@ export default function NoteApp() {
         {/* export */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              aria-label={"Export"}
+              title={"Export"}
+            >
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">{"Export"}</span>
             </Button>
@@ -734,25 +757,42 @@ export default function NoteApp() {
             <DropdownMenuItem onClick={() => void handleExport("svg")}>
               <FileUp /> {"SVG vector"}
             </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
-                <Printer /> {"PDF — print (A4)"}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
+            {compactLayout ? (
+              <>
                 <DropdownMenuItem
                   data-testid="export-pdf-portrait"
                   onClick={() => void handleExport("pdf-portrait")}
                 >
-                  <Printer /> {"A4 portrait"}
+                  <Printer /> {"PDF — A4 portrait"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   data-testid="export-pdf-landscape"
                   onClick={() => void handleExport("pdf-landscape")}
                 >
-                  <Printer /> {"A4 landscape"}
+                  <Printer /> {"PDF — A4 landscape"}
                 </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+              </>
+            ) : (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
+                  <Printer /> {"PDF — print (A4)"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuItem
+                    data-testid="export-pdf-portrait"
+                    onClick={() => void handleExport("pdf-portrait")}
+                  >
+                    <Printer /> {"A4 portrait"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="export-pdf-landscape"
+                    onClick={() => void handleExport("pdf-landscape")}
+                  >
+                    <Printer /> {"A4 landscape"}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{"Everything"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("backup")}>
@@ -787,7 +827,11 @@ export default function NoteApp() {
 
         {/* mobile drawer */}
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetContent side="left" className="w-72 p-0">
+          {/* pt-10 drops the sidebar below the sheet's close button — without
+              it the X (absolute top-4 right-4) sits on top of the header
+              row's "Add notebook" button and taps land on the wrong control
+              (found by the ui-surface-sweep pairwise audit). */}
+          <SheetContent side="left" className="w-72 p-0 pt-10">
             <SheetTitle className="sr-only">{"Navigation"}</SheetTitle>
             <Sidebar onNavigate={() => setDrawerOpen(false)} />
           </SheetContent>

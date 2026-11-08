@@ -457,6 +457,55 @@
   E2E double-insert guard), then this bump (package.json / twa-manifest /
   gradle at 1.10.1 / versionCode 201, F-Droid Builds entry for v1.10.1).
 
+## 2026-11-08 — app-surface sweep: every dialog, menu and drawer audited (4 defects fixed)
+
+- Follow-up to the save-indicator session's five-viewport chrome audit, in
+  the same probe-first style: swept EVERY first-party surface this time —
+  themes/sync/trash/search/move-pages/shortcuts dialogs, shapes/import/
+  export dropdowns (+ the PDF flyout), the tag popover, page-row context
+  menus and the mobile navigation drawer — measuring pairwise bounding-box
+  intersections and viewport clipping of all interactive controls at
+  1280/900/768/390/320, with a strict zero-console-error guard over the
+  whole run (clean everywhere).
+- Defect 1 (all widths): the search dialog's input spanned the full row
+  under its absolutely-positioned close X — clicking near the input's right
+  edge closed the dialog and lost the query. The command input wrapper now
+  keeps 40px clear of the X; an E2E mis-click pin clicks the input's right
+  edge and asserts the dialog survives.
+- Defect 2 (mobile): the drawer's close X sat on top of the sidebar header's
+  "Add notebook" button — taps landed on the wrong control. The sheet
+  content now starts below the X (pt-10).
+- Defect 3 (mobile): the export menu's PDF flyout submenu flipped off-screen
+  left below ~640px (the parent menu hugs the right edge; Radix flips the
+  flyout left and it cannot fit) — BOTH orientations were unreachable on
+  phones. At mobile widths the orientations now flatten into plain menu
+  items (same testids, so the export E2Es keep working); desktop keeps the
+  flyout.
+- Defect 4 (<=320px): the trash dialog's row forced the dialog wider than
+  the viewport — Radix ScrollArea's viewport uses table-layout sizing and
+  measures rows at their PREFERRED width, so the nowrap-truncated title
+  stretched everything (purge button 30px off-screen). Swapped the list to
+  a plain overflow-y-auto container; the purge button also gained its
+  missing aria-label ("Delete forever") — it was an unnamed icon.
+- A11y: the header's Search/Import/Export triggers lost their accessible
+  names below sm/lg (icon-only after the labels hide) — aria-labels added;
+  pinned by an E2E asserting the names exist at 390px.
+- Perf: the search dialog rebuilt its full index — JSON.parse of EVERY
+  page's serialized scene — on every keystroke (the memo depended on the
+  query). Split into an index memo (tree/content deps) and a results memo
+  (query); keystrokes now only rank.
+- Probe lessons banked: bulk-delete auto-exits select mode (a probe that
+  toggles it off afterwards re-ENTERS it); Escape on a dialog opened from
+  the drawer closes only the dialog (nested portal consumes the key), so
+  the drawer stays open for the next sidebar action; the sheet slide-in
+  must be awaited to transform:none before measuring (mid-animation reads
+  phantom -2px offsets); Playwright traces (trace.zip → *.trace JSON) pin
+  down exactly which action sequence ran when a test dies silently.
+- Gates: 451 unit + 120 E2E green (dev); the new sweep spec plus the
+  search/pdf/export specs re-verified against a production build
+  (NEXT_PUBLIC_E2E=1 next build + standalone server). New regression
+  surface: e2e/ui-surface-sweep.spec.ts (6 checks).
+
 ## 2026-11-08 — save-indicator calm pass (user report: the "Saved" label flickered)
 
 - User report, two parts: the header's save indicator flickers; check
