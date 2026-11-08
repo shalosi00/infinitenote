@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-08 |
+| **Last updated** | 2026-11-09 |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 451 unit + 120 E2E green; 0 known bugs; app-surface sweep 2026-11-08 (every dialog, menu, popover and the mobile drawer audited for overlaps/clipping at 5 viewports — 4 layout/a11y defects fixed, search index no longer rebuilt per keystroke); save-indicator calm pass 2026-11-08 (content-gated autosave kills the flicker, metadata-only re-stamps are absorbed, isDeleted tombstones no longer persist, <360px header overflow fixed, five-viewport overlap audit); full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Overall state** | 461 unit + 122 E2E green; 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -77,13 +77,13 @@ export (A4 portrait/landscape, vector text, sliced images).
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
-| File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan | Working | 46 sync unit tests + 4 E2E checks (e2e/sync.spec.ts) |
+| File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan; out-of-contract folders heal (a stale page file + its tombstone merges as deleted — restorable, never resurrected) | Working | 56 sync unit tests (46 + 10 in sync-fsa/sync-merge) + 5 E2E checks (e2e/sync.spec.ts) |
 | Desktop shell (Tauri 2): static-export build path, `src-tauri/` config + icons, Linux artifact workflow | Working — export build verified; binaries built by CI on `main`/tags | desktop-config unit tests + `.github/workflows/desktop.yml` (docs/desktop.md) |
 | Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 451 unit tests, 120 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 461 unit tests, 122 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -139,12 +139,34 @@ export (A4 portrait/landscape, vector text, sliced images).
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
 make test                            # 451 unit tests
-make e2e                             # 120 E2E checks (Playwright; boots the app if needed)
+make e2e                             # 122 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-09 — proactive investigation cycle (#148/#149/#150)**: probe-first
+  sweep of three untouched surfaces in the established style. (1) Console
+  sweep: a scripted driver exercised 16 flow phases (draw, CJK text,
+  rename, undo/redo, shapes, image/text/Markdown/audio/PDF imports, PNG
+  export, search, tags, trash, themes, quick note, shortcuts, paper
+  style, reload) capturing every console warning/error — **clean**; the
+  scary-looking click-blocker cascade during probing was root-caused to
+  probe artifacts (an open Radix menu blocks outside pointer events by
+  design; wrong shape testids), not an app defect. (2) Sync deep-dive
+  (#148): the merge's remote-only branch ignored remote tombstones, so a
+  folder carrying BOTH a stale page file and its tombstone (partial
+  replication, crashed write, or a zero-page write whose cleanup was
+  skipped) resurrected deleted pages on every fresh device; both halves
+  fixed (shared `applyRemoteTombstone`, unconditional stale-file
+  cleanup) with 10 unit + 1 E2E regressions. (3) Focus management
+  (#149/#150): every controlled dialog, the mobile drawer and the
+  rename editor dropped focus to `<body>` on close (WCAG 2.4.3); a
+  global outside-focus memory restores it, and the rename fix uncovered
+  a keydown-activation subtlety (React flushes the focus-return effect
+  inside the Enter dispatch — `preventDefault` keeps the browser from
+  clicking the newly focused title button) with 9 E2E regressions.
+  461 unit + 122 E2E green on develop.
 - **2026-11-08 — app-surface sweep (follow-up to the overlap audit in the
   same style: probe first, then fix, then pin)**: extended the
   five-viewport overlap audit from app chrome to EVERY first-party

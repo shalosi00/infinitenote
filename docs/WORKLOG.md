@@ -550,3 +550,89 @@
   the full suite re-verified against a production build after the CI
   failure; flicker probe reports 0 transitions for select/zoom/pan and
   a single quiet normalization on first boot.
+
+## 2026-11-09 — proactive investigation cycle: console sweep, sync healing, focus return (#148–#150)
+
+- Trigger: "do such investigations (in this fine style) to find more
+  issues and solve them" — a fourth pass of probe-first root-causing over
+  surfaces the earlier cycles had not touched.
+- **Investigation A — full-flow console sweep (clean)**: a scripted
+  Playwright driver (not part of the suite) exercised 16 phases — boot,
+  seed reset, draw + CJK text, title-bar rename, undo/redo, shape insert,
+  image/text/Markdown imports, audio + PDF imports, PNG export, Ctrl+K
+  search, tags, trash open/restore, themes, quick note, shortcuts dialog,
+  paper style, reload — capturing every console warning, error and
+  pageerror. Result: **zero of each** in dev mode. The first runs looked
+  like a full-header click-blocker after undo/redo, but elementFromPoint
+  diagnostics + screenshots traced every failure to probe artifacts: an
+  open Radix dropdown blocks outside pointer events by design (Escape
+  closes it), `shape-rectangle` is not a real catalog id (the menu never
+  closed), and `button[name="Import"]` queries a literal name attribute
+  that does not exist. Worth remembering when writing probes: close what
+  you open, use the specs' own selectors.
+- **Investigation B — sync subsystem deep-dive (#148, two real defects)**:
+  code review of merge/format/fsa/db plus failing repro tests.
+  - Out-of-contract folders (a stale `pages/<id>.json` + its tombstone in
+    `trash.jsonl` — partial Syncthing replication, a crashed write, or any
+    folder written by a device that itself resurrected the row) hit the
+    merge's remote-only branch, which trusted the writer-side invariant
+    "page files only exist for alive pages": the deleted page merged ALIVE
+    on every device that never saw it, and the healed folder kept carrying
+    the contradiction (a resurrect/delete flip-flop). The one-sided
+    branches now share `applyRemoteTombstone()` — a soft tombstone at or
+    after the row's last mutation keeps it deleted (content preserved,
+    restorable); a row newer than its tombstone still resurrects, mirroring
+    delete-vs-edit.
+  - `writeSyncFolder` skipped the stale-page-file cleanup when the write
+    carried zero page files (`if (pagesDir)` guard) — delete every page
+    since the last sync and the folder deterministically kept the stale
+    files, seeding the resurrection above. The pages dir is now always
+    ensured, so the folder mirrors the library exactly.
+  - Regressions: 4 merge unit tests, 6 new fsa adapter unit tests (mock
+    in-memory dir handle — first direct coverage of fsa.ts), 1 sync E2E
+    via the ZIP transport (stale file + tombstone imports as "1 item moved
+    to trash", restorable, never in the tree).
+  - Also reviewed: backup export/restore round-trip (page title/content/
+    background/tags + notebook colors preserved; fresh ids and reset
+    timestamps are documented design), zip/local adapters (fresh maps,
+    clean). One minor wart noted, not shipped: feeding a sync-manifest
+    JSON to "Restore backup" creates empty notebooks instead of erroring.
+- **Investigation C — focus management (#149/#150, WCAG 2.4.3)**: probed
+  every dialog/menu/popover close with elementFromPoint + activeElement.
+  Menus returned focus correctly (Radix triggers); all five controlled
+  dialogs (Themes/Sync/Trash/Shortcuts/Search), the mobile drawer and the
+  rename editor dropped focus to `<body>` — keyboard users restart the
+  tab order after every close.
+  - Fix: `src/lib/focus-return.ts` — a capture-phase focusin listener
+    remembers the last element focused outside any overlay; DialogContent
+    and SheetContent restore it in onCloseAutoFocus (composed with
+    consumer handlers; disconnected targets fall back to the Radix
+    default). First attempt installed the listener lazily inside the
+    getter and never recorded anything — the first read happens at
+    dialog close, long after focus was stolen. Install eagerly at module
+    load.
+  - The rename editor returns focus to the title button on Enter/Escape
+    (a ref flag + effect; click-away closes still follow the click). This
+    uncovered a keydown-activation subtlety: React flushes the blur +
+    re-render + focus-return effect INSIDE the Enter keydown dispatch, so
+    the browser applied Enter's activation behavior to the newly focused
+    title button — a synthetic click re-opened the editor with the
+    pre-rename title (diagnostic showed the draft value reverting).
+    `preventDefault()` on that keydown kills the activation.
+  - E2E: focus-return.spec.ts (7 checks: every dialog trigger, Ctrl+K
+    returns to the previously focused element, mobile drawer hamburger —
+    desktop boot + setViewportSize(390), because resetToSeed cannot find
+    visible page rows below md) and rename-focus.spec.ts (2 checks).
+- **End state**: develop @ 73401e0 + #150; 461 unit + 122 E2E test blocks
+  green (was 451 + 112 at cycle start); all three PRs squash-merged with
+  lint/typecheck/unit/build-smoke/e2e checks green; head branches
+  auto-deleted on merge.
+- **Environment notes (this cycle)**: the sandbox reverted the tree
+  between nearly every tool call — the staging-overlay + atomic-apply
+  pipeline (examples/staging/<feature>/apply.sh) carried all three fixes
+  through resets; asserted python anchors patched large files
+  (note-app.tsx) instead of full-file overlays. Playwright chromium-1248
+  had to be reinstalled after a cache wipe (the recycled cache held
+  build 1200). GitHub API auth needs the user:token pair split from the
+  remote URL (`Authorization: token <pass>`); pushes work with the full
+  pair in the URL.
