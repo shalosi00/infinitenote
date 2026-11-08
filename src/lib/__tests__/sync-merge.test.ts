@@ -433,3 +433,112 @@ describe("plan manifest", () => {
     expect(a.manifest.exportedAt).toBe(MERGE_NOW);
   });
 });
+
+/* ----------------- out-of-contract folders (stale + tombstone) ----------- */
+
+describe("out-of-contract folders: stale rows heal against their tombstones", () => {
+  // The folder can carry BOTH a stale row and its tombstone: a page file the
+  // writer could not remove, a partially replicated directory (Syncthing
+  // replicates file-by-file), a crashed write. A device that never saw the
+  // row must merge it as DELETED — resurrecting it would flip-flop against
+  // every device that holds the trashed row.
+
+  it("a stale remote page file plus its tombstone stays deleted on a fresh device", () => {
+    // Fresh device: only ever saw p1.
+    const local: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [pg("p1", "s1", { title: "Alpha", content: scene("l"), order: 1 })],
+    };
+    // Folder: p2's page file (stale, alive-looking) AND p2's tombstone.
+    const remote: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [
+        pg("p1", "s1", { title: "Alpha", content: scene("l"), order: 1 }),
+        pg("p2", "s1", { title: "Beta", content: scene("stale"), order: 2 }),
+      ],
+    };
+    const plan = run({
+      local,
+      remote,
+      base: null,
+      localPurges: [],
+      remoteTrash: [{ id: "p2", kind: "page", at: T + 100, purged: false, title: "Beta" }],
+    });
+
+    const p2 = plan.pages.find((p) => p.id === "p2");
+    expect(p2?.deletedAt).toBe(T + 100); // deleted, not resurrected
+    expect(p2?.content).toBe(scene("stale")); // stale content survives → restorable
+    // the re-exported tombstone log still carries the delete
+    expect(plan.trashLog.find((e) => e.id === "p2")?.at).toBe(T + 100);
+    // and the summary does not count a resurrected add
+    expect(plan.summary.pagesAdded).toBe(0);
+  });
+
+  it("a stale remote section row plus its tombstone stays deleted", () => {
+    const local: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [],
+    };
+    const remote: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1"), sec("s2", "nb1", { name: "Ghost", order: 2 })],
+      pages: [],
+    };
+    const plan = run({
+      local,
+      remote,
+      base: null,
+      localPurges: [],
+      remoteTrash: [{ id: "s2", kind: "section", at: T + 100, purged: false, title: "Ghost" }],
+    });
+    expect(plan.sections.find((s) => s.id === "s2")?.deletedAt).toBe(T + 100);
+  });
+
+  it("a remote row NEWER than its tombstone still wins (newer edit resurrects)", () => {
+    // A device resurrected the page and edited it at T+200; the tombstone
+    // (T+100) is the older event → the newer edit wins, exactly like the
+    // delete-vs-edit rule for rows both sides have.
+    const local: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [],
+    };
+    const remote: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [pg("p9", "s1", { title: "Edited after delete", updatedAt: T + 200 })],
+    };
+    const plan = run({
+      local,
+      remote,
+      base: null,
+      localPurges: [],
+      remoteTrash: [{ id: "p9", kind: "page", at: T + 100, purged: false, title: "Old title" }],
+    });
+    const p9 = plan.pages.find((p) => p.id === "p9");
+    expect(p9?.deletedAt).toBeNull(); // alive — the newer edit resurrects
+    expect(plan.summary.pagesAdded).toBe(1);
+    // the stale tombstone is dropped from the re-export (it lost)
+    expect(plan.trashLog.find((e) => e.id === "p9")).toBeUndefined();
+  });
+
+  it("a purge tombstone still wins over a stale row, no matter its timestamp", () => {
+    const local: LibrarySnapshot = { notebooks: [], sections: [], pages: [] };
+    const remote: LibrarySnapshot = {
+      notebooks: [nb("nb1")],
+      sections: [sec("s1", "nb1")],
+      pages: [pg("pz", "s1", { title: "Purged", updatedAt: T + 500 })],
+    };
+    const plan = run({
+      local,
+      remote,
+      base: null,
+      localPurges: [],
+      remoteTrash: [{ id: "pz", kind: "page", at: T + 100, purged: true, title: "Purged" }],
+    });
+    expect(plan.pages.find((p) => p.id === "pz")).toBeUndefined(); // purge: final
+  });
+});

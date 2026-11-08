@@ -192,4 +192,55 @@ test.describe.serial("file-based sync via ZIP (issue #37)", () => {
     );
     await page.keyboard.press("Escape");
   });
+
+  test("a stale page file plus its tombstone does not resurrect the page", async () => {
+    // Out-of-contract folder: pages/e2e-stale-page.json still exists while
+    // trash.jsonl records the page's delete. Devices that never saw the page
+    // must merge it as DELETED (restorable from trash), not resurrect it —
+    // otherwise deleted pages flip-flop back alive on every fresh device.
+    const t = Date.now();
+    const manifest: Manifest = {
+      app: "infinitenote",
+      format: "sync-folder",
+      version: 1,
+      exportedAt: t,
+      notebooks: [{ id: "e2e-nb-stale", name: "Stale folder", color: "teal", order: 1, createdAt: t, updatedAt: t }],
+      sections: [{ id: "e2e-sec-stale", notebookId: "e2e-nb-stale", name: "Ghosted", order: 1, createdAt: t, updatedAt: t }],
+      pages: [],
+    };
+    await openSyncDialog(page);
+    await importZip(page, {
+      "manifest.json": JSON.stringify(manifest, null, 2),
+      "pages/e2e-stale-page.json": JSON.stringify({
+        id: "e2e-stale-page",
+        sectionId: "e2e-sec-stale",
+        title: "Stale page",
+        order: 1,
+        createdAt: t,
+        updatedAt: t,
+        scene: { elements: [{ type: "rectangle", id: "r1" }], files: {} },
+      }),
+      "trash.jsonl": `${JSON.stringify({ id: "e2e-stale-page", kind: "page", at: t + 1000, purged: false, title: "Stale page" })}\n`,
+    });
+
+    // the notebook/section arrive; the page lands in the trash, not the tree
+    await expect(page.locator('[data-testid="sync-summary"]')).toContainText(
+      "1 item moved to trash",
+      { timeout: 20_000 }
+    );
+    await page.keyboard.press("Escape");
+
+    const nbButton = page.getByRole("button", { name: "Stale folder", exact: true });
+    await expect(nbButton).toBeVisible();
+    await nbButton.click();
+    const secButton = page.getByRole("button", { name: "Ghosted", exact: true });
+    await expect(secButton).toBeVisible();
+    await secButton.click();
+    await expect(page.getByRole("button", { name: "Stale page", exact: true })).toHaveCount(0);
+
+    // …and it is restorable from the trash (the stale content survived)
+    await page.getByRole("button", { name: "Trash" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Stale page (page)");
+    await page.keyboard.press("Escape");
+  });
 });

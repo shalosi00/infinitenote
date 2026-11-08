@@ -21,6 +21,11 @@
  *   final — no stale remote can resurrect a purged row.
  * - **Orders** are renumbered densely per parent after the merge, so two
  *   devices that both appended pages converge without collisions.
+ * - **Out-of-contract folders heal**: the folder can carry BOTH a stale row
+ *   (a page file the writer could not remove, a partially replicated
+ *   directory) and that row's tombstone. A remote-only row whose soft
+ *   tombstone is at-or-after the row's last mutation merges as deleted —
+ *   deleted rows must not resurrect on devices that never saw them.
  *
  * Pure: no I/O, injectable clock, fully unit-tested.
  */
@@ -114,6 +119,22 @@ interface BaseRowLike {
   updatedAt: number;
 }
 
+/**
+ * Merge a remote-only (or local-only) row against the folder's tombstones.
+ * Normally a one-sided row is a plain add (a local soft delete always leaves
+ * the trashed row in `local`), but the folder can carry BOTH a stale row and
+ * its tombstone — a page file the writer could not remove, a partially
+ * replicated directory, a crashed write. A soft tombstone at-or-after the
+ * row's last mutation keeps the row deleted; the trashed row keeps the
+ * stale content so it stays restorable.
+ */
+function applyRemoteTombstone<T extends RowLike>(row: T, tomb: TrashEntry | undefined): T {
+  if (tomb && !tomb.purged && tomb.at >= eventTime(row)) {
+    return { ...row, deletedAt: tomb.at, updatedAt: Math.max(row.updatedAt, tomb.at) };
+  }
+  return row;
+}
+
 /** Whole-row LWW for tree rows (notebooks/sections). */
 function mergeTreeRows<T extends RowLike>(
   local: Map<string, T>,
@@ -132,16 +153,11 @@ function mergeTreeRows<T extends RowLike>(
     } else if (l) {
       // Remote never had it (local add — keep), or removed it: a soft
       // tombstone at-or-after the local row's last mutation deletes it.
-      const tomb = remoteTrash.get(id);
-      if (tomb && !tomb.purged && tomb.at >= eventTime(l)) {
-        merged.set(id, { ...l, deletedAt: tomb.at, updatedAt: Math.max(l.updatedAt, tomb.at) });
-      } else {
-        merged.set(id, l);
-      }
+      merged.set(id, applyRemoteTombstone(l, remoteTrash.get(id)));
     } else if (r) {
-      // Remote-only row: a local soft delete always leaves the trashed row
-      // in `local`, so this is a plain remote add.
-      merged.set(id, r);
+      // Remote-only row: a plain remote add, unless a stale row + tombstone
+      // pair says it is deleted (out-of-contract folder healing).
+      merged.set(id, applyRemoteTombstone(r, remoteTrash.get(id)));
     }
     // neither side has it (base only) → row is gone on both: nothing to merge
   }
@@ -214,14 +230,13 @@ function mergePages(
       }
       merged.set(id, eventTime(l) >= eventTime(r) ? l : r); // plain LWW
     } else if (l) {
-      const tomb = remoteTrash.get(id);
-      if (tomb && !tomb.purged && tomb.at >= eventTime(l)) {
-        merged.set(id, { ...l, deletedAt: tomb.at, updatedAt: Math.max(l.updatedAt, tomb.at) });
-      } else {
-        merged.set(id, l);
-      }
+      // Remote never had it (local add — keep), or removed it: a soft
+      // tombstone at-or-after the local row's last mutation deletes it.
+      merged.set(id, applyRemoteTombstone(l, remoteTrash.get(id)));
     } else if (r) {
-      merged.set(id, r);
+      // Remote-only row: a plain remote add, unless a stale row + tombstone
+      // pair says it is deleted (out-of-contract folder healing).
+      merged.set(id, applyRemoteTombstone(r, remoteTrash.get(id)));
     }
   }
   return { merged, conflicts };
