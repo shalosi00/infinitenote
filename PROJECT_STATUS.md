@@ -9,7 +9,7 @@
 | **Last updated** | 2026-11-08 |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 434 unit + 107 E2E green; 0 known bugs; full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError, e2e helper flake fix); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Overall state** | 451 unit + 114 E2E green; 0 known bugs; save-indicator calm pass 2026-11-08 (content-gated autosave kills the flicker, metadata-only re-stamps are absorbed, isDeleted tombstones no longer persist, <360px header overflow fixed, five-viewport overlap audit); full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -58,7 +58,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 |---|---|---|
 | Notebook/Section/Page CRUD, rename, colors, reorder, duplicate page | Working | 34 E2E checks + unit tests |
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
-| Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
+| Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch, save-indicator-calm: steady label under viewport-only churn, undo-inside-debounce never persists) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
 | Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
 | Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts; the full backup restores into a wiped app through the UI | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts + e2e/import-export-roundtrip.spec.ts (PNG magic/IHDR bytes, SVG markup content, scene export → re-import round-trip, backup export → wipe → UI restore round-trip, 8 checks) |
@@ -82,7 +82,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 401 unit tests, 86 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 451 unit tests, 114 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -137,12 +137,35 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 401 unit tests
-make e2e                             # 86 E2E checks (Playwright; boots the app if needed)
+make test                            # 451 unit tests
+make e2e                             # 114 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
+
+- **2026-11-08 — save-indicator calm pass (user report: "Saved" flickered;
+  "check if any buttons overlap")**: Excalidraw's onChange fires for
+  appState-only updates (pan, zoom, selection, tool switches) and each one
+  used to schedule an autosave of identical content — every viewport
+  interaction blinked the indicator. Autosave is now gated on a
+  `sceneSignature` (id@version:status per element + file set,
+  order-independent) primed from `initialData`; a scene that returns to the
+  persisted state (edit undone inside the debounce window) drops its pending
+  stash instead of letting a stale timer write it; the "Saving…" label is
+  deferred 200ms so fast IndexedDB commits never flash it. Root-causing the
+  undo path found a real data bug: onChange delivers `isDeleted` tombstones
+  (undo/redo leftovers), and they were persisted — `sanitizeScene` now drops
+  them (and their files), so DB rows, sync folders and backups stop
+  accumulating invisible garbage; tombstone-polluted pages self-heal through
+  one normalizing save. The new five-viewport chrome overlap audit found one
+  real defect: below 360px the header pushed the theme toggle past the
+  viewport edge — it now yields below 360px (theming stays reachable via the
+  sidebar gallery). New tests: 10 sceneSignature + 5 structural-fingerprint + 2
+  tombstone-filter unit tests; E2E `save-indicator-calm.spec.ts` (organic autosave, steady label,
+  undo-never-persists) and `ui-overlap.spec.ts` (1280/900/768/390/320 audit);
+  dev probes `scripts/flicker-probe.ts` (50ms label sampling) and
+  `scripts/header-probe.ts` (320px header boxes). 451 unit + 114 E2E green.
 
 - **2026-11-08 — full import/export verification pass**: every transfer
   surface now has content-level E2E. New e2e/import-export-roundtrip.spec.ts

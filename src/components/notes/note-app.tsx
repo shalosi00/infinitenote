@@ -761,12 +761,16 @@ export default function NoteApp() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Separator orientation="vertical" className="mx-1 h-6" />
+        {/* Below 360px the header cannot fit every control at the 36px touch
+            target — the theme toggle yields (light/dark + accents stay
+            reachable via the sidebar Themes gallery) instead of overflowing
+            the viewport edge. */}
+        <Separator orientation="vertical" className="mx-1 h-6 max-[360px]:hidden" />
 
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 max-[360px]:hidden"
           aria-label={"Toggle theme"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >

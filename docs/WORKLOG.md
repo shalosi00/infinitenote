@@ -456,3 +456,48 @@
   ships as **v1.10.1**: PR #132 (fresh crypto.randomUUID() per insert +
   E2E double-insert guard), then this bump (package.json / twa-manifest /
   gradle at 1.10.1 / versionCode 201, F-Droid Builds entry for v1.10.1).
+
+## 2026-11-08 — save-indicator calm pass (user report: the "Saved" label flickered)
+
+- User report, two parts: the header's save indicator flickers; check
+  whether any buttons overlap. Reproduced with a 50ms-sampling probe
+  (`scripts/flicker-probe.ts`): the label strobed "Saving…"/"Saved" on
+  pure idle after boot (scene-restore replay), and on every selection
+  click, zoom and pan — 12 label transitions across four phases with
+  zero content edits.
+- Root cause 1: Excalidraw's onChange fires for appState-only updates
+  too, and the autosave stash+debounce ran unconditionally. Fix: a
+  `sceneSignature` (id@version:image-status per element + sorted file
+  set, order-independent — z-order changes bump element versions in
+  0.18, verified in the library source) gates the stash; the baseline
+  is primed from `initialData`, so the mount replay no longer counts
+  as an edit.
+- Root cause 2 (found while writing the undo regression test): undo
+  restores the pre-edit scene but onChange still carried the
+  soft-deleted element (`isDeleted: true`, version-bumped) — so the
+  gate missed AND the tombstone was persisted. Every undo-of-create
+  had been writing invisible garbage into the DB, sync folders and
+  backups since v1.0. `sanitizeScene` now drops tombstones and their
+  files at the persistence boundary; polluted pages self-heal through
+  one normalizing save. An edit undone inside the debounce window now
+  drops its pending stash (the stale timer can never write the
+  superseded scene) — pinned by E2E.
+- Root cause 3 (cosmetic): even legitimate saves flashed "Saving…" for
+  a few ms. The label is deferred 200ms — fast IndexedDB commits jump
+  straight to "Saved"; slow saves and failures stay honest.
+- Overlap audit (`e2e/ui-overlap.spec.ts`): pairwise bounding-box
+  intersections of every visible interactive control in the header,
+  title bar and sidebar across 1280/900/768/390/320 viewports, plus
+  viewport-clipping. One real defect: at 320px the header overflowed
+  by 29px and pushed the theme toggle past the edge — it now yields
+  below 360px (theming stays reachable via the sidebar Themes
+  gallery); all other viewports were already clean.
+- Staging-bundle discipline paid for itself: assembling the bundle from
+  a main-based note-app.tsx silently clobbered develop's #137
+  RestoreError handling — caught by the roundtrip E2E's
+  browser-must-stay-error-free guard, rebuilt from the develop base.
+- 451 unit (+17: sceneSignature ×10, structural fingerprint ×5,
+  tombstone filter ×2) and 114 E2E (+7: calm ×2, overlap ×5) green —
+  the full suite re-verified against a production build after the CI
+  failure; flicker probe reports 0 transitions for select/zoom/pan and
+  a single quiet normalization on first boot.
