@@ -9,7 +9,7 @@
 | **Last updated** | 2026-11-08 |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 451 unit + 114 E2E green; 0 known bugs; save-indicator calm pass 2026-11-08 (content-gated autosave kills the flicker, metadata-only re-stamps are absorbed, isDeleted tombstones no longer persist, <360px header overflow fixed, five-viewport overlap audit); full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Overall state** | 451 unit + 120 E2E green; 0 known bugs; app-surface sweep 2026-11-08 (every dialog, menu, popover and the mobile drawer audited for overlaps/clipping at 5 viewports — 4 layout/a11y defects fixed, search index no longer rebuilt per keystroke); save-indicator calm pass 2026-11-08 (content-gated autosave kills the flicker, metadata-only re-stamps are absorbed, isDeleted tombstones no longer persist, <360px header overflow fixed, five-viewport overlap audit); full import/export verification pass 2026-11-08 (export payloads + scene/backup round-trips E2E, typed RestoreError); full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -62,14 +62,15 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
 | Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
 | Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts; the full backup restores into a wiped app through the UI | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts + e2e/import-export-roundtrip.spec.ts (PNG magic/IHDR bytes, SVG markup content, scene export → re-import round-trip, backup export → wipe → UI restore round-trip, 8 checks) |
-| Cross-page search (Ctrl+K — content index reloads on every open), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
+| Cross-page search (Ctrl+K — content index reloads on every open and is built once per open, not per keystroke), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
-| Dark mode, mobile drawer navigation | Working | E2E + visual review |
+| Dark mode, mobile drawer navigation | Working | E2E + visual review | 
+| App-surface overlap/clipping sweep: every first-party dialog, dropdown, popover, context menu and the mobile drawer — pairwise bounding-box + viewport-clipping audit of all interactive controls at 1280/900/768/390/320, zero-console-error guard, named-controls a11y pin | Working | 6 E2E checks (e2e/ui-surface-sweep.spec.ts, also verified against a production build) |
 | UI: English-only chrome (the v1.7 en/zh-CN i18n layer — next-intl, catalogs, language toggle — was removed in v1.9; single locale, no switcher); CJK content (titles, tags, search, IME-safe input) fully supported | Working | plural/sync-summary/generated-names unit tests + E2E (IME renames, themes labels) |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | Hardened platform: autosave verifies the write landed (no false "Saved"), failed boots offer Retry, shape library survives reloads, recordings survive mic failures and minute-collisions, e2e hooks require a `NEXT_PUBLIC_E2E=1` build, pdfjs-dist pinned to the vendored worker with a drift test, `next build` fails on type errors | Working | hardening/boot-retry/save-content/reveal-focus unit tests + recorder-library/state-freshness E2E |
@@ -82,7 +83,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 451 unit tests, 114 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 451 unit tests, 120 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -138,12 +139,34 @@ export (A4 portrait/landscape, vector text, sliced images).
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
 make test                            # 451 unit tests
-make e2e                             # 114 E2E checks (Playwright; boots the app if needed)
+make e2e                             # 120 E2E checks (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-08 — app-surface sweep (follow-up to the overlap audit in the
+  same style: probe first, then fix, then pin)**: extended the
+  five-viewport overlap audit from app chrome to EVERY first-party
+  surface — six dialogs, five dropdown menus, the tag popover, page-row
+  context menus and the mobile navigation drawer — plus a
+  zero-console-error guard across the whole run (clean). Four real
+  defects fixed: (1) the search dialog's input ran under its close
+  button, so a click near the input's right edge closed the dialog and
+  lost the query — the input row now keeps clear of the X (pinned by a
+  mis-click E2E); (2) the mobile drawer's close X sat on top of the
+  "Add notebook" button — the sheet content now starts below it; (3)
+  the export menu's PDF flyout submenu flipped off-screen left below
+  ~640px, making both orientations unreachable on phones — at mobile
+  widths the orientations flatten into plain menu items; (4) the trash
+  dialog's row forced the dialog wider than a 320px viewport (Radix
+  ScrollArea's table-layout viewport measures at preferred width) and
+  its purge button was an unnamed icon — plain overflow container +
+  aria-label. Also: the header's Search/Import/Export triggers keep
+  accessible names below sm/lg (icon-only but labeled), and the search
+  dialog no longer rebuilds its full-page JSON.parse index on every
+  keystroke (index memo split from the query memo). 451 unit + 120 E2E
+  green (dev + production build for the new spec).
 - **2026-11-08 — save-indicator calm pass (user report: "Saved" flickered;
   "check if any buttons overlap")**: Excalidraw's onChange fires for
   appState-only updates (pan, zoom, selection, tool switches) and each one

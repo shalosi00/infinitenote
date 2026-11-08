@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAppStore } from "@/lib/store";
 import * as db from "@/lib/notes-db";
@@ -44,7 +43,7 @@ export function TrashDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" data-testid="trash-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trash2 className="h-4 w-4" /> {"Trash"}
@@ -54,7 +53,13 @@ export function TrashDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-96 rounded-md border p-2">
+        {/* A plain overflow container, not a Radix ScrollArea: its viewport
+            uses table-layout sizing, which measures rows at their PREFERRED
+            width — a long nowrap-truncated title then stretched the dialog
+            past a 320px viewport and pushed the purge button off-screen
+            (found by the ui-surface-sweep audit). Block layout truncates
+            correctly. */}
+        <div className="max-h-96 overflow-y-auto rounded-md border p-2">
           {empty && (
             <p className="py-8 text-center text-sm text-muted-foreground">{"Trash is empty."}</p>
           )}
@@ -88,7 +93,7 @@ export function TrashDialog() {
               />
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
         <Separator />
         <DialogFooter className="text-xs text-muted-foreground">
@@ -119,7 +124,7 @@ function TrashRow({
         {icon}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-      <Button variant="ghost" size="sm" className="h-8 gap-1.5" onClick={onRestore}>
+      <Button variant="ghost" size="sm" className="h-8 gap-1.5 shrink-0" onClick={onRestore}>
         <RotateCcw className="h-3.5 w-3.5" /> {"Restore"}
       </Button>
       {confirmPurge ? (
@@ -130,7 +135,9 @@ function TrashRow({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 text-destructive hover:text-destructive"
+          className="h-8 shrink-0 text-destructive hover:text-destructive"
+          aria-label={"Delete forever"}
+          title={"Delete forever"}
           onClick={() => setConfirmPurge(true)}
         >
           <Trash2 className="h-3.5 w-3.5" />

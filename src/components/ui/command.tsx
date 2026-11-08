@@ -72,7 +72,11 @@ function CommandInput({
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
+      // pr-10 keeps the input's box clear of the dialog's absolutely-positioned
+      // close button (top-4 right-4): without it the input spans the full row
+      // and clicks near its right edge hit the X — closing the dialog and
+      // losing the query (found by the ui-surface-sweep pairwise audit).
+      className="flex h-9 items-center gap-2 border-b px-3 pr-10"
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
