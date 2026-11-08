@@ -52,3 +52,6 @@ local-*
 /coverage
 .vercel
 tool-results/
+
+# staged-feature bundles: apply.sh syncs these into __tests__/ at apply time
+src/lib/__tests_stage__/
