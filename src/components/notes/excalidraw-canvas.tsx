@@ -20,7 +20,7 @@ import * as db from "@/lib/notes-db";
 import type { ScenePayload } from "@/lib/types";
 import type { PageBackground } from "@/lib/types";
 import type { CanvasApi } from "@/lib/excalidraw-utils";
-import { sanitizeScene } from "@/lib/excalidraw-utils";
+import { sanitizeScene, sceneSignature, structuralSceneJson } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
   getScenePayload,
@@ -52,6 +52,13 @@ if (typeof window !== "undefined") {
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 700;
+/**
+ * Show "Saving…" only when the write actually takes longer than this.
+ * Fast IndexedDB commits completing within the window leave the indicator
+ * untouched, so a burst of quick saves (stroke … pause … stroke) no longer
+ * blinks the label — slow saves and failures still show honest states.
+ */
+const SAVE_LABEL_DELAY_MS = 200;
 const LIBRARY_STORAGE_KEY = "infinitenote.library";
 
 /**
@@ -170,6 +177,21 @@ export default function ExcalidrawCanvas({
   const latestScene = useRef<ScenePayload | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ruledLayerRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Signature of the scene content as last successfully saved (or as loaded
+   * on mount, before the first onChange). Autosave gate: when the current
+   * onChange signature matches, the change was appState-only (pan / zoom /
+   * selection) and re-saving would only blink the indicator (issue: the
+   * "Saved" label flickered on every viewport interaction).
+   */
+  const lastSavedSig = useRef<string | null>(null);
+  /**
+   * Structural fingerprint (volatile metadata stripped) of what the DB
+   * holds. Second opinion of the gate: a signature that moved while the
+   * structure did not is Excalidraw re-stamping its own metadata (scene
+   * restore, font re-measure) — absorbed into the baseline, never written.
+   */
+  const lastSavedStructure = useRef<string | null>(null);
 
   /*
    * Latest-value refs (issue #72): Excalidraw invokes the `excalidrawAPI`
@@ -197,11 +219,16 @@ export default function ExcalidrawCanvas({
     const payload = latestScene.current;
     if (!payload) return;
     latestScene.current = null; // consumed
+    // Defer the "Saving…" label: commits that finish quickly never show it.
+    const labelTimer = setTimeout(() => onSaveIndicator("saving"), SAVE_LABEL_DELAY_MS);
     try {
-      onSaveIndicator("saving");
       await db.savePageContent(pageId, payload);
+      clearTimeout(labelTimer);
+      lastSavedSig.current = sceneSignature(payload);
+      lastSavedStructure.current = structuralSceneJson(payload);
       onSaveIndicator("saved");
     } catch {
+      clearTimeout(labelTimer);
       onSaveIndicator("error");
     }
   }, [pageId, onSaveIndicator]);
@@ -441,8 +468,36 @@ export default function ExcalidrawCanvas({
       // image elements whose file data is registered flip "pending" →
       // "saved" (issue #122) — Excalidraw 0.18's own insert paths (paste,
       // image tool) never do that flip themselves.
-      latestScene.current = sanitizeScene({ elements: [...elements], files });
+      const payload = sanitizeScene({ elements: [...elements], files });
       if (ruledLayerRef.current) syncRuledLayer(appState);
+      // Autosave gate: Excalidraw fires onChange for appState-only updates
+      // too (pan, zoom, selection, tool switches) — none of that changes
+      // what savePageContent persists, so re-saving would only blink the
+      // "Saved" indicator on every viewport interaction. Skip when the
+      // persisted content is unchanged since the last save.
+      const sig = sceneSignature(payload);
+      const unchanged =
+        sig === lastSavedSig.current ||
+        // signature moved but the structure did not: Excalidraw re-stamped
+        // its own metadata (restore / re-measure / normalization) — absorb
+        // the fresh signature into the baseline instead of writing
+        (lastSavedStructure.current !== null &&
+          structuralSceneJson(payload) === lastSavedStructure.current);
+      if (unchanged) {
+        // The scene is exactly what is persisted (modulo Excalidraw's own
+        // metadata stamps) — pure viewport noise, an edit undone inside the
+        // debounce window, or a metadata re-stamp. Any pending stash is now
+        // superseded and MUST be dropped (and its timer cancelled): letting
+        // it fire would persist the superseded scene.
+        lastSavedSig.current = sig;
+        latestScene.current = null;
+        if (saveTimer.current) {
+          clearTimeout(saveTimer.current);
+          saveTimer.current = null;
+        }
+        return;
+      }
+      latestScene.current = payload;
       scheduleSave();
     },
     [scheduleSave, syncRuledLayer]
@@ -483,6 +538,18 @@ export default function ExcalidrawCanvas({
         renderEmbeddable={renderEmbeddable}
         initialData={async () => {
           const payload = await db.getPageContent(pageId);
+          // Prime the autosave gate with the loaded content: Excalidraw
+          // replays the restored scene through onChange once on mount, and
+          // that replay must not count as an edit (it would flash the save
+          // indicator on every page open). Scenes that the sanitizer would
+          // change (legacy "pending" images) intentionally miss the gate
+          // and get normalized by the first save.
+          if (payload) {
+            lastSavedSig.current = sceneSignature(payload);
+            lastSavedStructure.current = structuralSceneJson(
+              sanitizeScene({ elements: payload.elements, files: payload.files })
+            );
+          }
           return {
             elements: (payload?.elements ?? []) as unknown as ExcalidrawElement[],
             files: (payload?.files ?? {}) as Record<string, BinaryFileData>,
