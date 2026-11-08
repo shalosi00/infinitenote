@@ -59,6 +59,36 @@ describe("sanitizeScene", () => {
     expect(sanitizeScene({ elements: [], files: {} })).toEqual({ elements: [], files: {} });
   });
 
+  it("drops soft-deleted tombstones (undo/redo leftovers) from the payload", () => {
+    // Excalidraw's onChange delivers deleted elements too; persisting them
+    // bloats the DB/sync/backup with invisible garbage AND (pre-fix) made
+    // every undo-of-create look like a content change to the autosave gate.
+    const payload = {
+      elements: [
+        { type: "text", id: "t1", text: "kept" },
+        { type: "rectangle", id: "r1", isDeleted: true },
+        { type: "text", id: "t2", text: "also kept" },
+      ],
+      files: {},
+    };
+    const out = sanitizeScene(payload);
+    expect(out.elements.map((e) => (e as { id: string }).id)).toEqual(["t1", "t2"]);
+  });
+
+  it("drops files referenced only by deleted images", () => {
+    const file = (id: string) => ({ id, dataURL: `data:${id}`, mimeType: "image/png", created: 1 });
+    const payload = {
+      elements: [
+        { type: "image", id: "live", fileId: "f-live", status: "saved" },
+        { type: "image", id: "gone", fileId: "f-gone", isDeleted: true, status: "saved" },
+      ],
+      files: { "f-live": file("f-live"), "f-gone": file("f-gone") },
+    };
+    const out = sanitizeScene(payload);
+    expect(out.elements.map((e) => (e as { id: string }).id)).toEqual(["live"]);
+    expect(Object.keys(out.files)).toEqual(["f-live"]);
+  });
+
   it("drops broken file records", () => {
     const payload = {
       elements: [{ type: "image", fileId: "f1" }],
