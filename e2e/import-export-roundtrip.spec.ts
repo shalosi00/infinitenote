@@ -74,7 +74,18 @@ async function renameOpenPage(page: Page, title: string): Promise<void> {
   await page.locator('button[title="Click to rename this page"]').click();
   const input = page.getByLabel("Page title");
   await input.fill(title);
-  await input.press("Enter");
+  // Under parallel CI load the draft input can blur on its own (focus lands
+  // on the freshly mounted canvas a beat late) — and the onBlur handler has
+  // ALREADY committed the rename by then. Pressing Enter through the locator
+  // then waits forever on an unmounted input. Only send the key while the
+  // draft is still open, and let the shared assertion below prove the rename
+  // landed either way.
+  if (await input.isVisible().catch(() => false)) {
+    await page.keyboard.press("Enter");
+  }
+  await expect(
+    page.locator("main").getByRole("button", { name: title, exact: true }),
+  ).toBeVisible();
 }
 
 test.describe.serial("import/export round-trips: PNG, SVG, scene file, full backup", () => {
