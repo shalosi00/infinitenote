@@ -71,17 +71,28 @@ async function exportViaMenu(
 
 /** Rename the open page through the title bar. */
 async function renameOpenPage(page: Page, title: string): Promise<void> {
-  await page.locator('button[title="Click to rename this page"]').click();
-  const input = page.getByLabel("Page title");
-  await input.fill(title);
   // Under parallel CI load the draft input can blur on its own (focus lands
-  // on the freshly mounted canvas a beat late) — and the onBlur handler has
-  // ALREADY committed the rename by then. Pressing Enter through the locator
-  // then waits forever on an unmounted input. Only send the key while the
-  // draft is still open, and let the shared assertion below prove the rename
-  // landed either way.
-  if (await input.isVisible().catch(() => false)) {
-    await page.keyboard.press("Enter");
+  // on the freshly mounted canvas a beat late): with an UNCHANGED draft the
+  // onBlur just closes the editor — the fill then waits forever on an
+  // unmounted input (20s CI timeout, observed on the docs PR run). Retry
+  // the open+fill a few times; the shared assertion below still proves the
+  // rename landed.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.locator('button[title="Click to rename this page"]').click();
+    const input = page.getByLabel("Page title");
+    const filled = await input
+      .fill(title, { timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (filled) {
+      // Only send the key while the draft is still open — the blur may have
+      // committed the rename between the fill and this check.
+      if (await input.isVisible().catch(() => false)) {
+        await page.keyboard.press("Enter");
+      }
+      break;
+    }
+    await page.waitForTimeout(400); // let the title bar settle, then retry
   }
   await expect(
     page.locator("main").getByRole("button", { name: title, exact: true }),
