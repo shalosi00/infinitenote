@@ -173,7 +173,15 @@ test.describe("app surface sweep (dialogs, menus, drawer)", () => {
         if (!(await page.locator('[data-slot="sheet-content"]').first().isVisible().catch(() => false)))
           return;
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(300);
+        // Wait for the sheet to fully UNMOUNT, not a fixed 300ms: the exit
+        // animation is itself 300ms, so a loaded CI runner can exceed the
+        // wait — and a lingering role="dialog" then breaks every strict
+        // [role="dialog"] locator in the search phase below.
+        await page
+          .locator('[data-slot="sheet-content"]')
+          .first()
+          .waitFor({ state: "detached", timeout: 5_000 });
+        await page.waitForTimeout(100);
       };
 
       if (mobile) {
