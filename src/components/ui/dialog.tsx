@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { lastOutsideFocus } from "@/lib/focus-return"
 
 function Dialog({
   ...props
@@ -50,6 +51,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -64,6 +66,19 @@ function DialogContent({
           className
         )}
         {...props}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (event.defaultPrevented) return
+          // Our dialogs open from controlled state (plain buttons / global
+          // keyboard shortcuts), never via DialogTrigger — Radix has no
+          // trigger to return focus to, so it falls to <body>. Restore the
+          // last element focused outside the overlay instead (WCAG 2.4.3).
+          const target = lastOutsideFocus()
+          if (target && target.isConnected) {
+            event.preventDefault()
+            target.focus()
+          }
+        }}
       >
         {children}
         {showCloseButton && (
