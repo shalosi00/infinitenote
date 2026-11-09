@@ -104,7 +104,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       structural change / manual "Save version now" / automatic pre-restore
       safety copy), restore to any version, 25-per-page FIFO budget,
       newest-first dialog — fully TDD (docs/test-plans/version-history.md)
-- [x] On-device OCR for images & PDF printouts: tesseract.js vendored under
+- [x] On-device OCR for images & PDF printouts (English + German): tesseract.js vendored under
       `public/ocr/` (no CDN, offline after first use, sha256-pinned),
       "Recognize text in images" makes scanned content full-text searchable
       — fully TDD (docs/test-plans/ocr.md)

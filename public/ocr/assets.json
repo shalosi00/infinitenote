@@ -2,7 +2,7 @@
   "tesseractJs": "6.0.1",
   "tesseractJsCore": "6.0.0",
   "tessdata": "4.0.0_fast",
-  "language": "eng",
+  "language": "deu",
   "files": {
     "tesseract.min.js": {
       "sha256": "10fff78484067759c43028a02a72d76d0b90eb17302bb23b58a9ec5410bc928b",
@@ -20,9 +20,9 @@
       "sha256": "9d7c43fb206dc9f48475228b46bf35f888fa9e6259da2e67d5a75c77049f2dc7",
       "bytes": 3954569
     },
-    "lang/eng.traineddata.gz": {
-      "sha256": "18c1ac52b75e35d44735fb6c2a60acfaf23033524653200738e98f0243edb75b",
-      "bytes": 1984273
+    "lang/deu.traineddata.gz": {
+      "sha256": "e4888b3bd6569d1bc21f45b517f006716c47cee6f11007dde689aa2a99af3d4d",
+      "bytes": 853415
     }
   }
 }

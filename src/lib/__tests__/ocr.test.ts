@@ -11,6 +11,8 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+  OCR_LANGS,
+  OCR_LANG_FILES,
   OCR_TEXT_CAP,
   normalizeOcrText,
   ocrRunSummary,
@@ -368,5 +370,21 @@ describe("search sees OCR text (OCR-S01..S03)", () => {
     expect(hits).toHaveLength(1);
     expect(hits[0].pageId).toBe("p1");
     expect(hits[0].snippet).toContain("QUOKKA");
+  });
+});
+
+/* ------------------- language policy (2026-11-09 addendum) ------------------ */
+
+describe("OCR language policy (docs/test-plans/ocr.md, OCR-L01/L02)", () => {
+  it("OCR-L01: a single German fast model drives the engine", () => {
+    // Evidence (docs/test-plans/ocr.md addendum): tesseract's LSTM
+    // combination mode ("eng+deu") strips umlauts — Ä→A, Ö→O, Ü→U — while
+    // the deu fast model recognizes German 9/9 AND every English probe
+    // flawlessly. One model, one code path.
+    expect(OCR_LANGS).toBe("deu");
+  });
+
+  it("OCR-L02: the policy lists exactly the traineddata files we ship", () => {
+    expect([...OCR_LANG_FILES]).toEqual(["deu.traineddata.gz"]);
   });
 });

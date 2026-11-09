@@ -19,7 +19,7 @@ const ASSETS = [
   "/ocr/worker.min.js",
   "/ocr/core/tesseract-core-lstm.wasm.js",
   "/ocr/core/tesseract-core-simd-lstm.wasm.js",
-  "/ocr/lang/eng.traineddata.gz",
+  "/ocr/lang/deu.traineddata.gz",
 ];
 
 // serial: E02 builds the state (fresh page + imported image + recognized
@@ -119,5 +119,24 @@ test.describe.serial("ocr: images become searchable", () => {
     await expect(page.getByText("No images on this page — nothing to recognize.")).toBeVisible({
       timeout: 15_000,
     });
+  });
+
+  test("OCR-E05: German text is recognized and searchable (umlauts intact)", async () => {
+    await clickInNotebook(page, "Welcome Notebook", "Add page");
+    await expectCount(page, 0);
+    await page.setInputFiles('input[aria-label="Import files"]', "e2e/fixtures/ocr-text-de.png");
+    await expectCount(page, 1);
+    expect((await sceneTypes(page))).toContain("image");
+
+    // run the real engine over the German fixture (GÄSTEBUCH / MÜNCHEN STRAßE)
+    await runOcr();
+    await expect(
+      page.getByText("Recognized text in 1 image — 1 had readable text."),
+    ).toBeVisible({ timeout: 60_000 });
+
+    // the umlaut word survives the whole path: engine → customData → search
+    await searchFor("GÄSTEBUCH");
+    await expectSearchHit("GÄSTEBUCH");
+    await page.keyboard.press("Escape");
   });
 });

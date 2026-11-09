@@ -2,6 +2,7 @@
 
 Feature: on-device OCR (tesseract.js, vendored — no CDN, no network) makes
 imported images and PDF-printout pages full-text searchable via Ctrl+K.
+**Recognizes English AND German text** (2026-11-09 addendum below).
 
 Status: **planned, TDD** — tests first (red), then implementation (green).
 
@@ -10,7 +11,7 @@ Status: **planned, TDD** — tests first (red), then implementation (green).
 | Aspect | Decision |
 |---|---|
 | Engine | tesseract.js **6.0.1** UMD, loaded lazily via `<script>` from `/ocr/` — never bundled, so webpack/Next can never break worker resolution |
-| Assets (vendored, `public/ocr/`) | `tesseract.min.js` (63 KB), `worker.min.js` (111 KB), `core/tesseract-core-simd-lstm.wasm.js` + `core/tesseract-core-lstm.wasm.js` (≈ 3.95 MB each — SIMD + fallback for older WebKitGTK), `lang/eng.traineddata.gz` (1.98 MB, tessdata 4.0.0_fast) |
+| Assets (vendored, `public/ocr/`) | `tesseract.min.js` (63 KB), `worker.min.js` (111 KB), `core/tesseract-core-simd-lstm.wasm.js` + `core/tesseract-core-lstm.wasm.js` (≈ 3.95 MB each — SIMD + fallback for older WebKitGTK), `lang/deu.traineddata.gz` (853 KB, tessdata 4.0.0_fast — see the 2026-11-09 addendum: `deu` supersedes the original `eng`) |
 | Offline story | Service worker gets a `"/ocr/"` static prefix (cache-first, runtime fill) — first use caches the engine for life; no CDN at any point, matching the F-Droid/TWA offline stance |
 | Trigger | Explicit "Recognize text in images" item in the Page-actions (⋯) menu — predictable cost, no surprise CPU burn |
 | Data flow | flushSave → read page content → OCR every image element's file dataURL → attach `customData.ocrText` (+ `ocrAt`) → write back → canvas remount (sync-proven path) |
@@ -103,8 +104,82 @@ every CI run.
 
 ## Non-goals (documented on purpose)
 
-- English-only recognition (matches the English-only UI; more languages would
-  balloon the vendored traineddata — a later opt-in download could add them).
 - No auto-OCR on import (explicit action only), no handwriting recognition
   (that is the separate v1.11 research track), no OCR of the visible canvas
   bitmap — only image/pdf-printout elements.
+- ~~English-only recognition~~ — superseded by the addendum below: German
+  must be understood too; one model now covers both languages.
+
+## Addendum (2026-11-09) — German must be understood too
+
+User requirement: OCR must understand German as well. This addendum swaps
+the recognition model and pins the decision with evidence.
+
+### Engine evidence — which model understands BOTH languages?
+
+Probed with the real tesseract.js 6.0.1 against the exact `.traineddata.gz`
+bytes that get vendored (Node driver, LSTM_ONLY, same engine family as the
+vendored wasm core). All runs 2026-11-09, fixtures rendered by Pillow
+(DejaVu Sans Bold, black on white):
+
+| Input | `eng` | `deu` | `eng+deu` | `deu+eng` |
+|---|---|---|---|---|
+| English passage (THE QUICK BROWN FOX… 3 lines) | perfect | perfect | perfect | perfect |
+| English fixture (`QUOKKA NOTEBOOK`) | perfect | perfect | perfect | perfect |
+| Tricky English (THOUGH THROUGH THOROUGH, mixed case, lowercase sentences) | — | perfect | — | — |
+| 9 German words incl. umlauts + ß (MÜNCHEN, STRAßE, GRÜßE, SCHÖN, ÜBUNG, ÄPFEL, ÖFFNEN, ZÜRICH, GÄSTEBUCH) | 0/9 correct | **9/9 correct** | 1/9 (STRAßE) | 3/9 |
+| Mixed EN+DE page (MEETING NOTES SUMMARY / GÄSTEBUCH MÜNCHEN / QUARTALSZAHLEN 2026) | German mangled (`GASTEBUCH MUNCHEN`) | **perfect** | German mangled | perfect |
+
+Conclusion: tesseract's LSTM **combination** mode lets the English model
+outvote the umlauts away (`Ä→A`, `Ö→O`, `Ü→U`), so `eng+deu` and `deu+eng`
+both FAIL the requirement. The single German fast model (`deu`,
+tessdata 4.0.0_fast) recognizes German perfectly **and** every English
+probe flawlessly — the German alphabet is a superset of the English one
+and the fast model's Latin coverage is excellent.
+
+**Decision: initialize the worker with `deu` only and drop `eng` from the
+bundle** (one model, one code path, −1.98 MB; English recognition stays
+pinned by the existing English E2E running through the German model —
+if it ever regresses, that spec goes red). The alternative — running two
+workers per image and merging — doubles runtime on a heuristic; rejected
+for stability.
+
+### Policy changes — `src/lib/ocr.ts`
+
+New single source of truth consumed by the driver and the tests:
+
+- `OCR_LANGS = "deu"` — the string handed to `createWorker`.
+- `OCR_LANG_FILES = ["deu.traineddata.gz"]` — the traineddata files the
+  bundle must ship.
+
+### Asset changes — `public/ocr/`
+
+- `lang/eng.traineddata.gz` (1 984 273 B) is REMOVED.
+- `lang/deu.traineddata.gz` (853 415 B, tessdata 4.0.0_fast, gzip -9 -n)
+  is vendored; `assets.json` language field becomes `"deu"` and pins the
+  new sha256. The service worker's `/ocr/` prefix caching covers it
+  unchanged.
+
+### Unit tests — additions
+
+| ID | Assertion |
+|---|---|
+| OCR-L01 | `OCR_LANGS === "deu"` — one model, per the evidence table |
+| OCR-L02 | `OCR_LANG_FILES` lists exactly `["deu.traineddata.gz"]` — the bundle ships what the worker loads |
+| OCR-A03′ | (updated) manifest `language === "deu"` |
+| OCR-A05 | manifest `lang/*` entries equal `OCR_LANG_FILES` — policy and bundle cannot drift apart |
+| OCR-A06 | `ocr-client.ts` hands `OCR_LANGS` to `createWorker` (source-level drift guard, issue-#103 pattern) |
+
+### E2E — `e2e/ocr.spec.ts` changes
+
+| ID | Scenario |
+|---|---|
+| OCR-E01′ | (updated) the five vendored assets now include `lang/deu.traineddata.gz` (not eng) |
+| OCR-E02 | UNCHANGED — the English fixture still recognizes and matches through the German model (the English regression net) |
+| OCR-E05 | NEW German full path: fresh page → import `ocr-text-de.png` (`GÄSTEBUCH` / `MÜNCHEN STRAßE`, deterministic Pillow fixture) → run recognition → success toast → Ctrl+K search for `GÄSTEBUCH` finds the page with the umlaut word intact in the snippet |
+
+Fixture: `e2e/fixtures/ocr-text-de.png`, 640×200, DejaVu Sans Bold 48 px —
+generated at generous spacing because a tight 40 px/480 px layout made the
+engine misread GRÜßE even under `deu`; the committed layout recognizes all
+three words verbatim (verified against the real engine before the fixture
+was committed).
