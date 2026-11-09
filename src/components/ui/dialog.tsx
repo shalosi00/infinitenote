@@ -7,10 +7,25 @@ import { XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lastOutsideFocus } from "@/lib/focus-return"
 
+/**
+ * Controlled-open note: every dialog in the app passes `open` from state.
+ * When it flips false we immediately clear Radix's inline
+ * `pointer-events: none` on <body> — Radix otherwise keeps it until the
+ * exit-animated layer unmounts, and for that whole window the first click
+ * after closing (a canvas interaction, a raw pointer event) dies on a
+ * pointer-transparent body. Radix's own unmount cleanup later restores the
+ * value it saved at open (usually empty), a no-op after this.
+ */
 function Dialog({
+  open,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  React.useEffect(() => {
+    if (!open && document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = ""
+    }
+  }, [open])
+  return <DialogPrimitive.Root data-slot="dialog" open={open} {...props} />
 }
 
 function DialogTrigger({

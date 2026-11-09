@@ -9,7 +9,7 @@
 | **Last updated** | 2026-11-09 |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 461 unit + 122 E2E green; 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
+| **Overall state** | 461 unit + 131 E2E green; dialog-close click-swallow fixed 2026-11-09 (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -83,7 +83,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 461 unit tests, 122 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 461 unit tests, 131 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -145,6 +145,16 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-09 — closing a dialog no longer swallows the next click**: the
+  first canvas interaction within ~100 ms of closing any dialog was silently
+  dropped. Two stacked causes, both fixed: Radix keeps `pointer-events:
+  none` on `<body>` until the exit-animated layer unmounts (the Dialog and
+  Sheet wrappers now clear it the moment `open` flips false), and the
+  closing overlay itself still carried an inline `pointer-events: auto`
+  (a `!important` closed-state rule in globals.css, modal overlays only).
+  Found by the new version-history E2E while it drove the canvas right
+  after a dialog close; regression-pinned by e2e/dialog-close-click.spec.ts
+  (style probe + functional raw click). +1 E2E check (131).
 - **2026-11-09 — proactive investigation cycle (#148/#149/#150)**: probe-first
   sweep of three untouched surfaces in the established style. (1) Console
   sweep: a scripted driver exercised 16 flow phases (draw, CJK text,

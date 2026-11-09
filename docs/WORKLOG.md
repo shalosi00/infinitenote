@@ -38,6 +38,28 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-09 — proactive investigation: features + a UI bug hunt (session open)
+
+Goal (user): implement the top-2 feature proposals — page version history
+and on-device OCR for images/PDF printouts — fully TDD ("plan and document
+many tests, then implement"), with maximum stability.
+
+- **Found + fixed before either feature shipped**: closing any dialog
+  swallowed the first click that followed (~100 ms window; raw canvas
+  events are exactly what Excalidraw uses). Root cause was two-layered:
+  Radix's `<body>` keeps `pointer-events: none` until the exit-animated
+  layer unmounts, and the closing overlay carries an inline
+  `pointer-events: auto` that plain CSS cannot beat. Fixes: the Dialog and
+  Sheet wrappers clear the body style the moment `open` flips false, and
+  globals.css pins `pointer-events: none !important` on **modal** overlay
+  slots in the closed state (dialog/alert-dialog/sheet only — extending it
+  to dropdown/popover/select content caused a hover-loop regression in the
+  export submenu and was bisected out). Regression coverage:
+  e2e/dialog-close-click.spec.ts (pointer-events style probe + body probe
+  + functional raw click). Side-finding: the Tailwind v4 setup never
+  generated the `data-[state=…]:` animate utilities — the app's Radix
+  overlays animate nothing; cosmetic follow-up, documented in the CSS.
+
 ## 2026-11-08 — full import/export verification pass (#137, PR #138)
 
 - **Task**: "FULLY test importing and exporting." Audit first: the import
