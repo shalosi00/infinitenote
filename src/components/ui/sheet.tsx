@@ -7,8 +7,22 @@ import { XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lastOutsideFocus } from "@/lib/focus-return"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+/**
+ * Controlled-open note: the app drawer passes `open` from state. On close we
+ * immediately clear Radix's inline `pointer-events: none` on <body> — see
+ * the Dialog wrapper for the full rationale (first click after close must
+ * not die on a pointer-transparent body while the layer exits).
+ */
+function Sheet({
+  open,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  React.useEffect(() => {
+    if (!open && document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = ""
+    }
+  }, [open])
+  return <SheetPrimitive.Root data-slot="sheet" open={open} {...props} />
 }
 
 function SheetTrigger({
