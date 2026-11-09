@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-09 (v1.11.0 release: recoverable & searchable pages) |
-| **Current version** | v1.11.0 — version files bumped on develop; tag + GitHub Release land with the release PR to main (previous tagged release: v1.10.1) |
-| **Phase** | v1.11.0 release in flight — page version history (#154), on-device OCR EN+DE (#155/#158), PDF file chips (#159), investigation-cycle fixes (#147–#153); next: #133 handwriting research (v1.12) |
+| **Last updated** | 2026-11-09 (v1.11.0 shipped) |
+| **Current version** | v1.11.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.11.0)) |
+| **Phase** | v1.11.0 shipped (recoverable & searchable pages: version history #154, on-device OCR EN+DE #155/#158, PDF file chips #159, investigation-cycle fixes #147–#153); main synced with develop via release PR #161; next: v1.12 — #133 handwriting research (milestone open) |
 | **Overall state** | 564 unit + 152 E2E green (re-verified pre-release 2026-11-09: lint + typecheck clean; CI-mode E2E against the production build, 152 passed in 3.7m; unit 564/564); version history + OCR shipped 2026-11-09 and verified; PDF printouts now land a OneNote-style file chip — right-click menu with byte-exact download (docs/test-plans/pdf-attachment.md); OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR

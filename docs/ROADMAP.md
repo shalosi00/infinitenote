@@ -98,7 +98,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       (issue #122) and the app reopens the last-opened page on reload
       (issue #123)
 
-## v1.12 — Recoverable & searchable pages (shipped on `develop`)
+## v1.11 — Recoverable & searchable pages (shipped in v1.11.0)
 
 - [x] Page version history: per-page snapshot timeline (auto ≥ 5 min on
       structural change / manual "Save version now" / automatic pre-restore
@@ -116,7 +116,7 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Fix: clicks right after closing a dialog are no longer swallowed
       (Radix body pointer-events + closed-overlay guard; regression-pinned)
 
-## v1.11 — Handwriting recognition (research; current)
+## v1.12 — Handwriting recognition (research; current)
 
 - [ ] Handwriting recognition research: on-device HTR options for the
       offline-first PWA + Android wrapper, data flow from freedraw strokes,
@@ -141,4 +141,4 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## Backlog (unscheduled)
 
-- (empty — handwriting recognition research moved to v1.11)
+- (empty — handwriting recognition research lives in v1.12, issue #133)
