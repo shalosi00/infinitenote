@@ -69,6 +69,17 @@ export async function serializeCurrentPage(page: Page): Promise<string> {
   return page.evaluate(() => window.__NOTE_E2E__?.serializeCurrentPage() ?? "");
 }
 
+/**
+ * Zoom/pan the viewport to the scene content. Embeddable containers
+ * (audio blocks, PDF attachment chips) only render while on-screen, so
+ * specs that interact with them bring the content into view first.
+ */
+export async function scrollToContent(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    window.__NOTE_E2E__?.excalidraw.scrollToContent(undefined, { viewportZoomFactor: 0.8 }),
+  );
+}
+
 export async function saveNow(page: Page): Promise<void> {
   await page.evaluate(() => window.__NOTE_E2E__?.saveNow());
 }
@@ -154,7 +165,11 @@ export async function drawRectangleOnCanvas(page: Page): Promise<void> {
 /** Create a text element with the text tool and type `text` into it. */
 export async function createTextElement(page: Page, text: string): Promise<void> {
   const b = await canvasBox(page);
-  await page.mouse.click(b.x + b.width * 0.35, b.y + b.height * 0.7);
+  // click RIGHT of the Shapes island — the floating panel overlays the
+  // left-center of the canvas and can swallow the pointer event (the 0.35
+  // x-ratio flaked exactly there under full-suite load; import-overlay.spec
+  // documented the same hazard for its inline clicks)
+  await page.mouse.click(b.x + b.width * 0.6, b.y + b.height * 0.75);
   const editor = page.locator(".excalidraw textarea").last();
   await editor.waitFor({ state: "visible", timeout: 10_000 });
   await page.keyboard.type(text, { delay: 20 });

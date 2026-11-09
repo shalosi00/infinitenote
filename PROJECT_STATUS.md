@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-08 |
-| **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
-| **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 433 unit + 99 E2E green; 0 known bugs; full manual pass 2026-11-07 — every feature verified human-style, findings #122/#123 fixed |
+| **Last updated** | 2026-11-09 (v1.11.0 release: recoverable & searchable pages) |
+| **Current version** | v1.11.0 — version files bumped on develop; tag + GitHub Release land with the release PR to main (previous tagged release: v1.10.1) |
+| **Phase** | v1.11.0 release in flight — page version history (#154), on-device OCR EN+DE (#155/#158), PDF file chips (#159), investigation-cycle fixes (#147–#153); next: #133 handwriting research (v1.12) |
+| **Overall state** | 564 unit + 152 E2E green (re-verified pre-release 2026-11-09: lint + typecheck clean; CI-mode E2E against the production build, 152 passed in 3.7m; unit 564/564); version history + OCR shipped 2026-11-09 and verified; PDF printouts now land a OneNote-style file chip — right-click menu with byte-exact download (docs/test-plans/pdf-attachment.md); OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -58,45 +58,43 @@ export (A4 portrait/landscape, vector text, sliced images).
 |---|---|---|
 | Notebook/Section/Page CRUD, rename, colors, reorder, duplicate page | Working | 34 E2E checks + unit tests |
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
-| Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch) |
+| Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch, save-indicator-calm: steady label under viewport-only churn, undo-inside-debounce never persists) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
-| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
-| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts |
-| Cross-page search (Ctrl+K — content index reloads on every open), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
+| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback; **PDF imports land a OneNote-style file chip (badge + file name) with the original bytes embedded** | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
+| Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts; the full backup restores into a wiped app through the UI | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts + e2e/import-export-roundtrip.spec.ts (PNG magic/IHDR bytes, SVG markup content, scene export → re-import round-trip, backup export → wipe → UI restore round-trip, 8 checks) |
+| Cross-page search (Ctrl+K — content index reloads on every open and is built once per open, not per keystroke), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
+| **Page version history**: per-page snapshot timeline (auto ≥ 5 min on structural change / manual "Save version now" / automatic pre-restore safety copy), restore to any version (DB-write + canvas remount — the proven sync path), 25-per-page FIFO budget, newest-first dialog; versions are local-only (excluded from backups and the sync folder), trash keeps them, purge cascades | Working | 35 unit tests + 5 E2E checks (docs/test-plans/version-history.md) |
+| **OCR (on-device)**: "Recognize text in images" (Page actions ⋯) runs tesseract.js 6.0.1 — vendored under `public/ocr/` (engine, LSTM cores ×2, **German fast model — recognizes English AND German incl. umlauts/ß**; no CDN, offline after first use; the eng+deu combination modes strip umlauts, evidence in docs/test-plans/ocr.md) — over every image element, stores `customData.ocrText` (normalized, 20k-code-point cap) in the scene, and the recognized text becomes full-text-searchable content with snippets; per-image failures never abort a batch; typed error toasts; assets pinned by sha256 drift tests | Working | 37 unit tests + 5 E2E checks with the real engine, incl. the German fixture (docs/test-plans/ocr.md) |
+| **PDF file chips (OneNote-style)**: every PDF printout import embeds the ORIGINAL file bytes in an Excalidraw embeddable chip above the rendered pages (red PDF badge + file name, survives restore/version history); right-clicking the chip opens a context menu — **View file** (blob URL, new tab), **Download file** (byte-exact original, offline forever), **Copy file name** (clipboard + toast); files over the 10 MiB cap import as plain printouts with an explicit skip toast; chip names are full-text-searchable | Working | 29 unit tests + 11 E2E checks incl. byte-exact round-trip (docs/test-plans/pdf-attachment.md) |
 | Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
-| Dark mode, mobile drawer navigation | Working | E2E + visual review |
+| Dark mode, mobile drawer navigation | Working | E2E + visual review | 
+| App-surface overlap/clipping sweep: every first-party dialog, dropdown, popover, context menu and the mobile drawer — pairwise bounding-box + viewport-clipping audit of all interactive controls at 1280/900/768/390/320, zero-console-error guard, named-controls a11y pin | Working | 6 E2E checks (e2e/ui-surface-sweep.spec.ts, also verified against a production build) |
 | UI: English-only chrome (the v1.7 en/zh-CN i18n layer — next-intl, catalogs, language toggle — was removed in v1.9; single locale, no switcher); CJK content (titles, tags, search, IME-safe input) fully supported | Working | plural/sync-summary/generated-names unit tests + E2E (IME renames, themes labels) |
 | PWA install (Linux + Android), offline SW | Working | E2E asset checks |
 | Hardened platform: autosave verifies the write landed (no false "Saved"), failed boots offer Retry, shape library survives reloads, recordings survive mic failures and minute-collisions, e2e hooks require a `NEXT_PUBLIC_E2E=1` build, pdfjs-dist pinned to the vendored worker with a drift test, `next build` fails on type errors | Working | hardening/boot-retry/save-content/reveal-focus unit tests + recorder-library/state-freshness E2E |
 | OneNote migration runbook (manual + Microsoft Graph script) | Documented | docs/onenote-migration.md, scripts/graph-export.mjs |
 | Sync & collaboration research (CRDT survey, file-based sync, E2EE server, phased plan) | Documented | docs/sync-research.md |
 | CI: lint, typecheck, unit tests, build, smoke boot, browser E2E | Required checks on every PR | GitHub Actions |
-| File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan | Working | 46 sync unit tests + 4 E2E checks (e2e/sync.spec.ts) |
+| File-based sync (phase 1): folder/ZIP export + merge, conflict copies, purge tombstones, foreground re-scan; out-of-contract folders heal (a stale page file + its tombstone merges as deleted — restorable, never resurrected) | Working | 56 sync unit tests (46 + 10 in sync-fsa/sync-merge) + 5 E2E checks (e2e/sync.spec.ts) |
 | Desktop shell (Tauri 2): static-export build path, `src-tauri/` config + icons, Linux artifact workflow | Working — export build verified; binaries built by CI on `main`/tags | desktop-config unit tests + `.github/workflows/desktop.yml` (docs/desktop.md) |
 | Android TWA: wrapper scaffold (Gradle/manifest/resources) + tested assetlinks.json generator | Working — generator CLI verified; APK built per docs/android-twa.md on a contributor machine | assetlinks + android-config unit tests, `scripts/generate-assetlinks.mjs`, `android-twa/`, docs/android-twa.md |
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 401 unit tests, 86 Playwright E2E checks (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 564 unit tests, 152 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Bug-hunt wave 1 (issues #72–#75) and **wave 2** (issues #63, #77–#105,
-  #107) are fixed on `develop`. Wave 2 shipped as six PRs (#106–#112):
-  state/data integrity (boot retry, honest autosave, fresh search/trash,
-  focus + reveal), PDF fidelity (audio blocks, CJK footers, vector shapes,
-  capped printouts, localized errors), imports (CJK-aware layout, SVG
-  fallback, docx hard breaks, audio size cap, batched updates), recording +
-  library (onerror handling, no-page guard, seconds-resolution names,
-  library restore), i18n (localized generated names + seed, IME-safe
-  Enter, surrogate-safe truncation) and hardening (localized sync errors,
-  tag feedback, flag-gated e2e hooks, pinned pdf.js, honest build,
-  folder-init sync). Every fix carries unit and/or E2E regression coverage.
+- PDF file chips (feat/pdf-attachment): OneNote-style file icon on every
+  PDF printout with a right-click menu — View / Download (byte-exact) /
+  Copy file name; 10 MiB attachment cap with skip toast; 564 unit + 152
+  E2E checks green locally (feature specs first-try); CI to confirm.
+  Next per the roadmap: the v1.11 handwriting-recognition research (#133).
 
 ## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
@@ -137,13 +135,177 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 401 unit tests
-make e2e                             # 86 E2E checks (Playwright; boots the app if needed)
+make test                            # 564 unit tests
+make e2e                             # 152 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-09 — verification pass on the top-2 features + E2E click
+  hardening**: full gate re-run on the merge state of #154/#155 —
+  lint/typecheck clean, 531/531 unit, E2E in CI mode (production build,
+  workers=2, retries=1) 140/140 first-try, both feature specs green in
+  isolation. Two dev-mode-only flakes hardened the #152 way (both
+  once-only clicks inside open Radix dialogs under the
+  memory-constrained serial dev-server run): the bulk-move target row
+  (the freshly-opened dialog's overlay once intercepted the click for
+  the whole action timeout) and the sync ZIP download (click once
+  silently dropped) now retry — final attempt uncaught, assertions
+  unchanged. Stale cheat-sheet counts corrected (451/122 → 531/140).
+- **2026-11-09 — OneNote-style PDF file chips (fully TDD)**: user
+  requirement — a PDF printout must carry a small file icon with its name,
+  and right-clicking it must offer multiple options incl. downloading the
+  file. Design mirrors the audio embeddables (#67): an Excalidraw
+  embeddable whose `link` carries the `infinitenote:pdf` marker scheme
+  (survives link sanitization) and whose `customData` holds the payload —
+  the ORIGINAL file bytes as a data: application/pdf URL — so the chip
+  moves/zooms/exports/restores like any element and the file stays
+  downloadable byte-exactly, offline, forever. Right-click is intercepted
+  in the capture phase on the canvas wrapper (client → scene coords via
+  Excalidraw's own transform helper, rotation-exact hit-test — React
+  bubbles contextmenu at the app root, so the wrapper capture provably
+  beats both the native and Excalidraw menus). Menu: View file (blob URL,
+  new tab), Download file (the proven downloadBlob), Copy file name
+  (clipboard + toast). 10 MiB attachment cap checked BEFORE scene mutation
+  (audio #91 stance): oversized PDFs keep importing as plain printouts +
+  skip toast. One updateScene per import → single undo removes chip+pages.
+  Chip names searchable (audio-name parity). Plan-first: docs/test-plans/
+  pdf-attachment.md; +29 unit (564) incl. rotation-exact hit-testing and
+  base64→Blob byte-exactness; +11 E2E (152) incl. the byte-exact download
+  round-trip and the oversized skip; count cascades updated in
+  imports/import-overlay/import-pdf-truncation specs (+1 element each).
+  Env findings: headless Chromium needs clipboard-write permission grants
+  and cannot commit top-level blob: PDF navigations (assertions adjusted;
+  headed Chrome renders the viewer).
+- **2026-11-09 — German OCR model swap (fully TDD)**: user requirement
+  "OCR must understand German too." Probed the real tesseract.js 6.0.1 with
+  the vendored `.traineddata.gz` bytes: the combination modes `eng+deu` /
+  `deu+eng` let the English model outvote the umlauts away (Ä→A, Ö→O, Ü→U —
+  1/9 and 3/9 German probe words correct), while the single German fast
+  model aced all nine German probes AND every English probe. `deu` now
+  drives the engine; `eng` is dropped (−1.98 MB). New: OCR-L01/L02 policy
+  exports, OCR-A05 policy↔manifest drift guard, OCR-A06 driver drift guard,
+  OCR-E05 German E2E (GÄSTEBUCH / MÜNCHEN STRAßE fixture, umlauts intact
+  through engine→customData→search); OCR-E02 (English) unchanged as the
+  regression net and still green. +4 unit (535), +1 E2E (141).
+- **2026-11-09 — On-device OCR for images & PDF printouts (fully TDD)**:
+  "Recognize text in images" (Page actions ⋯) makes imported images and
+  PDF printouts full-text searchable. The engine (tesseract.js 6.0.1 +
+  LSTM cores + English fast model, ≈10 MB) is vendored under `public/ocr/`
+  — no CDN at any point, cache-first via the service worker after first
+  use (offline-first / F-Droid stance); a sha256 manifest with drift tests
+  pins every byte. Results attach to the scene (`customData.ocrText`,
+  whitespace-normalized, surrogate-safe 20k cap) and flow into the existing
+  search index as content. Unit tests drive an injected engine (the wasm
+  never runs in unit tests); the E2E runs the REAL engine against a
+  committed fixture ("QUOKKA NOTEBOOK") and proves the whole path:
+  import → recognize → search hit → reload persistence. +35 unit (531),
+  +4 E2E (140).
+
+- **2026-11-09 — Page version history (fully TDD)**: a local, per-page
+  timeline of scene snapshots with point-in-time restore (OneNote "page
+  versions" parity). New `pageVersions` table (Dexie schema v3, additive —
+  a v2 database upgrades in place, test-pinned), a pure policy module
+  (interval-throttled auto snapshots gated by the autosave gate's own
+  structural fingerprint, FIFO pruning, locale-free relative times), a
+  History dialog behind one "Page actions" (⋯) menu button (the title bar
+  stays overlap-audit-clean), and restore via flush → pre-restore safety
+  snapshot → DB write → canvas remount. TDD: the full matrix
+  (docs/test-plans/version-history.md — 30 policy + 13 data-layer + 5 E2E
+  cases) was written first and watched fail, then implemented to green;
+  the E2E also exposed the dialog-close click-swallow fixed in #153.
+  +35 unit (496), +5 E2E (136).
+
+- **2026-11-09 — closing a dialog no longer swallows the next click**: the
+  first canvas interaction within ~100 ms of closing any dialog was silently
+  dropped. Two stacked causes, both fixed: Radix keeps `pointer-events:
+  none` on `<body>` until the exit-animated layer unmounts (the Dialog and
+  Sheet wrappers now clear it the moment `open` flips false), and the
+  closing overlay itself still carried an inline `pointer-events: auto`
+  (a `!important` closed-state rule in globals.css, modal overlays only).
+  Found by the new version-history E2E while it drove the canvas right
+  after a dialog close; regression-pinned by e2e/dialog-close-click.spec.ts
+  (style probe + functional raw click). +1 E2E check (131).
+- **2026-11-09 — proactive investigation cycle (#148/#149/#150)**: probe-first
+  sweep of three untouched surfaces in the established style. (1) Console
+  sweep: a scripted driver exercised 16 flow phases (draw, CJK text,
+  rename, undo/redo, shapes, image/text/Markdown/audio/PDF imports, PNG
+  export, search, tags, trash, themes, quick note, shortcuts, paper
+  style, reload) capturing every console warning/error — **clean**; the
+  scary-looking click-blocker cascade during probing was root-caused to
+  probe artifacts (an open Radix menu blocks outside pointer events by
+  design; wrong shape testids), not an app defect. (2) Sync deep-dive
+  (#148): the merge's remote-only branch ignored remote tombstones, so a
+  folder carrying BOTH a stale page file and its tombstone (partial
+  replication, crashed write, or a zero-page write whose cleanup was
+  skipped) resurrected deleted pages on every fresh device; both halves
+  fixed (shared `applyRemoteTombstone`, unconditional stale-file
+  cleanup) with 10 unit + 1 E2E regressions. (3) Focus management
+  (#149/#150): every controlled dialog, the mobile drawer and the
+  rename editor dropped focus to `<body>` on close (WCAG 2.4.3); a
+  global outside-focus memory restores it, and the rename fix uncovered
+  a keydown-activation subtlety (React flushes the focus-return effect
+  inside the Enter dispatch — `preventDefault` keeps the browser from
+  clicking the newly focused title button) with 9 E2E regressions.
+  461 unit + 122 E2E green on develop.
+- **2026-11-08 — app-surface sweep (follow-up to the overlap audit in the
+  same style: probe first, then fix, then pin)**: extended the
+  five-viewport overlap audit from app chrome to EVERY first-party
+  surface — six dialogs, five dropdown menus, the tag popover, page-row
+  context menus and the mobile navigation drawer — plus a
+  zero-console-error guard across the whole run (clean). Four real
+  defects fixed: (1) the search dialog's input ran under its close
+  button, so a click near the input's right edge closed the dialog and
+  lost the query — the input row now keeps clear of the X (pinned by a
+  mis-click E2E); (2) the mobile drawer's close X sat on top of the
+  "Add notebook" button — the sheet content now starts below it; (3)
+  the export menu's PDF flyout submenu flipped off-screen left below
+  ~640px, making both orientations unreachable on phones — at mobile
+  widths the orientations flatten into plain menu items; (4) the trash
+  dialog's row forced the dialog wider than a 320px viewport (Radix
+  ScrollArea's table-layout viewport measures at preferred width) and
+  its purge button was an unnamed icon — plain overflow container +
+  aria-label. Also: the header's Search/Import/Export triggers keep
+  accessible names below sm/lg (icon-only but labeled), and the search
+  dialog no longer rebuilds its full-page JSON.parse index on every
+  keystroke (index memo split from the query memo). 451 unit + 120 E2E
+  green (dev + production build for the new spec).
+- **2026-11-08 — save-indicator calm pass (user report: "Saved" flickered;
+  "check if any buttons overlap")**: Excalidraw's onChange fires for
+  appState-only updates (pan, zoom, selection, tool switches) and each one
+  used to schedule an autosave of identical content — every viewport
+  interaction blinked the indicator. Autosave is now gated on a
+  `sceneSignature` (id@version:status per element + file set,
+  order-independent) primed from `initialData`; a scene that returns to the
+  persisted state (edit undone inside the debounce window) drops its pending
+  stash instead of letting a stale timer write it; the "Saving…" label is
+  deferred 200ms so fast IndexedDB commits never flash it. Root-causing the
+  undo path found a real data bug: onChange delivers `isDeleted` tombstones
+  (undo/redo leftovers), and they were persisted — `sanitizeScene` now drops
+  them (and their files), so DB rows, sync folders and backups stop
+  accumulating invisible garbage; tombstone-polluted pages self-heal through
+  one normalizing save. The new five-viewport chrome overlap audit found one
+  real defect: below 360px the header pushed the theme toggle past the
+  viewport edge — it now yields below 360px (theming stays reachable via the
+  sidebar gallery). New tests: 10 sceneSignature + 5 structural-fingerprint + 2
+  tombstone-filter unit tests; E2E `save-indicator-calm.spec.ts` (organic autosave, steady label,
+  undo-never-persists) and `ui-overlap.spec.ts` (1280/900/768/390/320 audit);
+  dev probes `scripts/flicker-probe.ts` (50ms label sampling) and
+  `scripts/header-probe.ts` (320px header boxes). 451 unit + 114 E2E green.
+
+- **2026-11-08 — full import/export verification pass**: every transfer
+  surface now has content-level E2E. New e2e/import-export-roundtrip.spec.ts
+  (8 checks): PNG export bytes (magic + IHDR + non-stub size), SVG export
+  markup (typed text survives as vector text), .excalidraw scene export →
+  re-import round-trip (elements, typed text, image dataURL, persistence),
+  full-backup export → wiped app → UI restore round-trip (tree + content
+  intact), and the wrong-file restore error toast. Two fixes fell out of the
+  pass: restoreBackup now throws a typed RestoreError (code `notABackup`,
+  issue #85 parity — expected failures toast without console.error noise),
+  and the shared createTextElement e2e helper clicks right of the Shapes
+  island, killing a full-suite flake in state-freshness.spec. 434 unit +
+  107 E2E green.
 - **2026-11-08 — v1.10.0 released**: release PR #131 merge-committed to main
   (9ee3809), [tagged](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)
   and published; v1.10.0 milestone closed (#64/#65/#122/#123), v1.11.0 opened

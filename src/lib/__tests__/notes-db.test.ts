@@ -7,6 +7,7 @@
  * dynamically inside beforeAll.
  */
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { RestoreError } from "../restore-error";
 
 let notes: typeof import("../notes-db");
 
@@ -290,6 +291,21 @@ describe("backup / restore", () => {
     expect(notes.restoreBackup('{"app":"other","notebooks":[]}')).rejects.toThrow("Not an InfiniteNote");
   });
 
+  it("rejects foreign files with the TYPED error (issue #85 parity — the UI toasts without console noise)", async () => {
+    // found by the import/export round-trip E2E pass: expected restore
+    // failures must be distinguishable from real errors so the app shell
+    // can skip console.error for them, exactly like ExportError
+    try {
+      await notes.restoreBackup('{"app":"other","notebooks":[]}');
+      expect.unreachable("restoreBackup must throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(RestoreError);
+      const typed = err as RestoreError;
+      expect(typed.code).toBe("notABackup");
+      expect(typed.name).toBe("RestoreError");
+    }
+  });
+
   it("eraseAllData wipes everything", async () => {
     const nb = await notes.createNotebook("Doomed", "violet");
     const sec = await notes.createSection(nb.id, "S");
@@ -452,5 +468,210 @@ describe("bulk page operations (issue #27)", () => {
     expect(await notes.trashPages([p1.id])).toBe(0);
     const trash = await notes.listTrash();
     expect(trash.pages).toHaveLength(1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* page version history (docs/test-plans/version-history.md, VH-D*)     */
+/* ------------------------------------------------------------------ */
+
+describe("page version history", () => {
+  const scene = (n: number) =>
+    JSON.stringify({
+      elements: Array.from({ length: n }, (_, i) => ({ type: "text", text: `t${i}` })),
+      files: {},
+    });
+
+  async function seedPage(title = "P") {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const page = await notes.createPage(sec.id, title, scene(1));
+    return { nb, sec, page };
+  }
+
+  it("VH-D01: records a version and lists summaries newest-first without content", async () => {
+    const { page } = await seedPage();
+    await notes.recordPageVersion(page.id, { elements: [{ type: "text" }], files: {} }, "manual", 1_000);
+    await notes.recordPageVersion(page.id, { elements: [], files: {} }, "auto", 2_000);
+
+    const list = await notes.listPageVersions(page.id);
+    expect(list).toHaveLength(2);
+    expect(list[0].createdAt).toBe(2_000);
+    expect(list[1].createdAt).toBe(1_000);
+    for (const row of list) {
+      expect("content" in row).toBe(false);
+      expect(row.pageId).toBe(page.id);
+      expect(row.source).toBeTruthy();
+      expect(typeof row.elementCount).toBe("number");
+      expect(typeof row.byteSize).toBe("number");
+    }
+  });
+
+  it("VH-D02: 30 recorded versions prune to the newest 25", async () => {
+    const { page } = await seedPage();
+    for (let i = 0; i < 30; i++) {
+      await notes.recordPageVersion(page.id, { elements: [], files: {} }, "auto", (i + 1) * 1_000);
+    }
+    const list = await notes.listPageVersions(page.id);
+    expect(list).toHaveLength(25);
+    // timestamps are 1_000 … 30_000; the survivors are 6_000 … 30_000
+    // (newest first — the five oldest are gone)
+    expect(list[0].createdAt).toBe(30_000);
+    expect(list[24].createdAt).toBe(6_000);
+  });
+
+  it("VH-D03: getPageVersionContent returns the parsed stored payload", async () => {
+    const { page } = await seedPage();
+    const row = await notes.recordPageVersion(
+      page.id,
+      { elements: [{ type: "text", text: "hi" }], files: {} },
+      "manual",
+      1_000
+    );
+    const back = await notes.getPageVersionContent(page.id, row.id);
+    expect(back).not.toBeNull();
+    expect(back?.elements).toEqual([{ type: "text", text: "hi" }]);
+  });
+
+  it("VH-D04: a version belonging to another page is refused (null)", async () => {
+    const a = await seedPage("A");
+    const b = await seedPage("B");
+    const row = await notes.recordPageVersion(a.page.id, { elements: [], files: {} }, "manual", 1);
+    expect(await notes.getPageVersionContent(b.page.id, row.id)).toBeNull();
+    // the right page still reads it fine
+    expect(await notes.getPageVersionContent(a.page.id, row.id)).not.toBeNull();
+  });
+
+  it("VH-D05: a missing version id returns null", async () => {
+    const { page } = await seedPage();
+    expect(await notes.getPageVersionContent(page.id, "no-such-version")).toBeNull();
+  });
+
+  it("VH-D06: hand-corrupted content returns null instead of throwing", async () => {
+    const { page } = await seedPage();
+    const row = await notes.recordPageVersion(page.id, { elements: [], files: {} }, "manual", 1);
+    await notes.db.pageVersions.update(row.id, { content: "{corrupt" });
+    expect(await notes.getPageVersionContent(page.id, row.id)).toBeNull();
+  });
+
+  it("VH-D07: purgePage deletes its versions; other pages keep theirs", async () => {
+    const a = await seedPage("A");
+    const b = await seedPage("B");
+    await notes.recordPageVersion(a.page.id, { elements: [], files: {} }, "manual", 1);
+    await notes.recordPageVersion(b.page.id, { elements: [], files: {} }, "manual", 2);
+
+    await notes.purgePage(a.page.id);
+
+    expect(await notes.listPageVersions(a.page.id)).toEqual([]);
+    expect(await notes.listPageVersions(b.page.id)).toHaveLength(1);
+  });
+
+  it("VH-D08: purgeSection cascades to every page's versions under it", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const s1 = await notes.createSection(nb.id, "S1");
+    const s2 = await notes.createSection(nb.id, "S2");
+    const p1 = await notes.createPage(s1.id, "P1", scene(1));
+    const p2 = await notes.createPage(s1.id, "P2", scene(1));
+    const keeper = await notes.createPage(s2.id, "Keep", scene(1));
+    await notes.recordPageVersion(p1.id, { elements: [], files: {} }, "auto", 1);
+    await notes.recordPageVersion(p2.id, { elements: [], files: {} }, "auto", 2);
+    await notes.recordPageVersion(keeper.id, { elements: [], files: {} }, "auto", 3);
+
+    await notes.purgeSection(s1.id);
+
+    expect(await notes.listPageVersions(p1.id)).toEqual([]);
+    expect(await notes.listPageVersions(p2.id)).toEqual([]);
+    expect(await notes.listPageVersions(keeper.id)).toHaveLength(1);
+  });
+
+  it("VH-D09: purgeNotebook cascades through its sections to page versions", async () => {
+    const nb = await notes.createNotebook("NB", "violet");
+    const sec = await notes.createSection(nb.id, "S");
+    const page = await notes.createPage(sec.id, "P", scene(1));
+    await notes.recordPageVersion(page.id, { elements: [], files: {} }, "auto", 1);
+
+    await notes.purgeNotebook(nb.id);
+
+    expect(await notes.listPageVersions(page.id)).toEqual([]);
+  });
+
+  it("VH-D10: eraseAllData clears the version table", async () => {
+    const { page } = await seedPage();
+    await notes.recordPageVersion(page.id, { elements: [], files: {} }, "manual", 1);
+    await notes.eraseAllData();
+    expect(await notes.listPageVersions(page.id)).toEqual([]);
+  });
+
+  it("VH-D11: trashPage (soft delete) KEEPS the page's versions", async () => {
+    const { page } = await seedPage();
+    await notes.recordPageVersion(page.id, { elements: [], files: {} }, "manual", 1);
+    await notes.trashPage(page.id);
+    expect(await notes.listPageVersions(page.id)).toHaveLength(1);
+  });
+
+  it("VH-D12: duplicatePage starts a fresh (empty) version history", async () => {
+    const { page } = await seedPage();
+    await notes.recordPageVersion(page.id, { elements: [], files: {} }, "manual", 1);
+    const copy = await notes.duplicatePage(page.id);
+    expect(copy).not.toBeNull();
+    expect(await notes.listPageVersions(copy!.id)).toEqual([]);
+    // the original keeps its history
+    expect(await notes.listPageVersions(page.id)).toHaveLength(1);
+  });
+
+  it("VH-D13: a v2 database upgrades in place — rows survive, pageVersions usable", async () => {
+    // 1) wipe the app db and build a LEGACY v2 database with live data
+    await notes.db.delete();
+    await new Promise((r) => setTimeout(r, 25));
+    // Dexie must be loaded dynamically — after fake-indexeddb/auto in
+    // beforeAll — exactly like ../notes-db itself, or the module captures
+    // the pre-shim (undefined) indexedDB global.
+    const { default: Dexie } = await import("dexie");
+    class LegacyDB extends Dexie {
+      constructor(name: string) {
+        super(name);
+        this.version(1).stores({
+          notebooks: "id, order, deletedAt",
+          sections: "id, notebookId, order, deletedAt",
+          pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+        });
+        this.version(2).stores({
+          notebooks: "id, order, deletedAt",
+          sections: "id, notebookId, order, deletedAt",
+          pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+          tombstones: "id",
+          syncMeta: "key",
+        });
+      }
+    }
+    const legacy = new LegacyDB("infinitenote");
+    await legacy.open();
+    await legacy.table("notebooks").add({
+      id: "nb-legacy", name: "Legacy", color: "violet", order: 1,
+      createdAt: 1, updatedAt: 1, deletedAt: null,
+    });
+    await legacy.table("sections").add({
+      id: "sec-legacy", notebookId: "nb-legacy", name: "S", order: 1,
+      createdAt: 1, updatedAt: 1, deletedAt: null,
+    });
+    await legacy.table("pages").add({
+      id: "page-legacy", sectionId: "sec-legacy", title: "Old page", order: 1,
+      createdAt: 1, updatedAt: 1, deletedAt: null, content: scene(2),
+    });
+    await legacy.close();
+
+    // 2) the app db opens the same name → Dexie upgrades v2 → v3 (pageVersions)
+    await notes.db.open();
+    const pages = await notes.listPages();
+    expect(pages.find((p) => p.id === "page-legacy")?.title).toBe("Old page");
+    const content = await notes.getPageContent("page-legacy");
+    expect(content?.elements).toHaveLength(2);
+
+    // 3) the new table is functional
+    const row = await notes.recordPageVersion(
+      "page-legacy", { elements: [], files: {} }, "manual", 42_000
+    );
+    expect(await notes.listPageVersions("page-legacy")).toHaveLength(1);
+    expect(row.createdAt).toBe(42_000);
   });
 });

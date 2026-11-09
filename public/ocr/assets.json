@@ -1,0 +1,28 @@
+{
+  "tesseractJs": "6.0.1",
+  "tesseractJsCore": "6.0.0",
+  "tessdata": "4.0.0_fast",
+  "language": "deu",
+  "files": {
+    "tesseract.min.js": {
+      "sha256": "10fff78484067759c43028a02a72d76d0b90eb17302bb23b58a9ec5410bc928b",
+      "bytes": 62961
+    },
+    "worker.min.js": {
+      "sha256": "38645599043239c0eb6db08a6504a92dcdc292200535f3e9339cd77c4443b842",
+      "bytes": 111162
+    },
+    "core/tesseract-core-lstm.wasm.js": {
+      "sha256": "775a35df6f2ae100e02609443e6bd5cafcd07983dd6175454ca4a432a7730687",
+      "bytes": 3954181
+    },
+    "core/tesseract-core-simd-lstm.wasm.js": {
+      "sha256": "9d7c43fb206dc9f48475228b46bf35f888fa9e6259da2e67d5a75c77049f2dc7",
+      "bytes": 3954569
+    },
+    "lang/deu.traineddata.gz": {
+      "sha256": "e4888b3bd6569d1bc21f45b517f006716c47cee6f11007dde689aa2a99af3d4d",
+      "bytes": 853415
+    }
+  }
+}

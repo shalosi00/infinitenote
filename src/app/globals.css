@@ -1,6 +1,30 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+ * Closing overlays must never intercept input (found by version-history E2E).
+ *
+ * Radix keeps exit-animated overlays mounted after close, and for that whole
+ * window a full-viewport overlay with pointer-events would silently swallow
+ * the first canvas click (~30-100 ms after Escape). Plain CSS on purpose:
+ * the `data-[state=closed]:pointer-events-none` Tailwind utilities never
+ * generate in this v4 + tw-animate-css setup — the variant-prefixed
+ * animate classes are dead too (dialogs open/close without animation),
+ * which is a separate, cosmetic follow-up.
+ */
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="dialog-content"][data-state="closed"],
+[data-slot="alert-dialog-overlay"][data-state="closed"],
+[data-slot="alert-dialog-content"][data-state="closed"],
+[data-slot="sheet-overlay"][data-state="closed"],
+[data-slot="sheet-content"][data-state="closed"],
+[data-slot="select-content"][data-state="closed"] {
+  /* !important: Radix's DismissableLayer stamps an inline
+   * `pointer-events: auto` on modal overlays — only !important wins
+   * against an inline style, and the closed state must always win. */
+  pointer-events: none !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

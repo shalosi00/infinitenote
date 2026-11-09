@@ -33,12 +33,15 @@ test.describe.serial("PDF printout truncation notice (issue #75)", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "test-25pages.pdf"),
     );
-    // seed scene = 2 elements + 20 rendered pages
-    await expectCount(page, 22, 60_000);
+    // seed scene = 2 elements + 20 rendered pages + 1 attachment chip
+    await expectCount(page, 23, 60_000);
     await expect(
       page
         .locator("[data-sonner-toast]")
-        .filter({ hasText: "Inserted PDF printout (first 20 of 25 pages)" }),
+        .filter({
+          hasText:
+            'Inserted PDF printout "test-25pages.pdf" (first 20 of 25 pages) — the render cap is 20 pages',
+        }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -49,7 +52,7 @@ test.describe.serial("PDF printout truncation notice (issue #75)", () => {
       buffer: Buffer.from("   \n \n"),
     });
     // scene unchanged — nothing importable in the file
-    await expectCount(page, 22);
+    await expectCount(page, 23);
     await expect(
       page
         .locator("[data-sonner-toast]")

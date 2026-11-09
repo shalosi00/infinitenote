@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Download, type Page } from "@playwright/test";
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { attachErrorCollector, openPage, resetToSeed } from "./helpers";
 
@@ -15,14 +15,31 @@ async function openSyncDialog(page: Page): Promise<void> {
   await page.locator('[data-testid="sync-dialog"]').waitFor({ state: "visible" });
 }
 
-/** Click "Download sync ZIP", read the download and unzip it. */
+/**
+ * Click "Download sync ZIP", read the download and unzip it.
+ *
+ * The waiter is armed before each click and re-armed per retry: under a
+ * loaded runner the click inside the open dialog was once silently dropped
+ * (waitForEvent("download") ran its full 20s with no event, observed on a
+ * memory-constrained dev-server run). A slow-but-real first click simply
+ * wins the race, a swallowed one is retried — and if no download ever
+ * arrives the assertion below still fails loudly (#152 style).
+ */
 async function exportAndReadZip(page: Page): Promise<Record<string, string>> {
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    page.locator('[data-testid="sync-export-zip"]').click(),
-  ]);
-  expect(download.suggestedFilename()).toMatch(/^infinitenote-sync-\d{4}-\d{2}-\d{2}\.zip$/);
-  const path = await download.path();
+  let download: Download | null = null;
+  for (let attempt = 0; attempt < 3 && !download; attempt++) {
+    const waiter = page
+      .waitForEvent("download", { timeout: 8_000 })
+      .then((d) => {
+        download = d;
+      })
+      .catch(() => {});
+    await page.locator('[data-testid="sync-export-zip"]').click();
+    await waiter;
+  }
+  expect(download, "sync ZIP download event").toBeTruthy();
+  expect(download!.suggestedFilename()).toMatch(/^infinitenote-sync-\d{4}-\d{2}-\d{2}\.zip$/);
+  const path = await download!.path();
   expect(path, "downloaded zip path").toBeTruthy();
   const bytes = new Uint8Array(await (await import("node:fs/promises")).readFile(path!));
   const out: Record<string, string> = {};
@@ -190,6 +207,57 @@ test.describe.serial("file-based sync via ZIP (issue #37)", () => {
       "Everything already in sync.",
       { timeout: 20_000 }
     );
+    await page.keyboard.press("Escape");
+  });
+
+  test("a stale page file plus its tombstone does not resurrect the page", async () => {
+    // Out-of-contract folder: pages/e2e-stale-page.json still exists while
+    // trash.jsonl records the page's delete. Devices that never saw the page
+    // must merge it as DELETED (restorable from trash), not resurrect it —
+    // otherwise deleted pages flip-flop back alive on every fresh device.
+    const t = Date.now();
+    const manifest: Manifest = {
+      app: "infinitenote",
+      format: "sync-folder",
+      version: 1,
+      exportedAt: t,
+      notebooks: [{ id: "e2e-nb-stale", name: "Stale folder", color: "teal", order: 1, createdAt: t, updatedAt: t }],
+      sections: [{ id: "e2e-sec-stale", notebookId: "e2e-nb-stale", name: "Ghosted", order: 1, createdAt: t, updatedAt: t }],
+      pages: [],
+    };
+    await openSyncDialog(page);
+    await importZip(page, {
+      "manifest.json": JSON.stringify(manifest, null, 2),
+      "pages/e2e-stale-page.json": JSON.stringify({
+        id: "e2e-stale-page",
+        sectionId: "e2e-sec-stale",
+        title: "Stale page",
+        order: 1,
+        createdAt: t,
+        updatedAt: t,
+        scene: { elements: [{ type: "rectangle", id: "r1" }], files: {} },
+      }),
+      "trash.jsonl": `${JSON.stringify({ id: "e2e-stale-page", kind: "page", at: t + 1000, purged: false, title: "Stale page" })}\n`,
+    });
+
+    // the notebook/section arrive; the page lands in the trash, not the tree
+    await expect(page.locator('[data-testid="sync-summary"]')).toContainText(
+      "1 item moved to trash",
+      { timeout: 20_000 }
+    );
+    await page.keyboard.press("Escape");
+
+    const nbButton = page.getByRole("button", { name: "Stale folder", exact: true });
+    await expect(nbButton).toBeVisible();
+    await nbButton.click();
+    const secButton = page.getByRole("button", { name: "Ghosted", exact: true });
+    await expect(secButton).toBeVisible();
+    await secButton.click();
+    await expect(page.getByRole("button", { name: "Stale page", exact: true })).toHaveCount(0);
+
+    // …and it is restorable from the trash (the stale content survived)
+    await page.getByRole("button", { name: "Trash" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Stale page (page)");
     await page.keyboard.press("Escape");
   });
 });

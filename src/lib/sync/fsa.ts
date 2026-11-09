@@ -115,7 +115,13 @@ export async function writeSyncFolder(dir: FsaDirectoryHandle, files: SyncFolder
       await writable.close();
     }
   }
-  // The merged folder is the source of truth — drop page files we did not write.
+  // The merged folder is the source of truth — drop page files we did not
+  // write. This must also run when ZERO page files were written (every page
+  // deleted since the last sync): the folder has to mirror the library
+  // exactly, or a stale page file resurrects its page on the next device.
+  if (!pagesDir) {
+    pagesDir = await dir.getDirectoryHandle("pages", { create: true }).catch(() => null);
+  }
   if (pagesDir) {
     for await (const [name, handle] of pagesDir.entries()) {
       if (handle.kind !== "file" || !name.endsWith(".json")) continue;

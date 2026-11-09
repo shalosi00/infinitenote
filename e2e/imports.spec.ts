@@ -53,12 +53,12 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
     await expect.poll(() => sceneTypes(page)).toContain("text");
   });
 
-  test("imports a PDF as a printout (one image per page)", async () => {
+  test("imports a PDF as a printout with its file chip", async () => {
     await page.setInputFiles(
       'input[aria-label="Import files"]',
       path.join(FX, "test.pdf"),
     );
-    await expectCount(page, 4, 60_000); // 2 rendered PDF pages
+    await expectCount(page, 5, 60_000); // 2 rendered PDF pages + 1 attachment chip
   });
 
   test("imports a .excalidraw scene", async () => {
@@ -66,7 +66,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "test-scene.excalidraw"),
     );
-    await expectCount(page, 6);
+    await expectCount(page, 7); // + scene elements (with chip)
   });
 
   test("imports a Word document as structured text blocks", async () => {
@@ -74,7 +74,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "onenote-export.docx"),
     );
-    await expectCount(page, 16); // 6 + 10 blocks (headings/lists/table)
+    await expectCount(page, 17); // 7 + 10 blocks (headings/lists/table)
   });
 
   test("imports a OneNote-exported HTML page", async () => {
@@ -82,7 +82,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "onenote-page.html"),
     );
-    await expectCount(page, 25); // + 9 blocks
+    await expectCount(page, 26); // + 9 blocks
   });
 
   test("imports a OneNote .mht single-file page with its embedded images", async () => {
@@ -90,7 +90,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "onenote-page.mht"),
     );
-    await expectCount(page, 34); // + 7 text blocks + 2 images
+    await expectCount(page, 35); // + 7 text blocks + 2 images
     const types = await sceneTypes(page);
     expect(types).toContain("text");
     expect(types).toContain("image");
@@ -112,7 +112,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
       'input[aria-label="Import files"]',
       path.join(FX, "onenote-inline-image.html"),
     );
-    await expectCount(page, 38); // + 3 text blocks + 1 image
+    await expectCount(page, 39); // + 3 text blocks + 1 image
   });
 
   test("drag-dropping an image inserts it exactly once, saved (issue #122)", async () => {
@@ -132,7 +132,7 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
         new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }),
       );
     }, b64);
-    await expectCount(page, 39); // + 1 image — exactly ONE insert
+    await expectCount(page, 40); // + 1 image — exactly ONE insert
     const serialized = JSON.parse(await serializeCurrentPage(page)) as {
       elements: Array<{ type: string; status?: string }>;
     };
@@ -148,6 +148,6 @@ test.describe.serial("imports: image / text / PDF printout / scene", () => {
     await saveNow(page);
     await page.reload();
     await openPage(page, "Page 2");
-    await expectCount(page, 39);
+    await expectCount(page, 40);
   });
 });

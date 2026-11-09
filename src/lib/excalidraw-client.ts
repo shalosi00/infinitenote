@@ -49,6 +49,14 @@ import {
 } from "./audio-notes";
 import type { ScenePayload } from "./types";
 import { printoutViewportScale } from "./pdf-layout";
+import {
+  PDF_ATTACHMENT_HEIGHT,
+  PDF_ATTACHMENT_LINK_SCHEME,
+  PDF_ATTACHMENT_WIDTH,
+  isPdfAttachmentTooLarge,
+  withPdfMime,
+  type PdfAttachmentOutcome,
+} from "./pdf-attachment";
 
 const now = () => Date.now();
 
@@ -481,6 +489,7 @@ export async function importAudioFiles(
 
 /* ------------------------------------------------------------------ */
 /* PDF printout (OneNote-style: each page rendered onto the canvas)    */
+/* + the OneNote-style file chip that keeps the original bytes         */
 /* ------------------------------------------------------------------ */
 
 /** How much of a PDF actually made it onto the canvas (issue #75). */
@@ -490,10 +499,75 @@ export interface PdfPrintoutResult {
   /** pages the document actually contains — larger than `rendered` means
    *  the import was truncated and the user must be told */
   total: number;
+  /** was the original file embedded in an attachment chip?
+   *  (docs/test-plans/pdf-attachment.md) */
+  attachment: PdfAttachmentOutcome;
 }
 
 /** Render cap per imported PDF — keeps monster documents usable on canvas. */
 const MAX_PRINTOUT_PAGES = 20;
+
+/**
+ * The OneNote-style file chip above the printout pages (an Excalidraw
+ * embeddable, the audio-block pattern of issue #67): `link` carries the
+ * marker scheme (survives Excalidraw's link sanitization), `customData`
+ * carries the payload (survives scene restore) — the ORIGINAL PDF bytes
+ * as a data: URL, so the file stays downloadable byte-exactly, offline.
+ * Files beyond the 10 MiB attachment cap keep importing as a plain
+ * printout without a chip (docs/test-plans/pdf-attachment.md).
+ */
+export function makePdfAttachmentElement(
+  name: string,
+  dataUrl: string,
+  x: number,
+  y: number
+): ExcalidrawElement {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  return {
+    id: crypto.randomUUID(),
+    type: "embeddable",
+    x,
+    y,
+    width: PDF_ATTACHMENT_WIDTH,
+    height: PDF_ATTACHMENT_HEIGHT,
+    angle: 0,
+    strokeColor: "#dc2626",
+    backgroundColor: "#fff1f2",
+    fillStyle: "solid",
+    strokeWidth: 1,
+    strokeStyle: "solid",
+    roughness: 0,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed,
+    version: 1,
+    versionNonce: seed,
+    isDeleted: false,
+    boundElements: null,
+    updated: now(),
+    link: PDF_ATTACHMENT_LINK_SCHEME,
+    locked: false,
+    customData: { pdfName: name, pdfData: dataUrl },
+  } as unknown as ExcalidrawElement;
+}
+
+/**
+ * Read the original file bytes for the attachment chip, enforcing the
+ * size cap BEFORE any scene mutation. Drag-dropped PDFs often arrive with
+ * an empty MIME type (readAsDataURL stamps octet-stream), so the prefix
+ * is normalized to application/pdf like the audio clips do.
+ */
+async function pdfAttachmentDataUrl(
+  file: File,
+): Promise<{ kind: "stored"; dataUrl: string } | { kind: "skipped-large" }> {
+  if (isPdfAttachmentTooLarge(file.size)) return { kind: "skipped-large" };
+  const raw = await fileToDataUrl(file);
+  const dataUrl = withPdfMime(raw);
+  if (!dataUrl) return { kind: "skipped-large" }; // defensive: never a corrupt chip
+  return { kind: "stored", dataUrl };
+}
 
 export async function importPdfAsPrintout(
   api: ExcalidrawImperativeAPI,
@@ -507,9 +581,16 @@ export async function importPdfAsPrintout(
   const total = doc.numPages;
   const maxPages = Math.min(total, MAX_PRINTOUT_PAGES); // guard against monsters
   const anchor = nextInsertPosition(api.getSceneElements());
+  const attachment = await pdfAttachmentDataUrl(file);
   const newFiles: NonNullable<ScenePayload["files"]> = {};
   const skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }> = [];
-  let y = anchor.y;
+  // chip first at the anchor, pages directly below it — one updateScene,
+  // so a single undo removes the whole import
+  const chip =
+    attachment.kind === "stored"
+      ? makePdfAttachmentElement(file.name, attachment.dataUrl, anchor.x, anchor.y)
+      : null;
+  let y = anchor.y + (chip ? PDF_ATTACHMENT_HEIGHT + 24 : 0);
   const canvas = document.createElement("canvas");
   for (let i = 1; i <= maxPages; i++) {
     const page = await doc.getPage(i);
@@ -545,8 +626,8 @@ export async function importPdfAsPrintout(
     y += canvas.height + 32;
     onProgress?.(i, maxPages);
   }
-  applySkeletons(api, skeletons, newFiles);
-  return { rendered: skeletons.length, total };
+  applySkeletons(api, skeletons, newFiles, chip ? [chip] : []);
+  return { rendered: skeletons.length, total, attachment: attachment.kind };
 }
 
 /* ------------------------------------------------------------------ */
@@ -657,14 +738,15 @@ export function insertShapeById(
 function applySkeletons(
   api: ExcalidrawImperativeAPI,
   skeletons: Array<{ type: "image"; x: number; y: number; width: number; height: number; fileId: FileId }>,
-  newFiles: NonNullable<ScenePayload["files"]>
+  newFiles: NonNullable<ScenePayload["files"]>,
+  extraElements: ExcalidrawElement[] = []
 ): void {
   const created = convertToExcalidrawElements(skeletons, { regenerateIds: false }) as unknown as Array<
     ExcalidrawElement & { fileId: string }
   >;
   // ensure images render immediately (not stuck in "pending")
   const safe = created.map((e) => ({ ...e, status: "saved" }));
-  api.updateScene({ elements: [...api.getSceneElements(), ...(safe as ExcalidrawElement[])] });
+  api.updateScene({ elements: [...api.getSceneElements(), ...(safe as ExcalidrawElement[]), ...extraElements] });
   api.addFiles(Object.values(newFiles) as BinaryFileData[]);
 }
 

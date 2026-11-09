@@ -2,9 +2,11 @@
  * Cross-page full-text search.
  *
  * Extracts searchable text from serialized Excalidraw scenes without loading
- * them into the editor: text element bodies (raw + label), arrow labels, and
- * audio clip filenames (embeddable customData, issue #67). Matching = all
- * query terms must appear (AND), case-insensitive.
+ * them into the editor: text element bodies (raw + label), arrow labels,
+ * audio clip filenames (embeddable customData, issue #67) and OCR text
+ * recognized from images / PDF printouts (image customData.ocrText,
+ * docs/test-plans/ocr.md). Matching = all query terms must appear (AND),
+ * case-insensitive.
  */
 import type { Notebook, PageMeta, Section } from "./types";
 
@@ -12,7 +14,7 @@ interface SceneElementLike {
   type?: string;
   text?: string;
   id?: string;
-  customData?: { audioName?: unknown } | null;
+  customData?: { audioName?: unknown; ocrText?: unknown; pdfName?: unknown } | null;
 }
 
 /** Extract searchable strings from a serialized page content payload. */
@@ -32,6 +34,18 @@ export function extractSearchableText(contentJson: string | null | undefined): s
     if (el?.type === "embeddable" && typeof el.customData?.audioName === "string") {
       const name = el.customData.audioName.trim();
       if (name) out.push(name);
+    }
+    // PDF attachment chips (docs/test-plans/pdf-attachment.md) carry the
+    // printout's file name the same way — "contract" finds contract.pdf
+    if (el?.type === "embeddable" && typeof el.customData?.pdfName === "string") {
+      const name = el.customData.pdfName.trim();
+      if (name) out.push(name);
+    }
+    // OCR (docs/test-plans/ocr.md): recognized text on an image element is
+    // content like any other — a scanned PDF printout becomes searchable
+    if (el?.type === "image" && typeof el.customData?.ocrText === "string") {
+      const ocr = el.customData.ocrText.trim();
+      if (ocr) out.push(ocr);
     }
   }
   return out;

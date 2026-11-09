@@ -10,6 +10,42 @@ import { attachErrorCollector, resetToSeed } from "./helpers";
  *   Welcome Notebook / Ideas           / "Brainstorm"
  *   My Notebook     / New Section      / "Page 1"
  */
+
+/**
+ * Click a target row inside the freshly-opened Move-to dialog.
+ *
+ * Under a loaded runner the first click on a row of a just-opened Radix
+ * dialog can land on the still-mounted open overlay instead (observed once
+ * on a memory-constrained dev-server run: "element is not stable" during
+ * mount, then the open overlay intercepting the click for the full 20s
+ * action timeout). Retry the interaction: a fresh Escape→reopen cycle
+ * re-mounts the dialog and re-lays-out the list. The final attempt is
+ * deliberately uncaught — a real regression must still fail loudly, and
+ * the assertions after the call keep the outcome authoritative (#152 style).
+ */
+async function clickMoveTarget(page: Page, target: string): Promise<void> {
+  const row = page.locator('[data-testid="move-target"]').filter({ hasText: target });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (!(await row.first().isVisible().catch(() => false))) {
+      await page.locator('[data-testid="bulk-move"]').click({ timeout: 5_000 }).catch(() => {});
+      await expect(row.first()).toBeVisible();
+    }
+    if (
+      await row.first()
+        .click({ timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      return;
+    }
+    // dismiss whatever the failed attempt left behind, then retry
+    await page.keyboard.press("Escape");
+    await expect(row.first()).toHaveCount(0, { timeout: 5_000 }).catch(() => {});
+  }
+  await page.locator('[data-testid="bulk-move"]').click();
+  await row.first().click();
+}
+
 test.describe.serial("sidebar multi-select (issue #27)", () => {
   let page: Page;
   let consoleErrors: string[];
@@ -84,7 +120,7 @@ test.describe.serial("sidebar multi-select (issue #27)", () => {
     await expect(page.locator('[data-testid="bulk-count"]')).toHaveText("2 selected");
 
     await page.locator('[data-testid="bulk-move"]').click();
-    await dialog.filter({ hasText: "New Section" }).click();
+    await clickMoveTarget(page, "New Section");
 
     // both pages now live in My Notebook / New Section
     const newSection = page.locator('[data-testid="section-row"]').filter({ hasText: "New Section" });

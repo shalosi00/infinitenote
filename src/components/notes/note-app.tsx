@@ -12,15 +12,18 @@ import {
   FileDown,
   FileJson,
   FileUp,
+  History,
   Image as ImageIcon,
   LayoutTemplate,
   Menu,
   Mic,
   Moon,
+  MoreHorizontal,
   NotebookPen,
   PackageOpen,
   PenLine,
   Printer,
+  ScanText,
   Search,
   Shapes,
   Square,
@@ -52,8 +55,16 @@ import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
+import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
 import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  ocrRunSummary,
+  ocrTargets,
+  OCR_ERROR_MESSAGES,
+  OcrError,
+} from "@/lib/ocr";
 import {
   addTagWithResult,
   collectTags,
@@ -66,6 +77,7 @@ import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
+import { HistoryDialog } from "./history-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
@@ -121,8 +133,24 @@ export default function NoteApp() {
 
   const canvasApi = useRef<CanvasApi | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Compact screens cannot fit a flyout submenu beside the export menu (the
+  // menu hugs the right edge; the flyout flips left off-screen — the PDF
+  // orientations were unreachable below ~640px, found by the surface sweep).
+  // At mobile widths the two orientations render as plain items instead.
+  const compactLayout = useIsMobile();
   const [dropActive, setDropActive] = useState(false);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const titleButtonRef = useRef<HTMLButtonElement>(null);
+  /** Keyboard-closed rename editors return focus to the title button
+   * (WCAG 2.4.3); click-away closes let focus follow the click. */
+  const focusTitleAfterClose = useRef(false);
+
+  useEffect(() => {
+    if (titleDraft === null && focusTitleAfterClose.current) {
+      focusTitleAfterClose.current = false;
+      titleButtonRef.current?.focus();
+    }
+  }, [titleDraft]);
   /** Bumped after a sync replaced the open page — remounts the canvas (fresh initialData). */
   const [sceneEpoch, setSceneEpoch] = useState(0);
 
@@ -449,6 +477,13 @@ export default function NoteApp() {
       const count = await restoreBackupArchive(json);
       toast.success(`Restored backup — ${plural(count, "1 page", "# pages")} imported.`);
     } catch (err) {
+      // issue #85 parity (found by the import/export round-trip E2E): a user
+      // picking a non-backup file is an EXPECTED failure — toast only, no
+      // console.error noise. Real, unexpected errors still log.
+      if (err instanceof RestoreError) {
+        toast.error(RESTORE_ERROR_MESSAGES[err.code]);
+        return;
+      }
       console.error(err);
       toast.error("Could not restore that backup file.");
     }
@@ -517,6 +552,125 @@ export default function NoteApp() {
     await handleImportFiles(e.dataTransfer.files);
   };
 
+  /* ------------------------------ version history --------------------- */
+
+  /* ---------------------------- OCR (docs/test-plans/ocr.md) ----------- */
+
+  /** True while a recognition run is in flight — disables the menu item. */
+  const [ocrRunning, setOcrRunning] = useState(false);
+
+  /**
+   * "Recognize text in images" (explicit, page-scoped): flush edits → read
+   * the persisted scene → OCR every image element via the vendored engine →
+   * write the enriched scene back → remount the canvas (the proven
+   * sync/restore path). Progress rides a single loading toast; failures map
+   * to typed messages; a page without images is a friendly no-op.
+   */
+  const handleRunOcr = useCallback(async () => {
+    if (ocrRunning) return;
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId || !canvasApi.current) {
+      toast.error("Open a page first, then recognize text.");
+      return;
+    }
+    setOcrRunning(true);
+    const toastId = toast.loading("Preparing the text recognition engine…");
+    try {
+      await canvasApi.current.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast("Nothing to scan — this page has no content yet.", { id: toastId });
+        return;
+      }
+      const targets = ocrTargets(content);
+      if (targets.length === 0) {
+        toast("No images on this page — nothing to recognize.", { id: toastId });
+        return;
+      }
+      toast.loading(
+        `Recognizing text in ${plural(targets.length, "1 image", "# images")}…`,
+        { id: toastId },
+      );
+      const { recognizeImageText } = await import("@/lib/ocr-client");
+      const { recognizeAllImages } = await import("@/lib/ocr");
+      const outcome = await recognizeAllImages(content, recognizeImageText, {
+        onProgress: (done) =>
+          toast.loading(`Recognizing text… ${done}/${targets.length}`, { id: toastId }),
+      });
+      if (outcome.applied > 0) {
+        await db.savePageContent(pageId, outcome.payload);
+        canvasApi.current.discardPendingEdits();
+        setSceneEpoch((e) => e + 1);
+      }
+      toast.success(ocrRunSummary(outcome), { id: toastId });
+    } catch (err) {
+      if (err instanceof OcrError) {
+        toast.error(OCR_ERROR_MESSAGES[err.code], { id: toastId });
+      } else {
+        console.error(err);
+        toast.error("Text recognition failed.", { id: toastId });
+      }
+    } finally {
+      setOcrRunning(false);
+    }
+  }, [ocrRunning]);
+
+  /* ------------------------------ version history --------------------- */
+
+  /**
+   * "Save version now" (manual source): snapshot exactly what is persisted
+   * — flush pending edits first, then version the stored scene.
+   */
+  const handleSaveVersionNow = useCallback(async () => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) {
+      toast.error("Open a page first, then save a version.");
+      return;
+    }
+    try {
+      await canvasApi.current?.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast.error("Nothing to version yet — add something to the page first.");
+        return;
+      }
+      await db.recordPageVersion(pageId, content, "manual");
+      toast.success("Version saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not save a version.");
+    }
+  }, []);
+
+  /**
+   * Restore a stored version (docs/test-plans/version-history.md):
+   *   flush → safety-snapshot the current state ("pre-restore") → overwrite
+   *   the page row with the stored scene → drop the stale canvas stash and
+   *   remount (the same, proven path a sync-merged page takes). The user
+   * never loses the state they are leaving behind.
+   */
+  const handleRestoreVersion = useCallback(async (versionId: string) => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) return;
+    try {
+      await canvasApi.current?.flushSave();
+      const current = await db.getPageContent(pageId);
+      if (current) await db.recordPageVersion(pageId, current, "pre-restore");
+      const restored = await db.getPageVersionContent(pageId, versionId);
+      if (!restored) {
+        toast.error("That version could not be read.");
+        return;
+      }
+      await db.savePageContent(pageId, restored);
+      canvasApi.current?.discardPendingEdits();
+      setSceneEpoch((e) => e + 1);
+      toast.success("Version restored — the replaced state was saved as a version.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not restore that version.");
+    }
+  }, []);
+
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
@@ -576,6 +730,8 @@ export default function NoteApp() {
           variant="ghost"
           size="sm"
           className="ml-2 gap-2 text-muted-foreground"
+          aria-label={"Search pages"}
+          title={"Search pages (Ctrl+K)"}
           onClick={() => useAppStore.getState().setSearchOpen(true)}
         >
           <Search className="h-4 w-4" />
@@ -647,7 +803,16 @@ export default function NoteApp() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            {/* aria-label keeps the button named below sm, where the text
+                label is hidden and the trigger would otherwise be an unnamed
+                icon button (screen readers had nothing to announce). */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              aria-label={"Import"}
+              title={"Import"}
+            >
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">{"Import"}</span>
             </Button>
@@ -710,7 +875,13 @@ export default function NoteApp() {
         {/* export */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              aria-label={"Export"}
+              title={"Export"}
+            >
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">{"Export"}</span>
             </Button>
@@ -726,25 +897,42 @@ export default function NoteApp() {
             <DropdownMenuItem onClick={() => void handleExport("svg")}>
               <FileUp /> {"SVG vector"}
             </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
-                <Printer /> {"PDF — print (A4)"}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
+            {compactLayout ? (
+              <>
                 <DropdownMenuItem
                   data-testid="export-pdf-portrait"
                   onClick={() => void handleExport("pdf-portrait")}
                 >
-                  <Printer /> {"A4 portrait"}
+                  <Printer /> {"PDF — A4 portrait"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   data-testid="export-pdf-landscape"
                   onClick={() => void handleExport("pdf-landscape")}
                 >
-                  <Printer /> {"A4 landscape"}
+                  <Printer /> {"PDF — A4 landscape"}
                 </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+              </>
+            ) : (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid="export-pdf-submenu" className="gap-2">
+                  <Printer /> {"PDF — print (A4)"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuItem
+                    data-testid="export-pdf-portrait"
+                    onClick={() => void handleExport("pdf-portrait")}
+                  >
+                    <Printer /> {"A4 portrait"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="export-pdf-landscape"
+                    onClick={() => void handleExport("pdf-landscape")}
+                  >
+                    <Printer /> {"A4 landscape"}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{"Everything"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => void handleExport("backup")}>
@@ -753,12 +941,16 @@ export default function NoteApp() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Separator orientation="vertical" className="mx-1 h-6" />
+        {/* Below 360px the header cannot fit every control at the 36px touch
+            target — the theme toggle yields (light/dark + accents stay
+            reachable via the sidebar Themes gallery) instead of overflowing
+            the viewport edge. */}
+        <Separator orientation="vertical" className="mx-1 h-6 max-[360px]:hidden" />
 
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 max-[360px]:hidden"
           aria-label={"Toggle theme"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
@@ -775,7 +967,11 @@ export default function NoteApp() {
 
         {/* mobile drawer */}
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetContent side="left" className="w-72 p-0">
+          {/* pt-10 drops the sidebar below the sheet's close button — without
+              it the X (absolute top-4 right-4) sits on top of the header
+              row's "Add notebook" button and taps land on the wrong control
+              (found by the ui-surface-sweep pairwise audit). */}
+          <SheetContent side="left" className="w-72 p-0 pt-10">
             <SheetTitle className="sr-only">{"Navigation"}</SheetTitle>
             <Sidebar onNavigate={() => setDrawerOpen(false)} />
           </SheetContent>
@@ -812,13 +1008,27 @@ export default function NoteApp() {
                       // ignore keys while an IME composes (issue #99):
                       // Enter confirms the composition, not the rename
                       if (e.nativeEvent.isComposing) return;
-                      if (e.key === "Enter") e.currentTarget.blur();
-                      if (e.key === "Escape") setTitleDraft(null);
+                      if (e.key === "Enter") {
+                        // preventDefault: React flushes the blur +
+                        // re-render (and our focus-return effect) inside
+                        // this keydown dispatch — without it the browser
+                        // applies Enter's activation behavior to the
+                        // newly focused title button and the editor
+                        // re-opens with the pre-rename title.
+                        e.preventDefault();
+                        focusTitleAfterClose.current = true;
+                        e.currentTarget.blur();
+                      }
+                      if (e.key === "Escape") {
+                        focusTitleAfterClose.current = true;
+                        setTitleDraft(null);
+                      }
                     }}
                     aria-label={"Page title"}
                   />
                 ) : (
                   <button
+                    ref={titleButtonRef}
                     type="button"
                     className="truncate rounded px-1 py-1 text-left text-sm font-medium hover:bg-muted"
                     title={"Click to rename this page"}
@@ -835,6 +1045,40 @@ export default function NoteApp() {
                   allTags={allTags}
                   onSetTags={(tags) => void setPageTags(currentPage.id, tags)}
                 />
+
+                {/* page actions (⋯): version history — kept in ONE menu so
+                    the title bar never grows past a single icon button at
+                    phone-narrow widths (overlap audit) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label={"Page actions"}
+                      title={"Page actions"}
+                      data-testid="page-actions"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" data-testid="page-actions-menu">
+                    <DropdownMenuItem
+                      data-testid="open-version-history"
+                      onClick={() => useAppStore.getState().setHistoryOpen(true)}
+                    >
+                      <History /> {"Version history…"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="run-ocr"
+                      disabled={ocrRunning}
+                      onClick={() => void handleRunOcr()}
+                    >
+                      <ScanText />
+                      {ocrRunning ? "Recognizing text…" : "Recognize text in images"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {/* page paper style */}
                 <DropdownMenu>
@@ -921,6 +1165,10 @@ export default function NoteApp() {
       <SearchDialog />
       <TrashDialog />
       <ShortcutsDialog />
+      <HistoryDialog
+        onSaveNow={handleSaveVersionNow}
+        onRestore={handleRestoreVersion}
+      />
       <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>

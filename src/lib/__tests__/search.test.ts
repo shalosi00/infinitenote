@@ -175,3 +175,43 @@ describe("search — audio clip names (issue #67)", () => {
     expect(extractSearchableText(otherScene)).toEqual([]);
   });
 });
+
+describe("search — PDF attachment names (docs/test-plans/pdf-attachment.md, ATT-S*)", () => {
+  const pdfChipScene = (name: unknown) =>
+    JSON.stringify({
+      elements: [
+        { type: "embeddable", id: "chip1", link: "infinitenote:pdf", customData: { pdfName: name } },
+      ],
+      files: {},
+    });
+
+  it("ATT-S01: emits the chip's pdfName as searchable content", () => {
+    expect(extractSearchableText(pdfChipScene("quarterly-report.pdf"))).toEqual([
+      "quarterly-report.pdf",
+    ]);
+  });
+
+  it("ATT-S02: blank names are not emitted", () => {
+    expect(extractSearchableText(pdfChipScene("   "))).toEqual([]);
+    expect(extractSearchableText(pdfChipScene(""))).toEqual([]);
+  });
+
+  it("ATT-S03: non-embeddable elements carrying pdfName stay out of search", () => {
+    const otherScene = JSON.stringify({
+      elements: [{ type: "image", id: "i1", customData: { pdfName: "x.pdf" } }],
+      files: {},
+    });
+    expect(extractSearchableText(otherScene)).toEqual([]);
+  });
+
+  it("ATT-S04: a page whose only content is a chip is found by the file name", () => {
+    const idx = buildSearchIndex([nb], [sec], [
+      page("p1", "Meeting", pdfChipScene("quarterly-report.pdf")),
+      page("p2", "Other", scene("unrelated body text")),
+    ]);
+    const hits = searchIndex(idx, "quarterly");
+    expect(hits).toHaveLength(1);
+    expect(hits[0].pageId).toBe("p1");
+    expect(hits[0].snippet).toContain("quarterly-report.pdf");
+  });
+});
