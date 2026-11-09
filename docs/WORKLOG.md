@@ -38,6 +38,47 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-09 — v1.11.0 release: main catches up with develop
+
+- **User question answered first**: "Is main updated / the latest version the
+  default one?" — No. `main` sat at the v1.10.1 tag (09dea0e) while `develop`
+  was 16 PRs ahead (the whole #137–#159 train: import/export verification,
+  save-indicator calm, app-surface sweep, sync healing, focus return, dialog
+  click-swallow fix, page version history, OCR, German OCR, PDF file chips).
+  The GitHub default branch is `main`, so the default checkout was a release
+  behind.
+- **Pre-release verification (all green, on 1939c42)**: `bun run lint` clean,
+  `bunx tsc --noEmit` clean, `bun test src/lib/__tests__` → 564 pass / 0 fail
+  (1874 expect() calls, 43 files), `CI=true bunx playwright test` → **152
+  passed in 3.7m against the production build** (the same
+  `NEXT_PUBLIC_E2E=1 bun run build` + standalone-server path CI uses).
+- **Release mechanics (established flow)**: bump PR to develop first, then a
+  release PR develop → main (squash), tag on main, GitHub Release, milestone
+  closed. Bumped in lockstep: package.json / tauri.conf.json / Cargo.toml
+  (caught up from a stale 1.10.0) / twa-manifest / gradle `versionCode = 210`
+  (major×100+minor×10+patch) + F-Droid Builds entry for v1.11.0; the
+  android-config parity, fdroid-config and desktop-config unit tests pin the
+  bump.
+- **Numbering decision**: the roadmap had labeled this feature set "v1.12"
+  with v1.11 reserved for handwriting research (#133, still open). Released
+  as **v1.11.0** instead — no version skip, milestone 12 (v1.11.0) already
+  held release content, and unreleased research does not need a reserved
+  version number. The post-release docs PR renumbers the roadmap: v1.11 =
+  recoverable & searchable pages (shipped), v1.12 = handwriting research
+  (#133 moves to a new v1.12.0 milestone).
+- **Environment lesson (the big one this cycle)**: the sandbox tree-revert
+  struck mid-verification AND mid-call. A full local pass silently ran
+  against a stale v1.10.1-era tree (433 unit / 99 E2E — plausible numbers
+  from the wrong HEAD) after an earlier `git reset --hard origin/develop`
+  was rolled back between tool calls; later, a commit was created and then
+  lost in the commit→push window, so the push shipped bare develop. Caught
+  both by cross-checking on-disk file counts against
+  `git diff --name-status <merge-base> origin/develop` and by verifying the
+  remote tip SHA after every push. Countermeasure, now standing policy:
+  release-critical steps run as a deterministic rebuild loop — fresh branch
+  off origin/develop → asserted edits → commit → push → verify remote SHA —
+  retried until the remote tip equals the local commit.
+
 ## 2026-11-09 — German OCR + OneNote-style PDF file chips (fully TDD)
 
 User directives: (1) OCR must understand German too; (2) a PDF inserted as
