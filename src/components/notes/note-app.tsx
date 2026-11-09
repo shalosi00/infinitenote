@@ -23,7 +23,6 @@ import {
   PackageOpen,
   PenLine,
   Printer,
-  ScanText,
   Search,
   Shapes,
   Square,
@@ -59,12 +58,6 @@ import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
 import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  ocrRunSummary,
-  ocrTargets,
-  OCR_ERROR_MESSAGES,
-  OcrError,
-} from "@/lib/ocr";
 import {
   addTagWithResult,
   collectTags,
@@ -554,67 +547,6 @@ export default function NoteApp() {
 
   /* ------------------------------ version history --------------------- */
 
-  /* ---------------------------- OCR (docs/test-plans/ocr.md) ----------- */
-
-  /** True while a recognition run is in flight — disables the menu item. */
-  const [ocrRunning, setOcrRunning] = useState(false);
-
-  /**
-   * "Recognize text in images" (explicit, page-scoped): flush edits → read
-   * the persisted scene → OCR every image element via the vendored engine →
-   * write the enriched scene back → remount the canvas (the proven
-   * sync/restore path). Progress rides a single loading toast; failures map
-   * to typed messages; a page without images is a friendly no-op.
-   */
-  const handleRunOcr = useCallback(async () => {
-    if (ocrRunning) return;
-    const pageId = useAppStore.getState().selection?.pageId;
-    if (!pageId || !canvasApi.current) {
-      toast.error("Open a page first, then recognize text.");
-      return;
-    }
-    setOcrRunning(true);
-    const toastId = toast.loading("Preparing the text recognition engine…");
-    try {
-      await canvasApi.current.flushSave();
-      const content = await db.getPageContent(pageId);
-      if (!content) {
-        toast("Nothing to scan — this page has no content yet.", { id: toastId });
-        return;
-      }
-      const targets = ocrTargets(content);
-      if (targets.length === 0) {
-        toast("No images on this page — nothing to recognize.", { id: toastId });
-        return;
-      }
-      toast.loading(
-        `Recognizing text in ${plural(targets.length, "1 image", "# images")}…`,
-        { id: toastId },
-      );
-      const { recognizeImageText } = await import("@/lib/ocr-client");
-      const { recognizeAllImages } = await import("@/lib/ocr");
-      const outcome = await recognizeAllImages(content, recognizeImageText, {
-        onProgress: (done) =>
-          toast.loading(`Recognizing text… ${done}/${targets.length}`, { id: toastId }),
-      });
-      if (outcome.applied > 0) {
-        await db.savePageContent(pageId, outcome.payload);
-        canvasApi.current.discardPendingEdits();
-        setSceneEpoch((e) => e + 1);
-      }
-      toast.success(ocrRunSummary(outcome), { id: toastId });
-    } catch (err) {
-      if (err instanceof OcrError) {
-        toast.error(OCR_ERROR_MESSAGES[err.code], { id: toastId });
-      } else {
-        console.error(err);
-        toast.error("Text recognition failed.", { id: toastId });
-      }
-    } finally {
-      setOcrRunning(false);
-    }
-  }, [ocrRunning]);
-
   /* ------------------------------ version history --------------------- */
 
   /**
@@ -1068,14 +1000,6 @@ export default function NoteApp() {
                       onClick={() => useAppStore.getState().setHistoryOpen(true)}
                     >
                       <History /> {"Version history…"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      data-testid="run-ocr"
-                      disabled={ocrRunning}
-                      onClick={() => void handleRunOcr()}
-                    >
-                      <ScanText />
-                      {ocrRunning ? "Recognizing text…" : "Recognize text in images"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
