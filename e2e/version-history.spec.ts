@@ -52,6 +52,18 @@ test.describe.serial("page version history", () => {
     await page.locator('[data-testid="history-dialog"]').waitFor({ state: "visible" });
   }
 
+  /**
+   * Escape AND wait for the dialog to leave the visible state. A fast
+   * runner can fire the next canvas click ~30 ms after the keypress —
+   * before React commits the close, while the modal is legitimately still
+   * open and swallows it (a human cannot click that fast; the app is
+   * correct, the spec must not race it).
+   */
+  async function closeHistoryDialog(): Promise<void> {
+    await page.keyboard.press("Escape");
+    await page.locator('[data-testid="history-dialog"]').waitFor({ state: "hidden" });
+  }
+
   test("VH-E01: a brand-new page shows the empty state", async () => {
     // fresh page via the sidebar — null content, no normalization save,
     // therefore a provably empty history
@@ -60,7 +72,7 @@ test.describe.serial("page version history", () => {
 
     await openHistoryDialog();
     await expect(page.locator('[data-testid="history-empty"]')).toBeVisible();
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
 
     // back to the welcome page for the tests that follow
     await openPage(page, "Start here");
@@ -74,7 +86,7 @@ test.describe.serial("page version history", () => {
     await expect(row).toBeVisible();
     await expect(row.locator('[data-testid="version-source"]')).toHaveText("Manual");
     await expect(row.locator('[data-testid="version-meta"]')).toContainText("2 elements");
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
   });
 
   test("VH-E03: full restore round-trip — canvas returns to the versioned scene", async () => {
@@ -89,7 +101,7 @@ test.describe.serial("page version history", () => {
     await expect(
       page.locator('[data-testid="version-row"]', { hasText: "3 elements" }).first(),
     ).toBeVisible();
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
 
     // 3 → 4: type a text element
     await setActiveTool(page, "text");
@@ -112,7 +124,7 @@ test.describe.serial("page version history", () => {
     await expect(
       page.locator('[data-testid="version-row"]').first().locator('[data-testid="version-source"]'),
     ).toHaveText("Before restore");
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
   });
 
   test("VH-E04: the restored scene persists across a reload", async () => {
@@ -129,7 +141,7 @@ test.describe.serial("page version history", () => {
 
     await openHistoryDialog();
     await expect(page.locator('[data-testid="history-empty"]')).toBeVisible();
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
 
     // and back — the versioned page kept its history (restore still listed)
     await openPage(page, "Start here");
@@ -138,6 +150,6 @@ test.describe.serial("page version history", () => {
     await expect(
       page.locator('[data-testid="version-row"]').first().locator('[data-testid="version-source"]'),
     ).toHaveText("Before restore");
-    await page.keyboard.press("Escape");
+    await closeHistoryDialog();
   });
 });
