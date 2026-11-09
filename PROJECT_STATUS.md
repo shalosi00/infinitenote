@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-09 (version history + OCR) |
+| **Last updated** | 2026-11-09 (verification pass + click hardening) |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 531 unit + 140 E2E green; version history + OCR shipped 2026-11-09; dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
+| **Overall state** | 531 unit + 140 E2E green (CI-mode re-run, first-try); version history + OCR shipped 2026-11-09 and verified; two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -132,13 +132,24 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 451 unit tests
-make e2e                             # 122 E2E tests (Playwright; boots the app if needed)
+make test                            # 531 unit tests
+make e2e                             # 140 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
 ## Recent history
 
+- **2026-11-09 — verification pass on the top-2 features + E2E click
+  hardening**: full gate re-run on the merge state of #154/#155 —
+  lint/typecheck clean, 531/531 unit, E2E in CI mode (production build,
+  workers=2, retries=1) 140/140 first-try, both feature specs green in
+  isolation. Two dev-mode-only flakes hardened the #152 way (both
+  once-only clicks inside open Radix dialogs under the
+  memory-constrained serial dev-server run): the bulk-move target row
+  (the freshly-opened dialog's overlay once intercepted the click for
+  the whole action timeout) and the sync ZIP download (click once
+  silently dropped) now retry — final attempt uncaught, assertions
+  unchanged. Stale cheat-sheet counts corrected (451/122 → 531/140).
 - **2026-11-09 — On-device OCR for images & PDF printouts (fully TDD)**:
   "Recognize text in images" (Page actions ⋯) makes imported images and
   PDF printouts full-text searchable. The engine (tesseract.js 6.0.1 +

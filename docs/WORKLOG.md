@@ -38,6 +38,32 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-09 — verification pass on #154/#155 + E2E click hardening
+
+- **Baseline re-verified on the merge state of #154/#155 (b78988d)**:
+  lint, tsc, 531/531 unit; E2E in CI mode (production build, workers=2,
+  retries=1) 140/140 green with no retry consumed; both feature specs
+  green in isolation (9/9 — VH-E01–E05, OCR-E01–E04).
+- **Two dev-mode E2E flakes observed once each and hardened** (the
+  CI-mode run stayed green; both are the #152 class — a click inside an
+  open Radix dialog silently dropped under the memory-constrained serial
+  dev-server run):
+  1. multiselect bulk move — the target-row click on the freshly-opened
+     dialog once hit "element is not stable" during mount, then the open
+     overlay intercepted the click for the full 20s action timeout.
+  2. sync ZIP export — the "Download sync ZIP" click was once silently
+     dropped (waitForEvent("download") ran its full timeout with no
+     event).
+  Hardening (assertions unchanged; the final attempt is deliberately
+  uncaught so real regressions stay loud): the move-target click retries
+  an Escape→reopen cycle between attempts; the ZIP download waiter is
+  re-armed per click (8s cap, 3 attempts).
+- **Docs**: the v1.12 roadmap section for the two features was missing at
+  b78988d and landed via #156 while this session was in flight (no
+  further roadmap change needed here); the PROJECT_STATUS cheat-sheet
+  counts had drifted behind the real suites (451/122 vs 531/140) —
+  corrected to match.
+
 ## 2026-11-09 — proactive investigation: features + a UI bug hunt (session open)
 
 Goal (user): implement the top-2 feature proposals — page version history
