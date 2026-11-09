@@ -38,6 +38,63 @@
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
 
+## 2026-11-09 — German OCR + OneNote-style PDF file chips (fully TDD)
+
+User directives: (1) OCR must understand German too; (2) a PDF inserted as
+a printout must land a small file icon showing its name, and right-clicking
+it must offer multiple options, one of them downloading the file. Both
+shipped test-plan-first (docs/test-plans/ocr.md addendum; docs/test-plans/
+pdf-attachment.md), red → green, with every number below from an actual run.
+
+- **German OCR (#158)**: probed the real tesseract.js 6.0.1 with the exact
+  `.traineddata.gz` bytes under Node before deciding anything. Results: the
+  combination modes `eng+deu` / `deu+eng` strip umlauts (Ä→A, Ö→O, Ü→U;
+  1/9 and 3/9 of a 9-word German probe correct — the English LSTM outvotes
+  the umlauts), while the single German fast model (tessdata 4.0.0_fast)
+  scored 9/9 German AND perfect English (QUOKKA fixture, a 3-line passage,
+  THOUGH/THROUGH/THOROUGH + mixed/lowercase). Decision: `OCR_LANGS =
+  "deu"` drives the worker; `eng.traineddata.gz` dropped (−1.98 MB). The
+  German e2e fixture needed generous spacing — a tight 40px/480px layout
+  misread GRÜßE even under `deu`; the committed 640×200/48px layout
+  recognizes all three words verbatim. New tests: OCR-L01/L02 (policy),
+  OCR-A05 (manifest ↔ policy drift), OCR-A06 (driver ↔ policy source
+  drift), OCR-E05 (German full path, umlauts searchable); OCR-E02 English
+  regression net unchanged and green. 535 unit (was 531), 141 E2E (was
+  140). CI on #158: all three required checks green; squash-merged.
+- **PDF file chips (#159)**: an Excalidraw embeddable (the audio-block
+  pattern) above the printout pages — `link: "infinitenote:pdf"` marker
+  (survives sanitizeUrl), `customData: { pdfName, pdfData }` carrying the
+  ORIGINAL bytes as a data:application/pdf URL (survives scene restore;
+  deliberately NOT in scene.files, where the sanitizer would drop it).
+  Right-click interception: capture-phase listener on the canvas wrapper —
+  client→scene via Excalidraw's exported viewportCoordsToSceneCoords,
+  rotation-exact chip hit-test (React bubbles contextmenu at the app root,
+  so wrapper-capture provably beats both the native and Excalidraw menus).
+  Menu: View file / Download file / Copy file name; Escape, click-away,
+  wheel and miss-contextmenu all close it. 10 MiB attachment cap enforced
+  BEFORE scene mutation (audio #91 stance; oversized files still printout
+  + skip toast). Chip + pages land in ONE updateScene (single undo). Chip
+  names searchable. Tests: 25 unit (pdf-attachment.test.ts: marker,
+  extraction, cap boundaries, base64→Blob byte-exactness incl. 0x00/0xFF,
+  rotation-exact hit-testing, exact toast lines) + 4 search (ATT-S01–04);
+  11 E2E (PA-E01–11) incl. the byte-exact download round-trip
+  (Buffer.compare === 0 against the fixture), clipboard content assertion,
+  oversized-skip, and the OCR tie-in (printout text recognized by the deu
+  model and searchable). Count cascades in imports/import-overlay/
+  import-pdf-truncation shifted +1 element. 564 unit, 152 E2E on the
+  branch (feature specs first-try locally).
+- **Environment notes**: the sandbox reverted the tree mid-session again
+  (applied e2e files vanished between calls) — the staging pipeline
+  (examples/staging/<feature>/apply.sh) carried both features; two new
+  pipeline rules landed in apply.sh: `rm -rf src/lib/__tests_stage__`
+  between runs (stale staged tests otherwise leak into the next feature's
+  gate) and `git clean -fd src public e2e docs` after the reset (untracked
+  staging artifacts — e.g. the vendored deu model — otherwise survive
+  reset --hard and break the A03b stray-file drift test on the other
+  branch). Headless-shell findings: clipboard-write must be granted via
+  context permissions, and top-level blob: PDF navigation does not commit
+  (View file asserts the popup event; headed Chrome shows the viewer).
+
 ## 2026-11-09 — verification pass on #154/#155 + E2E click hardening
 
 - **Baseline re-verified on the merge state of #154/#155 (b78988d)**:

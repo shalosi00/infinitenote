@@ -69,6 +69,17 @@ export async function serializeCurrentPage(page: Page): Promise<string> {
   return page.evaluate(() => window.__NOTE_E2E__?.serializeCurrentPage() ?? "");
 }
 
+/**
+ * Zoom/pan the viewport to the scene content. Embeddable containers
+ * (audio blocks, PDF attachment chips) only render while on-screen, so
+ * specs that interact with them bring the content into view first.
+ */
+export async function scrollToContent(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    window.__NOTE_E2E__?.excalidraw.scrollToContent(undefined, { viewportZoomFactor: 0.8 }),
+  );
+}
+
 export async function saveNow(page: Page): Promise<void> {
   await page.evaluate(() => window.__NOTE_E2E__?.saveNow());
 }

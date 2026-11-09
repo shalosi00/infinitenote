@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-09 (German OCR model swap) |
+| **Last updated** | 2026-11-09 (OneNote-style PDF file chips) |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 535 unit + 141 E2E green (local dev run, first-try); version history + OCR shipped 2026-11-09 and verified; OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
+| **Overall state** | 564 unit + 152 E2E green (local dev run, feature specs first-try; full suite verified by CI on #159); version history + OCR shipped 2026-11-09 and verified; PDF printouts now land a OneNote-style file chip — right-click menu with byte-exact download (docs/test-plans/pdf-attachment.md); OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -60,7 +60,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Infinite canvas, draw + type on anything | Working | E2E (real mouse draw, per-key typing) |
 | Autosave + persistence across reloads | Working | E2E (autosave, flush-on-switch, save-indicator-calm: steady label under viewport-only churn, undo-inside-debounce never persists) |
 | Page paper styles: plain / ruled / grid, persisted, zoom/pan-synced | Working | E2E background.spec (6 checks) |
-| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
+| Imports: image, text, Markdown, PDF printout (20-page cap **with an explicit truncation notice**), `.docx`, OneNote HTML, **OneNote `.mht` with embedded images**, `.excalidraw`, **audio** — all types at once on one canvas, then ink + text on top; import toasts with explicit feedback; **PDF imports land a OneNote-style file chip (badge + file name) with the original bytes embedded** | Working | 36 E2E checks with fixture files (incl. e2e/import-overlay.spec.ts, e2e/import-pdf-truncation.spec.ts) |
 | Exports: PNG, SVG, .excalidraw, **paginated PDF (A4 portrait/landscape — vector text, sliced images, paper-aware, audio blocks as labeled player strips, non-Latin footer titles rasterized, unrotated shapes as true vectors)**, notebook backup — filenames follow the current page title (renames included) and keep CJK/Unicode characters; export errors are localized toasts; the full backup restores into a wiped app through the UI | Working | 19 policy unit tests + 6 E2E checks (e2e/pdf-export.spec.ts, e2e/pdf-wave2.spec.ts) + e2e/export-filename.spec.ts + e2e/import-export-roundtrip.spec.ts (PNG magic/IHDR bytes, SVG markup content, scene export → re-import round-trip, backup export → wipe → UI restore round-trip, 8 checks) |
 | Cross-page search (Ctrl+K — content index reloads on every open and is built once per open, not per keystroke), trash restore/purge (list refreshes live), search/tag jumps reveal their target in a collapsed tree | Working | Unit + 6 E2E checks (search-trash, state-freshness specs) |
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
@@ -68,6 +68,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | **Page version history**: per-page snapshot timeline (auto ≥ 5 min on structural change / manual "Save version now" / automatic pre-restore safety copy), restore to any version (DB-write + canvas remount — the proven sync path), 25-per-page FIFO budget, newest-first dialog; versions are local-only (excluded from backups and the sync folder), trash keeps them, purge cascades | Working | 35 unit tests + 5 E2E checks (docs/test-plans/version-history.md) |
 | **OCR (on-device)**: "Recognize text in images" (Page actions ⋯) runs tesseract.js 6.0.1 — vendored under `public/ocr/` (engine, LSTM cores ×2, **German fast model — recognizes English AND German incl. umlauts/ß**; no CDN, offline after first use; the eng+deu combination modes strip umlauts, evidence in docs/test-plans/ocr.md) — over every image element, stores `customData.ocrText` (normalized, 20k-code-point cap) in the scene, and the recognized text becomes full-text-searchable content with snippets; per-image failures never abort a batch; typed error toasts; assets pinned by sha256 drift tests | Working | 37 unit tests + 5 E2E checks with the real engine, incl. the German fixture (docs/test-plans/ocr.md) |
+| **PDF file chips (OneNote-style)**: every PDF printout import embeds the ORIGINAL file bytes in an Excalidraw embeddable chip above the rendered pages (red PDF badge + file name, survives restore/version history); right-clicking the chip opens a context menu — **View file** (blob URL, new tab), **Download file** (byte-exact original, offline forever), **Copy file name** (clipboard + toast); files over the 10 MiB cap import as plain printouts with an explicit skip toast; chip names are full-text-searchable | Working | 29 unit tests + 11 E2E checks incl. byte-exact round-trip (docs/test-plans/pdf-attachment.md) |
 | Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
@@ -85,14 +86,14 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 535 unit tests, 141 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 564 unit tests, 152 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- German OCR model swap (feat/ocr-german): one deu fast model drives the
-  engine — it recognizes German AND English; the eng+deu combination modes
-  strip umlauts (evidence table in docs/test-plans/ocr.md). 535 unit + 141
-  E2E checks green locally; CI to confirm.
+- PDF file chips (feat/pdf-attachment): OneNote-style file icon on every
+  PDF printout with a right-click menu — View / Download (byte-exact) /
+  Copy file name; 10 MiB attachment cap with skip toast; 564 unit + 152
+  E2E checks green locally (feature specs first-try); CI to confirm.
   Next per the roadmap: the v1.11 handwriting-recognition research (#133).
 
 ## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
@@ -134,8 +135,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 535 unit tests
-make e2e                             # 141 E2E tests (Playwright; boots the app if needed)
+make test                            # 564 unit tests
+make e2e                             # 152 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
@@ -152,6 +153,31 @@ make status                          # quick status snapshot (this file's head +
   the whole action timeout) and the sync ZIP download (click once
   silently dropped) now retry — final attempt uncaught, assertions
   unchanged. Stale cheat-sheet counts corrected (451/122 → 531/140).
+- **2026-11-09 — OneNote-style PDF file chips (fully TDD)**: user
+  requirement — a PDF printout must carry a small file icon with its name,
+  and right-clicking it must offer multiple options incl. downloading the
+  file. Design mirrors the audio embeddables (#67): an Excalidraw
+  embeddable whose `link` carries the `infinitenote:pdf` marker scheme
+  (survives link sanitization) and whose `customData` holds the payload —
+  the ORIGINAL file bytes as a data: application/pdf URL — so the chip
+  moves/zooms/exports/restores like any element and the file stays
+  downloadable byte-exactly, offline, forever. Right-click is intercepted
+  in the capture phase on the canvas wrapper (client → scene coords via
+  Excalidraw's own transform helper, rotation-exact hit-test — React
+  bubbles contextmenu at the app root, so the wrapper capture provably
+  beats both the native and Excalidraw menus). Menu: View file (blob URL,
+  new tab), Download file (the proven downloadBlob), Copy file name
+  (clipboard + toast). 10 MiB attachment cap checked BEFORE scene mutation
+  (audio #91 stance): oversized PDFs keep importing as plain printouts +
+  skip toast. One updateScene per import → single undo removes chip+pages.
+  Chip names searchable (audio-name parity). Plan-first: docs/test-plans/
+  pdf-attachment.md; +29 unit (564) incl. rotation-exact hit-testing and
+  base64→Blob byte-exactness; +11 E2E (152) incl. the byte-exact download
+  round-trip and the oversized skip; count cascades updated in
+  imports/import-overlay/import-pdf-truncation specs (+1 element each).
+  Env findings: headless Chromium needs clipboard-write permission grants
+  and cannot commit top-level blob: PDF navigations (assertions adjusted;
+  headed Chrome renders the viewer).
 - **2026-11-09 — German OCR model swap (fully TDD)**: user requirement
   "OCR must understand German too." Probed the real tesseract.js 6.0.1 with
   the vendored `.traineddata.gz` bytes: the combination modes `eng+deu` /
