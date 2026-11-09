@@ -21,6 +21,23 @@ import { plural } from "./plural";
  */
 export const OCR_TEXT_CAP = 20_000;
 
+/**
+ * Recognition languages — the single source of truth consumed by the
+ * engine driver (ocr-client.ts) and the asset drift tests.
+ *
+ * 2026-11-09: ONE German fast model. Measured against the real
+ * tesseract.js 6.0.1 (docs/test-plans/ocr.md, evidence table): the
+ * combination modes "eng+deu" / "deu+eng" strip umlauts (Ä→A, Ö→O, Ü→U)
+ * and fail German outright, while the deu fast model recognizes German
+ * perfectly AND every English probe flawlessly — the German alphabet is
+ * a superset of the English one. English stays pinned by the English
+ * fixture E2E running through this model.
+ */
+export const OCR_LANGS = "deu";
+
+/** The traineddata files the bundle must ship for OCR_LANGS. */
+export const OCR_LANG_FILES = ["deu.traineddata.gz"] as const;
+
 interface SceneElementLike {
   id?: string;
   type?: string;

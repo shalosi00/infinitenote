@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-09 (verification pass + click hardening) |
+| **Last updated** | 2026-11-09 (German OCR model swap) |
 | **Current version** | v1.10.0 (tagged, [GitHub Release published](https://github.com/shalosi00/infinitenote/releases/tag/v1.10.0)) — v1.10.1 patch in this release |
 | **Phase** | v1.10.0 shipped (offline-first Android wrapper, shape library, manual-pass fixes); v1.10.1 patch: fresh shape element ids (#132); v1.11.0 open (#133 handwriting research) |
-| **Overall state** | 531 unit + 140 E2E green (CI-mode re-run, first-try); version history + OCR shipped 2026-11-09 and verified; two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
+| **Overall state** | 535 unit + 141 E2E green (local dev run, first-try); version history + OCR shipped 2026-11-09 and verified; OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -67,7 +67,7 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | **Page version history**: per-page snapshot timeline (auto ≥ 5 min on structural change / manual "Save version now" / automatic pre-restore safety copy), restore to any version (DB-write + canvas remount — the proven sync path), 25-per-page FIFO budget, newest-first dialog; versions are local-only (excluded from backups and the sync folder), trash keeps them, purge cascades | Working | 35 unit tests + 5 E2E checks (docs/test-plans/version-history.md) |
-| **OCR (on-device)**: "Recognize text in images" (Page actions ⋯) runs tesseract.js 6.0.1 — vendored under `public/ocr/` (engine, LSTM cores ×2, English fast model; no CDN, offline after first use) — over every image element, stores `customData.ocrText` (normalized, 20k-code-point cap) in the scene, and the recognized text becomes full-text-searchable content with snippets; per-image failures never abort a batch; typed error toasts; assets pinned by sha256 drift tests | Working | 35 unit tests + 4 E2E checks with the real engine (docs/test-plans/ocr.md) |
+| **OCR (on-device)**: "Recognize text in images" (Page actions ⋯) runs tesseract.js 6.0.1 — vendored under `public/ocr/` (engine, LSTM cores ×2, **German fast model — recognizes English AND German incl. umlauts/ß**; no CDN, offline after first use; the eng+deu combination modes strip umlauts, evidence in docs/test-plans/ocr.md) — over every image element, stores `customData.ocrText` (normalized, 20k-code-point cap) in the scene, and the recognized text becomes full-text-searchable content with snippets; per-image failures never abort a batch; typed error toasts; assets pinned by sha256 drift tests | Working | 37 unit tests + 5 E2E checks with the real engine, incl. the German fixture (docs/test-plans/ocr.md) |
 | Themes gallery (issue #55): six accent themes over light/dark, live swatches, persisted + pre-hydration restore, localized labels | Working | 19 unit tests + 4 E2E checks (e2e/themes.spec.ts) |
 | Sidebar multi-select: checkboxes, select-all (expanded sections), bulk move (cross-notebook) + bulk delete → trash | Working | 26 unit tests + 4 E2E checks |
 | Keyboard shortcut cheatsheet (? / Ctrl+Cmd+/, sidebar button, platform-aware ⌘/Ctrl) | Working | 11 unit tests + 3 E2E checks |
@@ -85,12 +85,14 @@ export (A4 portrait/landscape, vector text, sliced images).
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 531 unit tests, 140 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 535 unit tests, 141 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- Nothing — `develop` is clean and green at b78988d (version history #154,
-  on-device OCR #155, dialog-close fix #153; 531 unit + 140 E2E checks).
+- German OCR model swap (feat/ocr-german): one deu fast model drives the
+  engine — it recognizes German AND English; the eng+deu combination modes
+  strip umlauts (evidence table in docs/test-plans/ocr.md). 535 unit + 141
+  E2E checks green locally; CI to confirm.
   Next per the roadmap: the v1.11 handwriting-recognition research (#133).
 
 ## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
@@ -132,8 +134,8 @@ export (A4 portrait/landscape, vector text, sliced images).
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 531 unit tests
-make e2e                             # 140 E2E tests (Playwright; boots the app if needed)
+make test                            # 535 unit tests
+make e2e                             # 141 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
@@ -150,6 +152,17 @@ make status                          # quick status snapshot (this file's head +
   the whole action timeout) and the sync ZIP download (click once
   silently dropped) now retry — final attempt uncaught, assertions
   unchanged. Stale cheat-sheet counts corrected (451/122 → 531/140).
+- **2026-11-09 — German OCR model swap (fully TDD)**: user requirement
+  "OCR must understand German too." Probed the real tesseract.js 6.0.1 with
+  the vendored `.traineddata.gz` bytes: the combination modes `eng+deu` /
+  `deu+eng` let the English model outvote the umlauts away (Ä→A, Ö→O, Ü→U —
+  1/9 and 3/9 German probe words correct), while the single German fast
+  model aced all nine German probes AND every English probe. `deu` now
+  drives the engine; `eng` is dropped (−1.98 MB). New: OCR-L01/L02 policy
+  exports, OCR-A05 policy↔manifest drift guard, OCR-A06 driver drift guard,
+  OCR-E05 German E2E (GÄSTEBUCH / MÜNCHEN STRAßE fixture, umlauts intact
+  through engine→customData→search); OCR-E02 (English) unchanged as the
+  regression net and still green. +4 unit (535), +1 E2E (141).
 - **2026-11-09 — On-device OCR for images & PDF printouts (fully TDD)**:
   "Recognize text in images" (Page actions ⋯) makes imported images and
   PDF printouts full-text searchable. The engine (tesseract.js 6.0.1 +

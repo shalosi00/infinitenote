@@ -10,7 +10,7 @@
  * The worker is a lazily-created singleton, reused across images and pages;
  * after a hard failure it is torn down so the next attempt starts clean.
  */
-import { OcrError } from "./ocr";
+import { OCR_LANGS, OcrError } from "./ocr";
 
 /** Where the vendored UMD bundle lives (same-origin). */
 const SCRIPT_URL = "/ocr/tesseract.min.js";
@@ -93,7 +93,10 @@ function getWorker(): Promise<TesseractWorkerLike> {
       // oem 1 = LSTM_ONLY: matches the vendored *-lstm core builds exactly
       // (the default mixed OEM would request core files we deliberately
       // do not ship). gzip: the traineddata is vendored .gz.
-      return await tesseract.createWorker("eng", 1, {
+      // OCR_LANGS (src/lib/ocr.ts): one German fast model — it recognizes
+      // German AND English; the "eng+deu" combination strips umlauts
+      // (docs/test-plans/ocr.md, evidence table).
+      return await tesseract.createWorker(OCR_LANGS, 1, {
         workerPath: "/ocr/worker.min.js",
         corePath: "/ocr/core",
         langPath: "/ocr/lang",
