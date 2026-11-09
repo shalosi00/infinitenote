@@ -12,7 +12,7 @@
 const CACHE = "infinitenote-v1";
 const PRECACHE = ["/manifest.webmanifest"];
 
-const STATIC_PREFIXES = ["/icons/", "/excalidraw/", "/pdf.worker.min.mjs", "/logo.svg"];
+const STATIC_PREFIXES = ["/icons/", "/excalidraw/", "/pdf.worker.min.mjs", "/logo.svg", "/ocr/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
