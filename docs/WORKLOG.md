@@ -77,6 +77,27 @@ many tests, then implement"), with maximum stability.
   first-load font re-measure records exactly one Automatic version
   (deterministic — rows are located by content, never by index).
 
+- **Shipped: on-device OCR for images & PDF printouts (#155, fully TDD)**
+  — "Recognize text in images" (Page actions ⋯) makes imported images and
+  PDF printouts full-text searchable via tesseract.js 6.0.1, fully vendored
+  under public/ocr/ (UMD bundle, worker, SIMD + non-SIMD LSTM cores,
+  English fast traineddata ≈10 MB; sha256 manifest + drift tests —
+  the pdf.js-worker pin pattern applied to the whole engine). No CDN at
+  any point; the service worker caches /ocr/ cache-first after first use.
+  Data flow: flush → read persisted scene → OCR every image element →
+  attach customData.ocrText (whitespace-normalized, surrogate-safe 20k
+  code-point cap) → write back → canvas remount (the proven sync/restore
+  path). Recognized text becomes search CONTENT (matches + snippets).
+  Unit tests inject the engine (35 tests: targeting, immutable merging,
+  status accounting, batch resilience, search integration, asset
+  integrity); the E2E runs the REAL engine against a committed
+  "QUOKKA NOTEBOOK" fixture and proves import → recognize → search hit →
+  reload persistence. E2E lessons: sonner toasts are pointer-interactive
+  (probe bottom-center before clicking there); a search dialog opened
+  into a booting app needs a settle beat + self-healing fill (controlled
+  input can wipe the typed value mid-open); stateful sequences again
+  needed test.describe.serial.
+
 ## 2026-11-08 — full import/export verification pass (#137, PR #138)
 
 - **Task**: "FULLY test importing and exporting." Audit first: the import
