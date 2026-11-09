@@ -12,15 +12,18 @@ import {
   FileDown,
   FileJson,
   FileUp,
+  History,
   Image as ImageIcon,
   LayoutTemplate,
   Menu,
   Mic,
   Moon,
+  MoreHorizontal,
   NotebookPen,
   PackageOpen,
   PenLine,
   Printer,
+  ScanText,
   Search,
   Shapes,
   Square,
@@ -57,6 +60,12 @@ import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
+  ocrRunSummary,
+  ocrTargets,
+  OCR_ERROR_MESSAGES,
+  OcrError,
+} from "@/lib/ocr";
+import {
   addTagWithResult,
   collectTags,
   MAX_TAGS_PER_PAGE,
@@ -68,6 +77,7 @@ import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
+import { HistoryDialog } from "./history-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
@@ -542,6 +552,125 @@ export default function NoteApp() {
     await handleImportFiles(e.dataTransfer.files);
   };
 
+  /* ------------------------------ version history --------------------- */
+
+  /* ---------------------------- OCR (docs/test-plans/ocr.md) ----------- */
+
+  /** True while a recognition run is in flight — disables the menu item. */
+  const [ocrRunning, setOcrRunning] = useState(false);
+
+  /**
+   * "Recognize text in images" (explicit, page-scoped): flush edits → read
+   * the persisted scene → OCR every image element via the vendored engine →
+   * write the enriched scene back → remount the canvas (the proven
+   * sync/restore path). Progress rides a single loading toast; failures map
+   * to typed messages; a page without images is a friendly no-op.
+   */
+  const handleRunOcr = useCallback(async () => {
+    if (ocrRunning) return;
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId || !canvasApi.current) {
+      toast.error("Open a page first, then recognize text.");
+      return;
+    }
+    setOcrRunning(true);
+    const toastId = toast.loading("Preparing the text recognition engine…");
+    try {
+      await canvasApi.current.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast("Nothing to scan — this page has no content yet.", { id: toastId });
+        return;
+      }
+      const targets = ocrTargets(content);
+      if (targets.length === 0) {
+        toast("No images on this page — nothing to recognize.", { id: toastId });
+        return;
+      }
+      toast.loading(
+        `Recognizing text in ${plural(targets.length, "1 image", "# images")}…`,
+        { id: toastId },
+      );
+      const { recognizeImageText } = await import("@/lib/ocr-client");
+      const { recognizeAllImages } = await import("@/lib/ocr");
+      const outcome = await recognizeAllImages(content, recognizeImageText, {
+        onProgress: (done) =>
+          toast.loading(`Recognizing text… ${done}/${targets.length}`, { id: toastId }),
+      });
+      if (outcome.applied > 0) {
+        await db.savePageContent(pageId, outcome.payload);
+        canvasApi.current.discardPendingEdits();
+        setSceneEpoch((e) => e + 1);
+      }
+      toast.success(ocrRunSummary(outcome), { id: toastId });
+    } catch (err) {
+      if (err instanceof OcrError) {
+        toast.error(OCR_ERROR_MESSAGES[err.code], { id: toastId });
+      } else {
+        console.error(err);
+        toast.error("Text recognition failed.", { id: toastId });
+      }
+    } finally {
+      setOcrRunning(false);
+    }
+  }, [ocrRunning]);
+
+  /* ------------------------------ version history --------------------- */
+
+  /**
+   * "Save version now" (manual source): snapshot exactly what is persisted
+   * — flush pending edits first, then version the stored scene.
+   */
+  const handleSaveVersionNow = useCallback(async () => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) {
+      toast.error("Open a page first, then save a version.");
+      return;
+    }
+    try {
+      await canvasApi.current?.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast.error("Nothing to version yet — add something to the page first.");
+        return;
+      }
+      await db.recordPageVersion(pageId, content, "manual");
+      toast.success("Version saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not save a version.");
+    }
+  }, []);
+
+  /**
+   * Restore a stored version (docs/test-plans/version-history.md):
+   *   flush → safety-snapshot the current state ("pre-restore") → overwrite
+   *   the page row with the stored scene → drop the stale canvas stash and
+   *   remount (the same, proven path a sync-merged page takes). The user
+   * never loses the state they are leaving behind.
+   */
+  const handleRestoreVersion = useCallback(async (versionId: string) => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) return;
+    try {
+      await canvasApi.current?.flushSave();
+      const current = await db.getPageContent(pageId);
+      if (current) await db.recordPageVersion(pageId, current, "pre-restore");
+      const restored = await db.getPageVersionContent(pageId, versionId);
+      if (!restored) {
+        toast.error("That version could not be read.");
+        return;
+      }
+      await db.savePageContent(pageId, restored);
+      canvasApi.current?.discardPendingEdits();
+      setSceneEpoch((e) => e + 1);
+      toast.success("Version restored — the replaced state was saved as a version.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not restore that version.");
+    }
+  }, []);
+
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
@@ -917,6 +1046,40 @@ export default function NoteApp() {
                   onSetTags={(tags) => void setPageTags(currentPage.id, tags)}
                 />
 
+                {/* page actions (⋯): version history — kept in ONE menu so
+                    the title bar never grows past a single icon button at
+                    phone-narrow widths (overlap audit) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label={"Page actions"}
+                      title={"Page actions"}
+                      data-testid="page-actions"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" data-testid="page-actions-menu">
+                    <DropdownMenuItem
+                      data-testid="open-version-history"
+                      onClick={() => useAppStore.getState().setHistoryOpen(true)}
+                    >
+                      <History /> {"Version history…"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="run-ocr"
+                      disabled={ocrRunning}
+                      onClick={() => void handleRunOcr()}
+                    >
+                      <ScanText />
+                      {ocrRunning ? "Recognizing text…" : "Recognize text in images"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 {/* page paper style */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1002,6 +1165,10 @@ export default function NoteApp() {
       <SearchDialog />
       <TrashDialog />
       <ShortcutsDialog />
+      <HistoryDialog
+        onSaveNow={handleSaveVersionNow}
+        onRestore={handleRestoreVersion}
+      />
       <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>

@@ -60,6 +60,23 @@ many tests, then implement"), with maximum stability.
   generated the `data-[state=…]:` animate utilities — the app's Radix
   overlays animate nothing; cosmetic follow-up, documented in the CSS.
 
+- **Shipped: page version history (#154, fully TDD)** — per-page snapshot
+  timeline with point-in-time restore. Dexie v3 (`pageVersions`, additive,
+  upgrade-from-v2 test-pinned), pure policy module (auto snapshots: ≥ 5 min
+  throttle AND structural change via `structuralSceneJson` — the autosave
+  gate's own fingerprint; 25/page FIFO; "Before restore" safety copies),
+  History dialog behind a single Page-actions (⋯) menu button, restore via
+  flush → pre-restore snapshot → DB write → canvas remount (the proven
+  sync path — one code path that can desync the canvas, not two).
+  Test plan documented BEFORE implementation
+  (docs/test-plans/version-history.md, 48 cases); red run captured (45
+  new tests failing), then green: 35 unit (VH-P/VH-D) + 5 E2E (VH-E).
+  E2E hardening lessons: stateful spec sequences need `test.describe.serial`
+  (fullyParallel split them across workers, each re-seeding via beforeAll);
+  canvas interactions need explicit tool switching; the welcome page's
+  first-load font re-measure records exactly one Automatic version
+  (deterministic — rows are located by content, never by index).
+
 ## 2026-11-08 — full import/export verification pass (#137, PR #138)
 
 - **Task**: "FULLY test importing and exporting." Audit first: the import
