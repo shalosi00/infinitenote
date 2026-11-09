@@ -14,7 +14,7 @@ interface SceneElementLike {
   type?: string;
   text?: string;
   id?: string;
-  customData?: { audioName?: unknown; ocrText?: unknown } | null;
+  customData?: { audioName?: unknown; ocrText?: unknown; pdfName?: unknown } | null;
 }
 
 /** Extract searchable strings from a serialized page content payload. */
@@ -33,6 +33,12 @@ export function extractSearchableText(contentJson: string | null | undefined): s
     // searching "interview" should find the page holding interview.mp3
     if (el?.type === "embeddable" && typeof el.customData?.audioName === "string") {
       const name = el.customData.audioName.trim();
+      if (name) out.push(name);
+    }
+    // PDF attachment chips (docs/test-plans/pdf-attachment.md) carry the
+    // printout's file name the same way — "contract" finds contract.pdf
+    if (el?.type === "embeddable" && typeof el.customData?.pdfName === "string") {
+      const name = el.customData.pdfName.trim();
       if (name) out.push(name);
     }
     // OCR (docs/test-plans/ocr.md): recognized text on an image element is

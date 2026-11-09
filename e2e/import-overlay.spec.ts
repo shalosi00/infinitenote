@@ -61,7 +61,7 @@ test.describe.serial("import matrix: every file type on one canvas + ink on top"
       path.join(FX, "onenote-page.mht"), // OneNote .mht
       path.join(FX, "test-audio.wav"), // audio (issue #67)
     ]);
-    await expectCount(page, 36, 90_000);
+    await expectCount(page, 37, 90_000);
   });
 
   test("the single canvas carries every imported kind", async () => {
@@ -74,7 +74,7 @@ test.describe.serial("import matrix: every file type on one canvas + ink on top"
       elements: Array<{ type: string }>;
       files: Record<string, unknown>;
     };
-    expect(serialized.elements).toHaveLength(36);
+    expect(serialized.elements).toHaveLength(37); // incl. the PDF chip
     expect(Object.keys(serialized.files).length).toBeGreaterThanOrEqual(5); // png + 2 pdf pages + 2 mht images
   });
 
@@ -95,7 +95,7 @@ test.describe.serial("import matrix: every file type on one canvas + ink on top"
     }
     await page.mouse.up();
     await setActiveTool(page, "selection");
-    await expectCount(page, 37); // 36 imported + 1 freedraw stroke ON TOP
+    await expectCount(page, 38); // 37 imported (incl. chip) + 1 freedraw stroke ON TOP
     expect(await sceneTypes(page)).toContain("freedraw");
   });
 
@@ -111,7 +111,7 @@ test.describe.serial("import matrix: every file type on one canvas + ink on top"
     await page.keyboard.type("annotated over everything", { delay: 20 });
     await page.keyboard.press("Escape");
     await setActiveTool(page, "selection");
-    await expectCount(page, 38);
+    await expectCount(page, 39);
     const scene = JSON.parse(await serializeCurrentPage(page)) as {
       elements: Array<{ type: string; text?: string }>;
     };
@@ -123,7 +123,7 @@ test.describe.serial("import matrix: every file type on one canvas + ink on top"
     await saveNow(page);
     await page.reload();
     await openPage(page, "Page 2");
-    await expectCount(page, 38);
+    await expectCount(page, 39);
     // the imported stack is taller than the viewport — fit it so the audio
     // block (bottom of the stack) enters view and Excalidraw mounts its
     // embeddable player again
