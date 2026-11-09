@@ -89,17 +89,9 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- Bug-hunt wave 1 (issues #72–#75) and **wave 2** (issues #63, #77–#105,
-  #107) are fixed on `develop`. Wave 2 shipped as six PRs (#106–#112):
-  state/data integrity (boot retry, honest autosave, fresh search/trash,
-  focus + reveal), PDF fidelity (audio blocks, CJK footers, vector shapes,
-  capped printouts, localized errors), imports (CJK-aware layout, SVG
-  fallback, docx hard breaks, audio size cap, batched updates), recording +
-  library (onerror handling, no-page guard, seconds-resolution names,
-  library restore), i18n (localized generated names + seed, IME-safe
-  Enter, surrogate-safe truncation) and hardening (localized sync errors,
-  tag feedback, flag-gated e2e hooks, pinned pdf.js, honest build,
-  folder-init sync). Every fix carries unit and/or E2E regression coverage.
+- Nothing — `develop` is clean and green at b78988d (version history #154,
+  on-device OCR #155, dialog-close fix #153; 531 unit + 140 E2E checks).
+  Next per the roadmap: the v1.11 handwriting-recognition research (#133).
 
 ## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
