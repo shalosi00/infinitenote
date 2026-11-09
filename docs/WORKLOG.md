@@ -78,6 +78,11 @@
   release-critical steps run as a deterministic rebuild loop — fresh branch
   off origin/develop → asserted edits → commit → push → verify remote SHA —
   retried until the remote tip equals the local commit.
+- **Shipped**: release PR #161 squash-merged to main (bacf898), tag v1.11.0
+  pushed and verified, GitHub Release published, milestone 12 (v1.11.0)
+  closed with 23 issues/PRs, #133 moved to the new v1.12.0 milestone (13).
+  main and develop now both carry the 1.11.0 version files — the default
+  branch is the latest release, which is what the user asked for.
 
 ## 2026-11-09 — German OCR + OneNote-style PDF file chips (fully TDD)
 
