@@ -83,6 +83,13 @@
   closed with 23 issues/PRs, #133 moved to the new v1.12.0 milestone (13).
   main and develop now both carry the 1.11.0 version files — the default
   branch is the latest release, which is what the user asked for.
+- **Tag verification (fresh clone)**: cloned tag v1.11.0 from GitHub into a
+  clean directory — `bun install --frozen-lockfile` (988 packages, no
+  drift), `bun run build` clean, the standalone production server answered
+  in 2s with the right title, and the unit suite ran 564/564 with 0 fail.
+  The Desktop workflow built the v1.11.0 Linux artifacts (deb / rpm /
+  AppImage) and all three are attached to the release; CI on the main push
+  is green.
 
 ## 2026-11-09 — German OCR + OneNote-style PDF file chips (fully TDD)
 
