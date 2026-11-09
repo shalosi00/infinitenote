@@ -227,6 +227,14 @@ export default function ExcalidrawCanvas({
       lastSavedSig.current = sceneSignature(payload);
       lastSavedStructure.current = structuralSceneJson(payload);
       onSaveIndicator("saved");
+      // Version history (docs/test-plans/version-history.md): after a
+      // successful save, offer the scene to the auto-snapshot policy
+      // (≥ 5 min since the page's newest version AND structure changed).
+      // Fire-and-forget: a failed snapshot must never fail the save, and
+      // the IndexedDB write completes on its own once issued.
+      db.maybeRecordAutoVersion(pageId, payload).catch((err: unknown) => {
+        console.error("auto version snapshot failed", err);
+      });
     } catch {
       clearTimeout(labelTimer);
       onSaveIndicator("error");

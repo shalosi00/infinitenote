@@ -11,11 +11,22 @@
  * - v2 (sync, v1.5): `tombstones` remembers purges so a stale sync folder
  *   can never resurrect a purged row; `syncMeta` holds the last-synced
  *   manifest. Both are additive stores — no data migration needed.
+ * - v3 (version history): `pageVersions` holds per-page scene snapshots
+ *   (auto / manual / pre-restore) with a FIFO budget — additive again.
  */
 import Dexie, { type Table } from "dexie";
 import { generatedNames } from "./generated-names";
 import { RestoreError } from "./restore-error";
 import { byOrder } from "./types";
+import {
+  buildPageVersion,
+  pruneToCapacity,
+  shouldAutoSnapshot,
+  sortVersionsNewestFirst,
+  type PageVersionRow,
+  type PageVersionSource,
+  type PageVersionSummary,
+} from "./version-history";
 import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
 
 /** Purge tombstone — `purged: true` entries of the sync trash log. */
@@ -39,6 +50,7 @@ export class InfiniteNoteDB extends Dexie {
   pages!: Table<PageRow, string>;
   tombstones!: Table<TombstoneRow, string>;
   syncMeta!: Table<SyncMetaRow, string>;
+  pageVersions!: Table<PageVersionRow, string>;
 
   constructor() {
     super("infinitenote");
@@ -53,6 +65,14 @@ export class InfiniteNoteDB extends Dexie {
       pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
       tombstones: "id",
       syncMeta: "key",
+    });
+    this.version(3).stores({
+      notebooks: "id, order, deletedAt",
+      sections: "id, notebookId, order, deletedAt",
+      pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+      tombstones: "id",
+      syncMeta: "key",
+      pageVersions: "id, pageId, createdAt",
     });
   }
 }
@@ -165,7 +185,7 @@ export async function restoreNotebook(id: string): Promise<void> {
 }
 
 export async function purgeNotebook(id: string): Promise<void> {
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.pageVersions], async () => {
     const nb = await db.notebooks.get(id);
     if (nb) await db.tombstones.put({ id: nb.id, kind: "notebook", at: now(), title: nb.name });
     const sections = await db.sections.where("notebookId").equals(id).toArray();
@@ -182,6 +202,8 @@ async function purgeRowsOfSection(s: Section): Promise<void> {
   const pages = await db.pages.where("sectionId").equals(s.id).toArray();
   for (const p of pages) {
     await db.tombstones.put({ id: p.id, kind: "page", at: now(), title: p.title });
+    // version history is page-scoped — it dies with the page (v3)
+    await db.pageVersions.where("pageId").equals(p.id).delete();
   }
   await db.pages.where("sectionId").equals(s.id).delete();
   await db.sections.delete(s.id);
@@ -259,7 +281,7 @@ export async function restoreSection(id: string): Promise<void> {
 }
 
 export async function purgeSection(id: string): Promise<void> {
-  await db.transaction("rw", [db.sections, db.pages, db.tombstones], async () => {
+  await db.transaction("rw", [db.sections, db.pages, db.tombstones, db.pageVersions], async () => {
     const sec = await db.sections.get(id);
     if (sec) await purgeRowsOfSection(sec);
   });
@@ -496,10 +518,11 @@ export async function restorePage(id: string): Promise<void> {
 }
 
 export async function purgePage(id: string): Promise<void> {
-  await db.transaction("rw", [db.pages, db.tombstones], async () => {
+  await db.transaction("rw", [db.pages, db.tombstones, db.pageVersions], async () => {
     const page = await db.pages.get(id);
     if (page) {
       await db.tombstones.put({ id: page.id, kind: "page", at: now(), title: page.title });
+      await db.pageVersions.where("pageId").equals(id).delete();
       await db.pages.delete(id);
     }
   });
@@ -530,6 +553,74 @@ export async function savePageContent(id: string, payload: ScenePayload): Promis
   // so the autosave indicator shows the error instead of "Saved".
   if (updated === 0) {
     throw new Error(`savePageContent: page row "${id}" no longer exists`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* page version history (v3, docs/test-plans/version-history.md)        */
+/* ------------------------------------------------------------------ */
+
+/** Record one version of a page's scene and prune the per-page budget. */
+export async function recordPageVersion(
+  pageId: string,
+  payload: ScenePayload,
+  source: PageVersionSource,
+  at: number = now(),
+): Promise<PageVersionSummary> {
+  const row = buildPageVersion(pageId, payload, source, at);
+  await db.transaction("rw", db.pageVersions, async () => {
+    await db.pageVersions.add(row);
+    const all = await db.pageVersions.where("pageId").equals(pageId).toArray();
+    const doomed = pruneToCapacity(all);
+    if (doomed.length > 0) await db.pageVersions.bulkDelete(doomed);
+  });
+  const { content: _content, ...summary } = row;
+  return summary;
+}
+
+/** A page's versions, newest first — summaries only (content stays in the DB). */
+export async function listPageVersions(pageId: string): Promise<PageVersionSummary[]> {
+  const rows = await db.pageVersions.where("pageId").equals(pageId).toArray();
+  return sortVersionsNewestFirst(rows).map(({ content: _content, ...summary }) => summary);
+}
+
+/** The newest full version row of a page (content included), or null. */
+async function lastPageVersionRow(pageId: string): Promise<PageVersionRow | null> {
+  const rows = await db.pageVersions.where("pageId").equals(pageId).toArray();
+  return sortVersionsNewestFirst(rows)[0] ?? null;
+}
+
+/**
+ * The autosave hook: record an AUTO version when the policy says so
+ * (≥ 5 min since the newest version AND the structure really changed).
+ * Returns whether a version was recorded. Callers treat failures as
+ * non-fatal — a failed snapshot must never fail the save itself.
+ */
+export async function maybeRecordAutoVersion(
+  pageId: string,
+  payload: ScenePayload,
+): Promise<boolean> {
+  const last = await lastPageVersionRow(pageId);
+  if (!shouldAutoSnapshot(last, payload, Date.now())) return false;
+  await recordPageVersion(pageId, payload, "auto");
+  return true;
+}
+
+/**
+ * The scene a stored version holds, validated against the requesting page:
+ * null when the version is missing, belongs to another page, or its content
+ * no longer parses (corrupt rows restore nothing rather than garbage).
+ */
+export async function getPageVersionContent(
+  pageId: string,
+  versionId: string,
+): Promise<ScenePayload | null> {
+  const row = await db.pageVersions.get(versionId);
+  if (!row || row.pageId !== pageId) return null;
+  try {
+    return JSON.parse(row.content) as ScenePayload;
+  } catch {
+    return null;
   }
 }
 
@@ -569,12 +660,13 @@ export async function listTrash(): Promise<TrashSnapshot> {
  * instead of being blocked by tombstones for rows the user just erased.
  */
 export async function eraseAllData(): Promise<void> {
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.syncMeta], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.syncMeta, db.pageVersions], async () => {
     await db.notebooks.clear();
     await db.sections.clear();
     await db.pages.clear();
     await db.tombstones.clear();
     await db.syncMeta.clear();
+    await db.pageVersions.clear();
   });
 }
 

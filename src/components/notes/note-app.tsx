@@ -12,11 +12,13 @@ import {
   FileDown,
   FileJson,
   FileUp,
+  History,
   Image as ImageIcon,
   LayoutTemplate,
   Menu,
   Mic,
   Moon,
+  MoreHorizontal,
   NotebookPen,
   PackageOpen,
   PenLine,
@@ -68,6 +70,7 @@ import CanvasEditor from "./canvas-editor";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
+import { HistoryDialog } from "./history-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
@@ -542,6 +545,64 @@ export default function NoteApp() {
     await handleImportFiles(e.dataTransfer.files);
   };
 
+  /* ------------------------------ version history --------------------- */
+
+  /* ------------------------------ version history --------------------- */
+
+  /**
+   * "Save version now" (manual source): snapshot exactly what is persisted
+   * — flush pending edits first, then version the stored scene.
+   */
+  const handleSaveVersionNow = useCallback(async () => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) {
+      toast.error("Open a page first, then save a version.");
+      return;
+    }
+    try {
+      await canvasApi.current?.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast.error("Nothing to version yet — add something to the page first.");
+        return;
+      }
+      await db.recordPageVersion(pageId, content, "manual");
+      toast.success("Version saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not save a version.");
+    }
+  }, []);
+
+  /**
+   * Restore a stored version (docs/test-plans/version-history.md):
+   *   flush → safety-snapshot the current state ("pre-restore") → overwrite
+   *   the page row with the stored scene → drop the stale canvas stash and
+   *   remount (the same, proven path a sync-merged page takes). The user
+   * never loses the state they are leaving behind.
+   */
+  const handleRestoreVersion = useCallback(async (versionId: string) => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) return;
+    try {
+      await canvasApi.current?.flushSave();
+      const current = await db.getPageContent(pageId);
+      if (current) await db.recordPageVersion(pageId, current, "pre-restore");
+      const restored = await db.getPageVersionContent(pageId, versionId);
+      if (!restored) {
+        toast.error("That version could not be read.");
+        return;
+      }
+      await db.savePageContent(pageId, restored);
+      canvasApi.current?.discardPendingEdits();
+      setSceneEpoch((e) => e + 1);
+      toast.success("Version restored — the replaced state was saved as a version.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not restore that version.");
+    }
+  }, []);
+
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
@@ -917,6 +978,32 @@ export default function NoteApp() {
                   onSetTags={(tags) => void setPageTags(currentPage.id, tags)}
                 />
 
+                {/* page actions (⋯): version history — kept in ONE menu so
+                    the title bar never grows past a single icon button at
+                    phone-narrow widths (overlap audit) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label={"Page actions"}
+                      title={"Page actions"}
+                      data-testid="page-actions"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" data-testid="page-actions-menu">
+                    <DropdownMenuItem
+                      data-testid="open-version-history"
+                      onClick={() => useAppStore.getState().setHistoryOpen(true)}
+                    >
+                      <History /> {"Version history…"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 {/* page paper style */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1002,6 +1089,10 @@ export default function NoteApp() {
       <SearchDialog />
       <TrashDialog />
       <ShortcutsDialog />
+      <HistoryDialog
+        onSaveNow={handleSaveVersionNow}
+        onRestore={handleRestoreVersion}
+      />
       <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
