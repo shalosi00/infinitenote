@@ -98,6 +98,19 @@ milestones/issues. This file is the plan; the status file is the reality.
       (issue #122) and the app reopens the last-opened page on reload
       (issue #123)
 
+## v1.12 — Recoverable & searchable pages (shipped on `develop`)
+
+- [x] Page version history: per-page snapshot timeline (auto ≥ 5 min on
+      structural change / manual "Save version now" / automatic pre-restore
+      safety copy), restore to any version, 25-per-page FIFO budget,
+      newest-first dialog — fully TDD (docs/test-plans/version-history.md)
+- [x] On-device OCR for images & PDF printouts: tesseract.js vendored under
+      `public/ocr/` (no CDN, offline after first use, sha256-pinned),
+      "Recognize text in images" makes scanned content full-text searchable
+      — fully TDD (docs/test-plans/ocr.md)
+- [x] Fix: clicks right after closing a dialog are no longer swallowed
+      (Radix body pointer-events + closed-overlay guard; regression-pinned)
+
 ## v1.11 — Handwriting recognition (research; current)
 
 - [ ] Handwriting recognition research: on-device HTR options for the

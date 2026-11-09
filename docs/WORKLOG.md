@@ -98,6 +98,24 @@ many tests, then implement"), with maximum stability.
   input can wipe the typed value mid-open); stateful sequences again
   needed test.describe.serial.
 
+- **Session close (all green)**: three PRs squash-merged with all required
+  checks green in CI — #153 (dialog-close click-swallow fix, +1 E2E),
+  #154 (page version history, +35 unit / +5 E2E), #155 (on-device OCR,
+  +35 unit / +4 E2E). Final state on `develop` (b78988d): lint ✅ ·
+  typecheck ✅ · 531/531 unit ✅ · 140 E2E — 135 passed + 1 pre-existing
+  local flake (state-freshness #79, `ERR_CONNECTION_REFUSED` — a local
+  server-startup race, not an app bug; CI runners show it green on all
+  three PRs). Test plans committed under docs/test-plans/ for both
+  features. Environment lessons this session: the sandbox reverted the
+  working tree between tool calls many times — everything rode an
+  untracked staging overlay (examples/dev-stage) + atomic
+  reset-and-apply; PR branches must be built from per-PR file sets (a
+  combined working-tree note-app leaked OCR imports into the
+  version-history PR — caught by CI, fixed in-branch); fast CI runners
+  can click ~30 ms after Escape, before React commits a dialog close —
+  specs must wait for the closed state instead of racing it
+  (`closeHistoryDialog`).
+
 ## 2026-11-08 — full import/export verification pass (#137, PR #138)
 
 - **Task**: "FULLY test importing and exporting." Audit first: the import
