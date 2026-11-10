@@ -83,3 +83,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.11.1
+    versionCode: 211
+    commit: v1.11.1
+    subdir: android-twa
+    gradle:
+      - yes
