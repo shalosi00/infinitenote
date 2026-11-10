@@ -90,3 +90,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.12.0
+    versionCode: 220
+    commit: v1.12.0
+    subdir: android-twa
+    gradle:
+      - yes
