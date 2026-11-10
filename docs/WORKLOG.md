@@ -1076,3 +1076,51 @@ many tests, then implement"), with maximum stability.
   Final state: bun-bundled web build (1.1 MB, gzip 220 KB), relative
   localModelPath, absolute wasmPaths — recognition works end-to-end
   (probe + E2E), unit 614/614, local production build exit 0.
+
+## 2026-11-10 — test-growth cycle: +200 unit tests closing lib coverage gaps (#179)
+
+User-set goal for the cycle: grow the unit suite by 200 tests. Survey
+first (LOC vs existing test counts per module), then fill the gaps:
+excalidraw-client.ts and pdf-export.ts were excluded — both touch
+`window` at import time and cannot load in bun; everything else in
+src/lib was fair game. Issue #179 tracks the goal.
+
+- **What was added (exactly 200 tests, 21 new files)**: sync
+  format/db/merge edges and conflict cases (47), store CRUD +
+  notes-db Dexie edges (38), the docx/html/mht/import-blocks
+  importers (41), shape library + themes + search ranking + tags
+  (39), tree ops + shortcuts + generated names (35), and
+  excalidraw-utils + pdf-layout + audio notes + ocr-client (32) —
+  every file covers aspects the existing suite did not pin (edge
+  cases, error paths, boundaries, round-trips), verified against the
+  old files for duplication before writing. 232 tests were drafted;
+  the weakest 32 were dropped (4 whole files + 16 individual tests)
+  to land on exactly 200 rather than pad the count.
+
+- **Verification (actual runs)**: full suite 814/814 across 67 files
+  (614 pre-existing + 200 new) in 4.6 s, run three times with zero
+  flakes; `bun run lint` and `bunx tsc --noEmit` clean. Test-only PR
+  — zero behavior changes, zero production files touched.
+
+- **PR #178 build-smoke detour**: the handwriting Phase A PR's
+  build-smoke job failed once with a Turbopack PostCSS worker IPC
+  timeout ("timeout while receiving message from process … deadline
+  has elapsed" on globals.css) while the identical production build
+  in the e2e job passed — a runner flake, not a code defect. One
+  re-run of the failed job went green; PR merged (squash 9d6866a),
+  issue #175 closed with a referencing comment.
+
+- **Typo fixed in passing**: the hwr cycle's PROJECT_STATUS said
+  "full local run 613/613" — the real count was 614 (proven by this
+  cycle's arithmetic: 814 − 200 = 614). Corrected while updating the
+  status row.
+
+- **Suspected bugs found while writing tests (documented, NOT
+  asserted)**: (1) docx-import `iterateTopLevel` yields a normal
+  paragraph twice when it is preceded by a self-closing `<w:p/>`
+  (common in real Word exports) — the close-tag search swallows the
+  next paragraph's `</w:p>`; fix scheduled as its own PR with a
+  regression test. (2) tags `addTagWithResult` reports "added" but
+  silently drops the new tag when the input list already exceeds
+  MAX_TAGS_PER_PAGE (reachable only via imported/persisted data).
+  Both are noted for the next cycle; neither is pinned by a test.
