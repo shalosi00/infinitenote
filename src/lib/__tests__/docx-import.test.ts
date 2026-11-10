@@ -112,4 +112,19 @@ describe("extractDocxBlocks — edge cases", () => {
     const bytes = zipSync({ "word/document.xml": new TextEncoder().encode(xml) });
     expect(extractDocxBlocks(bytes)[0].text).toBe("&lt;raw&gt;");
   });
+
+  it("yields self-closing <w:p/> once and never duplicates the paragraph after it", () => {
+    // Real Word exports emit <w:p/> (and <w:p w:rsid…/>) for empty
+    // paragraphs. The close-tag scan used to swallow the NEXT paragraph's
+    // </w:p>, yielding its content twice.
+    const xml =
+      '<w:document xmlns:w="urn:x"><w:body>' +
+      '<w:p/><w:p w:rsidR="00A6D5B9"/>' +
+      "<w:p><w:r><w:t>real</w:t></w:r></w:p>" +
+      "</w:body></w:document>";
+    const bytes = zipSync({ "word/document.xml": new TextEncoder().encode(xml) });
+    const blocks = extractDocxBlocks(bytes);
+    expect(blocks).toHaveLength(1); // the two empty paragraphs contribute nothing
+    expect(blocks[0].text).toBe("real");
+  });
 });

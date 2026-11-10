@@ -82,6 +82,15 @@ function* iterateTopLevel(body: string): Generator<string> {
   for (const open of opens) {
     if (open.start < skipUntil) continue; // inside a table handled earlier
     if (open.tag === "p") {
+      // Self-closing <w:p/> (an empty paragraph — common in real Word
+      // exports): it has no </w:p>, so the indexOf below would swallow the
+      // NEXT paragraph's close tag and yield that paragraph twice. Yield the
+      // bare tag instead; paragraphBlock returns null for it (no runs).
+      const tagEnd = body.indexOf(">", open.start);
+      if (tagEnd >= 0 && body[tagEnd - 1] === "/") {
+        yield body.slice(open.start, tagEnd + 1);
+        continue;
+      }
       const close = body.indexOf("</w:p>", open.start);
       yield close < 0
         ? body.slice(open.start)
