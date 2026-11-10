@@ -99,7 +99,7 @@ describe("desktop CI workflow", () => {
     expect(workflow).not.toContain("runs-on: ubuntu-latest");
   });
 
-  it("triggers on pushes to main (the corrupted 'ain]' filter never matched)", () => {
+  it("triggers on pushes to main (pin: the filter was always correct on disk — an output-display artifact made it look corrupted)", () => {
     expect(workflow).toContain("branches: [main]");
   });
 
