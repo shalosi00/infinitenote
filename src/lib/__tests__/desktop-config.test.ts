@@ -89,4 +89,23 @@ describe("desktop CI workflow", () => {
     const onBlock = workflow.split("jobs:")[0];
     expect(onBlock).not.toContain("pull_request");
   });
+
+  // Issue #164: linuxdeploy copies the runner's webkit2gtk/glib into the
+  // AppImage, so an ubuntu-latest build silently required GLIBC_2.42/2.43 and
+  // failed to launch on every current LTS distro. The runner must stay pinned
+  // to the oldest supported LTS image.
+  it("builds on a pinned LTS runner, never ubuntu-latest (issue #164)", () => {
+    expect(workflow).toContain("runs-on: ubuntu-22.04");
+    expect(workflow).not.toContain("runs-on: ubuntu-latest");
+  });
+
+  it("triggers on pushes to main (the corrupted 'ain]' filter never matched)", () => {
+    expect(workflow).toContain("branches: [main]");
+  });
+
+  it("enforces the AppImage glibc floor after the build (issue #164)", () => {
+    expect(workflow).toContain('GLIBC_FLOOR: "2.35"');
+    expect(workflow).toContain("--appimage-extract");
+    expect(workflow).toContain("Enforce the AppImage glibc floor");
+  });
 });

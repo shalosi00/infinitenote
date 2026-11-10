@@ -3,6 +3,15 @@ name: Desktop
 # Builds the Tauri desktop shell. NOT a required PR check: this only runs on
 # main (and v* tags) because a full Rust/Tauri compile takes ~10 minutes and
 # needs the webkit2gtk system libraries.
+#
+# The runner is PINNED to ubuntu-22.04 on purpose (issue #164): linuxdeploy
+# copies webkit2gtk/glib and friends from the build host into the AppImage,
+# so building on ubuntu-latest makes the bundle require the newest image's
+# glibc (observed: 2.43) and the AppImage then failed to launch on Ubuntu
+# 24.04 / Debian 13 / Mint 22 with no visible error. The glibc-floor guard
+# below fails the build if that ever regresses. Do not bump the runner
+# without re-checking the guard and the supported-distro matrix in
+# docs/desktop.md.
 on:
   push:
     branches: [main]
@@ -16,10 +25,15 @@ concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Highest GLIBC symbol version bundled ELF files may require (ubuntu-22.04
+  # ships glibc 2.35). Enforced after the build; see issue #164.
+  GLIBC_FLOOR: "2.35"
+
 jobs:
   linux:
-    name: Linux build (deb / rpm / AppImage)
-    runs-on: ubuntu-latest
+    name: Linux build (deb / rpm / AppImage) + glibc floor guard
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +73,26 @@ jobs:
 
       - name: Build desktop bundles
         run: bun run tauri build
+
+      # Issue #164: the released v1.11.0 AppImage bundled libraries taken
+      # from the (much newer) ubuntu-latest image and required GLIBC_2.42/
+      # 2.43, so it silently failed to launch on every current LTS distro
+      # when double-clicked. Guard: no bundled ELF file may require a GLIBC
+      # symbol version above the floor.
+      - name: Enforce the AppImage glibc floor
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(ls src-tauri/target/release/bundle/appimage/*.AppImage)"
+          "$APPIMAGE" --appimage-extract >/dev/null
+          maxv="$(find squashfs-root -type f -exec sh -c \
+            'for f do objdump -T "$f" 2>/dev/null; done' sh {} + \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | cut -d_ -f2- | sort -Vu | tail -1 || true)"
+          rm -rf squashfs-root
+          echo "Highest GLIBC symbol version required by the bundle: ${maxv:-none}"
+          if [ -n "${maxv:-}" ] && [ "$(printf '%s\n%s\n' "$GLIBC_FLOOR" "$maxv" | sort -V | tail -1)" != "$GLIBC_FLOOR" ]; then
+            echo "::error::Bundled libraries require GLIBC_${maxv}, above the ${GLIBC_FLOOR} floor — the AppImage would fail to launch on target distros (issue #164). Pin an older build runner."
+            exit 1
+          fi
 
       - name: Upload build artifacts (retention copy)
         uses: actions/upload-artifact@v4
