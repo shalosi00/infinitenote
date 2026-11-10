@@ -17,6 +17,7 @@
 import Dexie, { type Table } from "dexie";
 import { generatedNames } from "./generated-names";
 import { RestoreError } from "./restore-error";
+import { safeTags } from "./tags";
 import { byOrder } from "./types";
 import {
   buildPageVersion,
@@ -786,6 +787,11 @@ export async function restoreBackup(json: string): Promise<number> {
         for (const page of sec.pages ?? []) {
           pageOrder += 1;
           pageCount += 1;
+          // tags/content are hand-editable backup fields: a "tags": "work"
+          // string or a non-string "content" must restore as absent rather
+          // than crash the sidebar/search later (same contract as
+          // parseSyncFolder on the sync side).
+          const tags = safeTags(page.tags);
           await db.pages.add({
             id: newId(),
             sectionId: secId,
@@ -794,9 +800,9 @@ export async function restoreBackup(json: string): Promise<number> {
             createdAt: ts,
             updatedAt: ts,
             deletedAt: null,
-            content: page.content ?? null,
+            content: typeof page.content === "string" ? page.content : null,
             background: page.background,
-            tags: page.tags?.length ? page.tags : undefined,
+            tags: tags.length ? tags : undefined,
           });
         }
       }

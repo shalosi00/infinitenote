@@ -239,6 +239,52 @@ export function titleToFilename(title: string, ext: string): string {
   return `${base}.${ext}`;
 }
 
+/** The shape a .excalidraw scene file must have to be importable. */
+export interface ParsedSceneFile {
+  elements: unknown[];
+  files: Record<string, unknown>;
+  appState?: unknown;
+}
+
+/**
+ * Parse + shape-validate the text of a .excalidraw scene file — the pure,
+ * unit-testable half of `importExcalidrawFile`. A truncated download or a
+ * file that was never a scene at all (renamed binary, hand-mangled JSON)
+ * fails HERE with an error that says WHAT is wrong, instead of a bare
+ * `SyntaxError: Unexpected token` from JSON.parse or an unattributed crash
+ * deep inside Excalidraw's restore() mid-import-batch.
+ *
+ * Minimal valid input: `{"elements": []}`. `files` defaults to {}, and an
+ * `elements` array of arbitrary junk objects is accepted as-is — element
+ * sanitization is Excalidraw's restore() job; this seam only pins the
+ * outer envelope.
+ */
+export function parseSceneFileText(text: string): ParsedSceneFile {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`not valid JSON (${(e as Error).message})`);
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error("the root must be a scene object");
+  }
+  const scene = data as { elements?: unknown; files?: unknown };
+  if (scene.elements !== undefined && !Array.isArray(scene.elements)) {
+    throw new Error('"elements" must be an array');
+  }
+  if (scene.files !== undefined && (typeof scene.files !== "object" || scene.files === null || Array.isArray(scene.files))) {
+    throw new Error('"files" must be an object');
+  }
+  return {
+    elements: Array.isArray(scene.elements) ? scene.elements : [],
+    files: (typeof scene.files === "object" && scene.files !== null && !Array.isArray(scene.files)
+      ? scene.files
+      : {}) as Record<string, unknown>,
+    appState: (data as { appState?: unknown }).appState,
+  };
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

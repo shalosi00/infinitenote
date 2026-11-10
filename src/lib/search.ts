@@ -10,6 +10,7 @@
  * query terms must appear (AND), case-insensitive.
  */
 import type { Notebook, PageMeta, Section } from "./types";
+import { safeTags } from "./tags";
 
 interface SceneElementLike {
   type?: string;
@@ -18,7 +19,15 @@ interface SceneElementLike {
   customData?: { audioName?: unknown; ocrText?: unknown; pdfName?: unknown; hwrText?: unknown } | null;
 }
 
-/** Extract searchable strings from a serialized page content payload. */
+/** Extract searchable strings from a serialized page content payload.
+ *
+ * Defensive by contract: page content is persisted JSON that a hand-edited
+ * sync page file or an older restore can leave shape-corrupt
+ * ("scene": {"elements": 42}). A non-array `elements` value is treated as
+ * "no elements" — the same way an unparseable payload already is — instead
+ * of crashing the whole search index with `TypeError: number is not
+ * iterable` (one bad page must never take the search dialog down).
+ */
 export function extractSearchableText(contentJson: string | null | undefined): string[] {
   if (!contentJson) return [];
   let parsed: { elements?: SceneElementLike[] };
@@ -27,8 +36,9 @@ export function extractSearchableText(contentJson: string | null | undefined): s
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed?.elements)) return [];
   const out: string[] = [];
-  for (const el of parsed.elements ?? []) {
+  for (const el of parsed.elements) {
     if (typeof el?.text === "string" && el.text.trim()) out.push(el.text);
     // audio blocks (issue #67) carry their clip filename in customData —
     // searching "interview" should find the page holding interview.mp3
@@ -84,7 +94,7 @@ export function buildSearchIndex(
       notebookId: nb?.id ?? "",
       title: page.title,
       pagePath: [nb?.name ?? "…", sec?.name ?? "…"].join(" / "),
-      haystack: [page.title, ...(page.tags ?? []), ...contents],
+      haystack: [page.title, ...safeTags(page.tags), ...contents],
       contents,
     };
   });

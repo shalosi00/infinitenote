@@ -1151,3 +1151,75 @@ that cycle's worklog, deliberately not asserted until fixed).
   regression test pins both the bare `<w:p/>` and the attributed
   `<w:p w:rsidR="…"/>` forms and asserts the following paragraph
   appears exactly once.
+
+## 2026-11-10 — corrupt-input hardening: "test unexpected cases like humans do"
+
+Goal directive: probe the app the way a human QA would — hand-edit the
+documented JSON surfaces, truncate files, rename binaries, forget the
+brackets — and fix whatever breaks.
+
+- **Method**: surveyed every `JSON.parse` consumer and every spread /
+  for-of over persisted shapes in src/lib, then replayed plausible
+  hand-edits against them with a scratch probe before writing tests:
+  `"scene": 42`, `"scene": {"elements": 42}`, `"tags": "work"`,
+  `"tags": [1,2]`, `"tags": {"length":5}`, truncated .excalidraw text,
+  non-string backup fields. Six of the probes crashed or corrupted
+  real surfaces (search dialog, sidebar chips, import batches).
+
+- **Defects found and fixed**:
+  1. `extractSearchableText` (search.ts): `for...of` over a non-array
+     `elements` value crashed the ENTIRE search index build — one
+     shape-corrupt page (reachable via a hand-edited sync page file)
+     took the search dialog down with `TypeError: number is not
+     iterable`. Now an `Array.isArray` guard degrades it to "no
+     elements", same as unparseable JSON always did.
+  2. `buildSearchIndex` (search.ts): `...(page.tags ?? [])` spread a
+     hand-edited `"tags": "work"` string into single-char haystack
+     entries (a search for "w" matched), and a `{length:5}` object
+     into a spread TypeError. Tags now go through `safeTags`.
+  3. tags.ts: `collectTags`, `pageHasTag`, `removeTag`, `normalizeTags`
+     crashed on non-string entries from imported rows
+     (`t.toLowerCase is not a function` on `[1,2]`, not-iterable on
+     `{length:5}`). New exported `safeTags()` coercion boundary; every
+     consumer goes through it, well-formed callers unchanged.
+  4. `parseSyncFolder` (sync/format.ts): scene and tags fields passed
+     into the DB with zero shape validation. Scene now must be null/
+     absent or an object with array `elements` + object `files`, else
+     a typed `badPageFile` naming the file (consistent with the
+     module's own "no half-merging garbage" philosophy — the error
+     message tells the user which page file to restore). Tags degrade:
+     non-arrays drop, non-string entries filter out.
+  5. `importExcalidrawFile` (excalidraw-client.ts): a truncated or
+     renamed .excalidraw file aborted the whole import batch with a
+     bare SyntaxError and no file name. New pure
+     `parseSceneFileText(text)` seam in excalidraw-utils.ts parses +
+     shape-validates the envelope and fails with the reason; the
+     client prefixes the file name. Minimal hand-written scenes
+     (`{"elements": []}`) still import; element junk stays restore()'s
+     job.
+  6. `restoreBackup` (notes-db.ts): hand-edited backup JSON with
+     `"tags": "work"` or non-string `content` stored garbage that
+     later crashed the sidebar/search. Both now validate (tags via
+     safeTags, content must be a string).
+
+- **Deferred finding from the 2026-11-10 sweep, now fixed**:
+  `addTagWithResult` reported "added" while the normalize cap silently
+  dropped the new tag when the input list already exceeded
+  MAX_TAGS_PER_PAGE (imported/persisted rows only). It now reports
+  "capped" and leaves the input untouched; the clean-input semantics
+  are pinned unchanged.
+
+- **Regression caught by the existing suite during the fix**: the
+  first scene-validation draft rejected page files that OMIT the
+  `scene` key — but "defaults malformed page fields instead of
+  throwing" (sync-format.test.ts) pins that minimal file as legal.
+  Absent/null are the documented empty page; only a PRESENT wrong-typed
+  value is corruption.
+
+- **Verification (actual runs)**: full unit suite 858/858 across 68
+  files (815 + 43 new adversarial tests in corrupt-input.test.ts) in
+  4.7 s; `bun run lint` and `bunx tsc --noEmit` clean. The scratch
+  probe re-run confirms every consumer crash is now a graceful
+  degradation and the sync-boundary rejections are typed
+  SyncFormatErrors naming the offending file. README badge and counts
+  updated (858 unit).

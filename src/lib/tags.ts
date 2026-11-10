@@ -10,6 +10,19 @@
 export const MAX_TAGS_PER_PAGE = 12;
 export const MAX_TAG_LENGTH = 24;
 
+/**
+ * Coerce anything into a clean string[] — the defensive boundary for tag
+ * data that did not come from this app's own input path. Rows can carry
+ * non-string tags after a hand-edited sync page file ("tags": "work") or
+ * backup JSON ("tags": [1,2]) slipped through an older import; those must
+ * degrade to "some tags missing", never to a `t.toLowerCase is not a
+ * function` crash in the sidebar or search dialog. Types stay honest for
+ * well-formed callers: a real string[] passes through unchanged.
+ */
+export function safeTags(tags: unknown): string[] {
+  return Array.isArray(tags) ? tags.filter((t): t is string => typeof t === "string") : [];
+}
+
 /** Normalize one raw tag: trim, collapse whitespace, cap length. null = invalid.
  * The cap slices by CODE POINTS (issue #101): a UTF-16 .slice could split a
  * surrogate pair and leave a lone half rendering as U+FFFD. */
@@ -23,7 +36,7 @@ export function normalizeTag(raw: string): string | null {
 export function normalizeTags(raw: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const r of raw) {
+  for (const r of safeTags(raw)) {
     const t = normalizeTag(r);
     if (!t) continue;
     const key = t.toLowerCase();
@@ -54,12 +67,16 @@ export function addTagWithResult(
 ): { tags: string[]; status: AddTagStatus } {
   const t = normalizeTag(raw);
   if (!t) return { tags, status: "invalid" };
-  if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) {
+  const current = safeTags(tags);
+  if (current.some((x) => x.toLowerCase() === t.toLowerCase())) {
     return { tags, status: "duplicate" };
   }
-  const next = normalizeTags([...tags, t]);
-  if (next.length === tags.length) {
-    // the cap consumed the new entry — the page was already at the maximum
+  const next = normalizeTags([...current, t]);
+  if (next.length <= current.length) {
+    // the cap consumed the new entry: the page was already at (or, for
+    // imported/persisted rows, beyond) MAX_TAGS_PER_PAGE — "added" would
+    // be a lie the chip list immediately contradicts (deferred finding
+    // from the 2026-11-10 test sweep, pinned in corrupt-input.test.ts)
     return { tags, status: "capped" };
   }
   return { tags: next, status: "added" };
@@ -68,13 +85,13 @@ export function addTagWithResult(
 /** Remove a tag case-insensitively. */
 export function removeTag(tags: string[], tag: string): string[] {
   const key = tag.toLowerCase();
-  return tags.filter((t) => t.toLowerCase() !== key);
+  return safeTags(tags).filter((t) => t.toLowerCase() !== key);
 }
 
 /** True when the page carries this tag (case-insensitive; undefined-safe). */
 export function pageHasTag(tags: string[] | undefined, tag: string): boolean {
   const key = tag.toLowerCase();
-  return (tags ?? []).some((t) => t.toLowerCase() === key);
+  return safeTags(tags).some((t) => t.toLowerCase() === key);
 }
 
 export interface TagCount {
@@ -86,7 +103,7 @@ export interface TagCount {
 export function collectTags(pages: Array<{ tags?: string[] }>): TagCount[] {
   const counts = new Map<string, TagCount>();
   for (const p of pages) {
-    for (const t of p.tags ?? []) {
+    for (const t of safeTags(p.tags)) {
       const key = t.toLowerCase();
       const existing = counts.get(key);
       if (existing) existing.count += 1;
