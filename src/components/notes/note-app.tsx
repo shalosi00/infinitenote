@@ -26,6 +26,7 @@ import {
   ScanText,
   Search,
   Shapes,
+  Signature,
   Square,
   Sun,
   Tags,
@@ -65,6 +66,13 @@ import {
   OCR_ERROR_MESSAGES,
   OcrError,
 } from "@/lib/ocr";
+import {
+  hwrRunSummary,
+  hwrStrokes,
+  segmentLines,
+  HWR_ERROR_MESSAGES,
+  HwrError,
+} from "@/lib/hwr";
 import {
   addTagWithResult,
   collectTags,
@@ -615,6 +623,74 @@ export default function NoteApp() {
     }
   }, [ocrRunning]);
 
+  /** True while a handwriting recognition run is in flight — disables the menu item. */
+  const [hwrRunning, setHwrRunning] = useState(false);
+
+  /**
+   * "Recognize handwriting" (explicit, page-scoped, English-only — issue
+   * #175 Phase A): flush edits → read the persisted scene → segment the
+   * freedraw ink into text lines → rasterize + recognize each line via
+   * the vendored on-device engine → store the text as stroke metadata
+   * (the ink is never mutated) → write the enriched scene back → remount
+   * the canvas (the proven sync/restore path). Progress rides a single
+   * loading toast; failures map to typed messages; a page without ink is
+   * a friendly no-op.
+   */
+  const handleRunHwr = useCallback(async () => {
+    if (hwrRunning) return;
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId || !canvasApi.current) {
+      toast.error("Open a page first, then recognize handwriting.");
+      return;
+    }
+    setHwrRunning(true);
+    const toastId = toast.loading("Preparing the handwriting engine…");
+    try {
+      await canvasApi.current.flushSave();
+      const content = await db.getPageContent(pageId);
+      if (!content) {
+        toast("Nothing to recognize — this page has no content yet.", { id: toastId });
+        return;
+      }
+      const lines = segmentLines(hwrStrokes(content));
+      if (lines.length === 0) {
+        toast("No handwriting on this page — nothing to recognize.", { id: toastId });
+        return;
+      }
+      toast.loading(
+        `Recognizing handwriting (English) in ${plural(lines.length, "1 line", "# lines")}…`,
+        { id: toastId },
+      );
+      const { renderLineBitmap } = await import("@/lib/hwr-raster");
+      const { recognizeHandwritingLine } = await import("@/lib/hwr-client");
+      const { recognizeAllHandwriting } = await import("@/lib/hwr");
+      const outcome = await recognizeAllHandwriting(
+        content,
+        renderLineBitmap,
+        recognizeHandwritingLine,
+        {
+          onProgress: (done, total) =>
+            toast.loading(`Recognizing handwriting… ${done}/${total}`, { id: toastId }),
+        },
+      );
+      if (outcome.applied > 0) {
+        await db.savePageContent(pageId, outcome.payload);
+        canvasApi.current.discardPendingEdits();
+        setSceneEpoch((e) => e + 1);
+      }
+      toast.success(hwrRunSummary(outcome), { id: toastId });
+    } catch (err) {
+      if (err instanceof HwrError) {
+        toast.error(HWR_ERROR_MESSAGES[err.code], { id: toastId });
+      } else {
+        console.error(err);
+        toast.error("Handwriting recognition failed.", { id: toastId });
+      }
+    } finally {
+      setHwrRunning(false);
+    }
+  }, [hwrRunning]);
+
   /* ------------------------------ version history --------------------- */
 
   /**
@@ -1076,6 +1152,14 @@ export default function NoteApp() {
                     >
                       <ScanText />
                       {ocrRunning ? "Recognizing text…" : "Recognize text in images"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="run-hwr"
+                      disabled={hwrRunning}
+                      onClick={() => void handleRunHwr()}
+                    >
+                      <Signature />
+                      {hwrRunning ? "Recognizing handwriting…" : "Recognize handwriting (English)"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
