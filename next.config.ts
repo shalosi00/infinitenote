@@ -11,6 +11,10 @@ const isDesktopExport = process.env.NEXT_OUTPUT_MODE === "export";
 
 const nextConfig: NextConfig = {
   output: isDesktopExport ? "export" : "standalone",
+  // the handwriting engine is imported dynamically in the browser only —
+  // keep it external in SSR bundles (never executed server-side) so the
+  // native onnxruntime-node bits never enter a server bundle
+  serverExternalPackages: ["@huggingface/transformers"],
   // Static export has no image-optimization server available.
   images: isDesktopExport ? { unoptimized: true } : undefined,
   // type errors FAIL the build (issue #104): the standalone tsc gate covers

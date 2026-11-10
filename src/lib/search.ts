@@ -5,8 +5,9 @@
  * them into the editor: text element bodies (raw + label), arrow labels,
  * audio clip filenames (embeddable customData, issue #67) and OCR text
  * recognized from images / PDF printouts (image customData.ocrText,
- * docs/test-plans/ocr.md). Matching = all query terms must appear (AND),
- * case-insensitive.
+ * docs/test-plans/ocr.md) and handwriting (freedraw customData.hwrText,
+ * docs/test-plans/handwriting.md — Phase A, issue #175). Matching = all
+ * query terms must appear (AND), case-insensitive.
  */
 import type { Notebook, PageMeta, Section } from "./types";
 
@@ -14,7 +15,7 @@ interface SceneElementLike {
   type?: string;
   text?: string;
   id?: string;
-  customData?: { audioName?: unknown; ocrText?: unknown; pdfName?: unknown } | null;
+  customData?: { audioName?: unknown; ocrText?: unknown; pdfName?: unknown; hwrText?: unknown } | null;
 }
 
 /** Extract searchable strings from a serialized page content payload. */
@@ -46,6 +47,14 @@ export function extractSearchableText(contentJson: string | null | undefined): s
     if (el?.type === "image" && typeof el.customData?.ocrText === "string") {
       const ocr = el.customData.ocrText.trim();
       if (ocr) out.push(ocr);
+    }
+    // Handwriting (docs/test-plans/handwriting.md, issue #175): each
+    // recognized line's text is stored on the line's first freedraw
+    // stroke — the ink itself stays unsearchable vector geometry, but the
+    // words the user wrote become findable
+    if (el?.type === "freedraw" && typeof el.customData?.hwrText === "string") {
+      const hwr = el.customData.hwrText.trim();
+      if (hwr) out.push(hwr);
     }
   }
   return out;
