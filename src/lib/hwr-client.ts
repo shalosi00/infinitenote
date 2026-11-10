@@ -1,28 +1,32 @@
 /**
- * Browser-side handwriting engine driver (transformers.js, vendored under
- * /hwr/). Mirrors ocr-client.ts: browser-only, always loaded on demand
- * (`await import("@/lib/hwr-client")`) — the engine never enters the main
- * bundle. Everything comes from same-origin static files (public/hwr/),
- * so recognition works fully offline after first use (the service worker
- * caches the /hwr/ prefix) and no CDN is ever contacted — the ink, the
- * line crops and the recognized text never leave the device (issue #175,
- * privacy stance).
+ * Browser-side handwriting engine driver (transformers.js, model + wasm
+ * vendored under /hwr/). Mirrors ocr-client.ts: browser-only, always
+ * loaded on demand (`await import("@/lib/hwr-client")`) — the engine never
+ * enters the main bundle. The model weights AND the onnxruntime wasm pair
+ * come from same-origin static files (public/hwr/), so recognition works
+ * fully offline after first use (the service worker caches the /hwr/
+ * prefix) and no CDN is ever contacted — the ink, the line crops and the
+ * recognized text never leave the device (issue #175, privacy stance).
  *
- * The vendored bundle is an ES module; it is imported through `new
- * Function` so neither webpack nor turbopack tries to resolve the URL at
- * build time (the classic runtime-ESM trick — the specifier is invisible
- * to static analysis). The pipeline is a lazily-created singleton reused
- * across lines and pages; after a hard failure it is torn down so the
- * next attempt starts clean.
+ * The runtime itself is the npm dependency (@huggingface/transformers,
+ * pinned 4.3.2, loaded via dynamic import so it lands in a lazy chunk;
+ * serverExternalPackages keeps it out of the SSR bundle). Vendoring the
+ * runtime FILE was rejected 2026-11-10: GitHub push protection false-
+ * positives on a minified string inside the bundle ("Mistral AI API Key",
+ * a provider-template artifact), and a mutated bundle would break the
+ * sha256 pinning story. The heavy bytes — ≈64 MB model + ≈27 MB wasm —
+ * are still vendored and pinned.
+ *
+ * The pipeline is a lazily-created singleton reused across lines and
+ * pages; after a hard failure it is torn down so the next attempt starts
+ * clean.
  */
 import { HwrError } from "./hwr";
 
-/** Where the vendored transformers.js ESM bundle lives (same-origin). */
-const BUNDLE_URL = "/hwr/transformers.min.js";
-/** How long the engine script may take to load before we give up. */
-const SCRIPT_TIMEOUT_MS = 60_000;
 /** The vendored model directory name under /hwr/models/. */
 const MODEL_ID = "trocr-small-handwritten";
+/** Where the vendored onnxruntime wasm pair lives (same-origin). */
+const ORT_WASM_DIR = "/hwr/ort/";
 
 /** The narrow slice of the transformers.js module this app needs. */
 interface TransformersLib {
@@ -43,7 +47,7 @@ interface ImageToTextPipeline {
   (image: string, options?: Record<string, unknown>): Promise<Array<{ generated_text: string }>>;
 }
 
-/** The vendored, pinned engine versions (public/hwr/assets.json). */
+/** The pinned engine versions (public/hwr/assets.json). */
 export const HWR_ENGINE = {
   transformersJs: "4.3.2",
   onnxruntimeWeb: "1.31.0-dev.20260914-8d85527a0",
@@ -51,7 +55,7 @@ export const HWR_ENGINE = {
   precision: "q8",
 } as const;
 
-/** Inject the vendored ESM bundle once; resolve its module namespace. */
+/** Import the runtime once and pin it to same-origin assets. */
 let libPromise: Promise<TransformersLib> | null = null;
 
 function loadTransformers(): Promise<TransformersLib> {
@@ -61,27 +65,23 @@ function loadTransformers(): Promise<TransformersLib> {
       throw new HwrError("load-failed", "handwriting requested outside the browser");
     }
     try {
-      const timer = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timed out")), SCRIPT_TIMEOUT_MS),
-      );
-      const dynamicImport = new Function("url", "return import(url)") as (url: string) => Promise<unknown>;
-      const lib = (await Promise.race([dynamicImport(BUNDLE_URL), timer])) as TransformersLib;
+      const lib = (await import("@huggingface/transformers")) as unknown as TransformersLib;
       if (typeof lib?.pipeline !== "function") {
-        throw new Error("pipeline export missing from the bundle");
+        throw new Error("pipeline export missing from the runtime");
       }
-      // everything local, always: model weights, tokenizer and the wasm
-      // runtime come from /hwr/ (same-origin); remote model access is
-      // disabled outright so a misconfiguration can never phone home.
+      // everything local, always: model weights and the wasm runtime come
+      // from /hwr/ (same-origin); remote model access is disabled outright
+      // so a misconfiguration can never phone home.
       lib.env.allowRemoteModels = false;
       lib.env.allowLocalModels = true;
       lib.env.localModelPath = "/hwr/models/";
-      lib.env.backends.onnx.wasm.wasmPaths = "/hwr/ort/";
+      lib.env.backends.onnx.wasm.wasmPaths = ORT_WASM_DIR;
       return lib;
     } catch (err) {
       libPromise = null;
       throw new HwrError(
         "load-failed",
-        err instanceof Error ? err.message : `could not load ${BUNDLE_URL}`,
+        err instanceof Error ? err.message : "could not import the handwriting runtime",
       );
     }
   })();
@@ -127,8 +127,12 @@ function getPipeline(): Promise<ImageToTextPipeline> {
  */
 export async function recognizeHandwritingLine(dataUrl: string): Promise<string> {
   const pipe = await getPipeline();
+  const t0 = Date.now();
   try {
     const out = await pipe(dataUrl, { max_new_tokens: 48 });
+    // per-line latency log — the recorded evidence for the test plan's
+    // latency table (docs/test-plans/handwriting.md)
+    console.info(`[handwriting] line: ${Date.now() - t0}ms (wasm)`);
     const text = out?.[0]?.generated_text;
     return typeof text === "string" ? text : "";
   } catch (err) {

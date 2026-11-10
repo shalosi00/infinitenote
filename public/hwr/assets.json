@@ -1,0 +1,49 @@
+{
+  "transformersJs": "4.3.2",
+  "onnxruntimeWeb": "1.31.0-dev.20260914-8d85527a0",
+  "model": "Xenova/trocr-small-handwritten",
+  "modelPrecision": "q8",
+  "language": "eng",
+  "files": {
+    "models/trocr-small-handwritten/config.json": {
+      "sha256": "ab388d889bdead2a554fc77ae4899caabdb279318e660b457afd29394e8ee43d",
+      "bytes": 4515
+    },
+    "models/trocr-small-handwritten/generation_config.json": {
+      "sha256": "cce308da91e0d656e07404c70d4b9c9f5839d426f679eff6fda6dcc0e727e3b6",
+      "bytes": 185
+    },
+    "models/trocr-small-handwritten/onnx/decoder_model_merged_quantized.onnx": {
+      "sha256": "51076aa396ab5939c4668db9de901ad51765094b4c05c4c8c1f8ae2012ba1e08",
+      "bytes": 40527613
+    },
+    "models/trocr-small-handwritten/onnx/encoder_model_quantized.onnx": {
+      "sha256": "2f29edbd925f8a49c9c7d1349895f960cf09d2efdc76fe23f957048d476e0d03",
+      "bytes": 23082942
+    },
+    "models/trocr-small-handwritten/preprocessor_config.json": {
+      "sha256": "70da3434c33eedb3b56caf4067851741dfeed02f67576dcc3c6407c2533bfaf0",
+      "bytes": 465
+    },
+    "models/trocr-small-handwritten/special_tokens_map.json": {
+      "sha256": "d5469a60db23249c7f8945013d78df30b44b6bf686c6bb4740f4223f77b1b535",
+      "bytes": 279
+    },
+    "models/trocr-small-handwritten/tokenizer.json": {
+      "sha256": "68bcb5468c854362a615f3d2ff6a5e4091a85f4c8198993ed9a30afe0b143737",
+      "bytes": 4494727
+    },
+    "models/trocr-small-handwritten/tokenizer_config.json": {
+      "sha256": "ce50304582ca15b925982e96dfe56548ddbaba89b584e73176d6bb3a5a0b4713",
+      "bytes": 471
+    },
+    "ort/ort-wasm-simd-threaded.asyncify.mjs": {
+      "sha256": "0966b6105cd936744498aa60df7a22cbd47af3374dbc64a9ab561c08a71e3611",
+      "bytes": 53057
+    },
+    "ort/ort-wasm-simd-threaded.asyncify.wasm": {
+      "sha256": "49871f5a4409519797e127440868a6d1923339d9185907f301a5b2a1d90af082",
+      "bytes": 26861777
+    }
+  }
+}

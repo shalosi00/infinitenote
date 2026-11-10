@@ -242,7 +242,7 @@ describe("applyHwrResults (HWR-P30..P36)", () => {
 
   it("HWR-P31: empty text is stored (scanned-but-blank ≠ never-run)", () => {
     const payload = scene([ink("m1", [[0, 200], [60, 240]])]);
-    const { payload: next } = applyHwrResults(payload, [lines()[1]], [{ lineIndex: 0, text: "   ", at: 7 }]);
+    const { payload: next } = applyHwrResults(payload, [{ ...lines()[1], index: 0 }], [{ lineIndex: 0, text: "   ", at: 7 }]);
     const el = (next.elements as Array<{ customData?: { hwrText?: string; hwrAt?: number } }>)[0];
     expect(el.customData?.hwrText).toBe("");
     expect(el.customData?.hwrAt).toBe(7);
@@ -261,7 +261,7 @@ describe("applyHwrResults (HWR-P30..P36)", () => {
 
   it("HWR-P33: other customData fields survive", () => {
     const payload = scene([ink("m1", [[0, 200], [60, 240]], { customData: { keep: "me" } })]);
-    const { payload: next } = applyHwrResults(payload, [lines()[1]], [{ lineIndex: 0, text: "x", at: 1 }]);
+    const { payload: next } = applyHwrResults(payload, [{ ...lines()[1], index: 0 }], [{ lineIndex: 0, text: "x", at: 1 }]);
     const el = (next.elements as Array<{ customData?: Record<string, unknown> }>)[0];
     expect(el.customData?.keep).toBe("me");
     expect(el.customData?.hwrText).toBe("x");
@@ -281,7 +281,7 @@ describe("applyHwrResults (HWR-P30..P36)", () => {
 
   it("HWR-P36: recognition text is normalized on the way in", () => {
     const payload = scene([ink("m1", [[0, 200], [60, 240]])]);
-    const { payload: next } = applyHwrResults(payload, [lines()[1]], [{ lineIndex: 0, text: "  spaced\t out ", at: 1 }]);
+    const { payload: next } = applyHwrResults(payload, [{ ...lines()[1], index: 0 }], [{ lineIndex: 0, text: "  spaced\t out ", at: 1 }]);
     expect((next.elements[0] as { customData?: { hwrText?: string } }).customData?.hwrText).toBe("spaced out");
   });
 });
@@ -429,9 +429,9 @@ describe("search integration (HWR-P70..P72)", () => {
 
   it("HWR-P71: handwriting-only queries find the page through the index", () => {
     const index = buildSearchIndex(
-      [{ id: "nb", name: "Notes", createdAt: 1, order: 0, color: "blue" }],
-      [{ id: "s", notebookId: "nb", name: "S", createdAt: 1, order: 0 }],
-      [{ id: "p", sectionId: "s", title: "Page", createdAt: 1, order: 0, tags: [], content }],
+      [{ id: "nb", name: "Notes", createdAt: 1, order: 0, updatedAt: 1, deletedAt: null, color: "violet" }],
+      [{ id: "s", notebookId: "nb", name: "S", createdAt: 1, order: 0, updatedAt: 1, deletedAt: null }],
+      [{ id: "p", sectionId: "s", title: "Page", createdAt: 1, updatedAt: 1, deletedAt: null, order: 0, tags: [], content }],
     );
     expect(searchIndex(index, "icily")).toHaveLength(1);
     expect(searchIndex(index, "icily notebook")).toHaveLength(0); // AND semantics

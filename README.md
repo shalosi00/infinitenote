@@ -61,6 +61,10 @@ full ownership of your data. No account, no cloud, no lock-in.
   or copy the file name.
 - **OCR** — "Recognize text in images" runs fully on-device (tesseract.js,
   English + German) and makes recognized text searchable.
+- **Handwriting search** — "Recognize handwriting (English)" recognizes freehand
+  ink on-device (TrOCR model, ≈64 MB, downloaded once and cached) and makes the
+  recognized text searchable — your ink is never modified and nothing leaves
+  the device.
 - **Export** — PNG, SVG, scene JSON, paginated **PDF (A4 portrait/landscape)**
   with selectable vector text, or a full notebook backup file.
 - **File-based sync (phase 1)** — point the app at a sync folder (or merge via

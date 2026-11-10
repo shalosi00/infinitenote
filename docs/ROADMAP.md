@@ -127,13 +127,15 @@ milestones/issues. This file is the plan; the status file is the reality.
       Phase B ink-to-text gated on Phase A accuracy; cloud, proprietary
       (MyScript) and OS-API-only (WICG) paths rejected; CJK deferred
 
-## v1.13 — Handwriting search (candidate; next)
+## v1.13 — Handwriting search (current)
 
 - [ ] Phase A — handwriting search (metadata-only): explicit per-page
-      "Recognize handwriting" action, line segmentation from freedraw
-      geometry, trocr-small-handwritten ONNX (~64 MB lazy, English),
-      recognized text stored as machine-generated metadata and indexed by
-      the existing full-text search (docs/handwriting-research.md §4)
+      "Recognize handwriting (English)" action, union-find line
+      segmentation from freedraw geometry, height-normalized rasterizer,
+      vendored trocr-small-handwritten ONNX (q8 ≈ 64 MB, first use,
+      sha256-pinned, no CDN), recognized text stored as machine-generated
+      stroke metadata and indexed by the existing full-text search
+      (docs/test-plans/handwriting.md; issues #175)
 - [ ] Phase B — ink-to-text conversion (only after Phase A accuracy
       proves out in dogfooding) (docs/handwriting-research.md §4)
 

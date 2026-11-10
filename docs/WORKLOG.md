@@ -984,3 +984,66 @@ many tests, then implement"), with maximum stability.
 - State after this cycle: 567 unit + 152 E2E green, 0 known bugs, all 3
   required CI checks green on #172/#173/#174; next: #175 Phase A.
 
+
+## 2026-11-10 — v1.13 Phase A: handwriting search (issue #175)
+
+- **Feature**: "Recognize handwriting (English)" in the page-actions menu —
+  freedraw ink is segmented into lines, rasterized and recognized fully
+  on-device, and the recognized text is stored as machine-generated stroke
+  metadata (`customData.hwrText`/`hwrAt` on each line's leftmost stroke)
+  that the existing Ctrl+K full-text search indexes. The ink is never
+  mutated; re-running is idempotent (stale annotations are stripped first);
+  deleting recognition is trivial (empty customData bag is dropped).
+- **Engine**: transformers.js 4.3.2 (vendored ESM bundle at
+  `public/hwr/transformers.min.js`, runtime `new Function` import so no
+  bundler ever touches it) + Xenova/trocr-small-handwritten q8
+  (encoder 23,082,942 B + decoder-merged 40,527,613 B, byte-identical to
+  the HF originals — sizes match docs/handwriting-research.md §3.1) +
+  onnxruntime-web 1.31.0-dev asyncify wasm pair. All 11 files sha256-pinned
+  in `public/hwr/assets.json` (HWR-A01..A04 drift tests; issue #103
+  pattern). `env.allowRemoteModels = false` + service-worker `/hwr/`
+  prefix: nothing can phone home, offline after first use.
+- **Segmentation** (hwr.ts): union-find over pairwise `sameLine` (vertical
+  overlap ≥ 55 % of the smaller stroke's height + horizontal gap ≤
+  2.5×height + 8 px), min/max size filters drop i-dots and drawings.
+- **Pre-implementation validation** (2026-11-10, Node + onnxruntime-node):
+  the real q8 model reads block-letter pen strokes — "CAT" at 0.35–0.6 s
+  per line; tight (≈80 px) letter spacing is required or the model emits
+  inter-letter spaces ("C A T"), which is why the E2E fixture letters
+  nearly touch. Native-CPU numbers are references only; the shipped
+  browser numbers below are the honest WASM ones.
+- **Measured (headless Chromium, WASM)**: per line ≈ 3.6 s (3 585 ms);
+  first use ≈ 11.9 s including the ≈92 MB same-origin fetch + pipeline
+  init. WebGPU deliberately not enabled in Phase A (device pinned "wasm");
+  recorded as a follow-up in the test plan.
+- **E2E (4 new checks, real engine, committed fixture)**: assets served;
+  import ink → recognize → Ctrl+K finds "CAT" → ZERO cross-origin requests
+  (privacy asserted live); persistence across reload; friendly no-op
+  without ink. The fixture's A crossbar and T top bar carry a slight slant —
+  zero-height strokes would be dropped by the size filter and deform the
+  letters.
+- **Verification (actual runs this cycle)**: bun run lint clean; tsc
+  clean; unit 613/613 across 46 files (was 567/567 — +46 HWR tests);
+  e2e/handwriting.spec.ts 4/4 (26.3 s, dev server reused). Three test
+  bugs fixed on the way in (two single-line fixtures mis-indexed, one
+  stray-directory listing) and one code improvement (empty customData
+  dropped after stale-annotation cleanup).
+- **Environment notes**: the dev server needs ≈5 min cold Turbopack
+  compile in this sandbox and the playwright webServer timeout is 300 s —
+  boot the server manually first (reuseExistingServer picks it up);
+  playwright chromium-1248 had to be reinstalled after another cache wipe.
+  A parallel cron-loop agent had already committed the hwr core locally
+  (6c282ee + 12a55e6, unpushed) — this cycle finished that work instead of
+  duplicating it: vendored the assets, wrote the E2E + fixture + test
+  plan, fixed the failing tests, updated README/ROADMAP/PROJECT_STATUS.
+
+- **Push-protection detour (2026-11-10)**: vendoring the transformers.js
+  minified bundle was rejected by GitHub push protection — the scanner
+  flags a provider-template string inside it as a "Mistral AI API Key"
+  (false positive; the bundle ships no secrets). The unblock URL is
+  web-UI-only (API returns 404), so the runtime switched to the pinned
+  npm dependency (dynamic import, serverExternalPackages for SSR) while
+  the heavy bytes (≈64 MB model + ≈27 MB asyncify wasm pair) stay
+  vendored and sha256-pinned. Lesson: a minified third-party bundle can
+  fail push protection on vendor-template artifacts — prefer the pinned
+  dependency and vendor only the weight-bearing files.

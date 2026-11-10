@@ -34,7 +34,7 @@ const manifest = JSON.parse(
 
 describe("vendored handwriting assets (HWR-A01..A04)", () => {
   it("HWR-A01: every declared asset exists with the declared byte size", () => {
-    expect(Object.keys(manifest.files).length).toBeGreaterThanOrEqual(11);
+    expect(Object.keys(manifest.files).length).toBeGreaterThanOrEqual(10);
     for (const [name, meta] of Object.entries(manifest.files)) {
       const path = join(HWR_DIR, name);
       const stat = statSync(path); // throws (fails the test) when missing
@@ -68,6 +68,8 @@ describe("vendored handwriting assets (HWR-A01..A04)", () => {
   it("HWR-A03b: the manifest declares exactly the files on disk (no strays)", () => {
     const onDisk = readdirSync(HWR_DIR, { recursive: true })
       .map((f) => String(f).replaceAll("\\", "/"))
+      // recursive readdir lists directories too — only files are pinned
+      .filter((f) => statSync(join(HWR_DIR, f)).isFile())
       .filter(
         (f) =>
           !f.endsWith("assets.json") &&

@@ -255,7 +255,13 @@ export function applyHwrResults(
       customData.hwrText = normalizeHwrText(result.text);
       customData.hwrAt = result.at;
     }
-    return { ...(el as Record<string, unknown>), customData };
+    const rest = Object.keys(customData).length
+      ? customData
+      : // a stroke whose only metadata was stale recognition drops the
+        // (now empty) customData bag entirely — deleting recognition is
+        // byte-for-byte trivial (back to the pre-recognition element)
+        undefined;
+    return { ...(el as Record<string, unknown>), customData: rest };
   });
   return { payload: applied ? { ...payload, elements } : { ...payload }, applied };
 }
