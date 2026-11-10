@@ -37,6 +37,11 @@
   - This file replaced a gitignored local `worklog.md` that was wiped by a
     restore (2026-11-07). Never keep working state in untracked files.
 - The GitHub token lives in the remote URL only; it is never committed.
+- The agent's OUTPUT DISPLAY strips the two-byte sequence 'opening bracket
+  + lowercase m' from everything shown back (shell output, file reads,
+  API responses). `branches: [main]` reads as `branches: ain]`, `[migration guide]` as `igration guide]`. Writes and parameters
+  arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
+  corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
 ## 2026-11-09 — v1.11.0 release: main catches up with develop
 
@@ -868,19 +873,19 @@ many tests, then implement"), with maximum stability.
     needs 2.39. Result: silent dynamic-linker abort on Ubuntu 24.04
     (2.39), Debian 13 (2.41), Mint 22 — i.e. every current LTS distro;
     launched from a file manager the error is invisible.
-  - Latent bug in the same file: the workflow push trigger literally
-    read `branches: ain]` (a corrupted `[main]` that never matches), so
-    desktop builds only ever ran on `v*` tags and manual dispatch.
+  - Suspected latent bug in the same file: the workflow push trigger
+    appeared to read `branches: ain]` — a display artifact of the agent environment (its output view strips the two bytes bracket + lowercase m; see the follow-up addendum). Byte probes later proved the file always carried the correct filter, and the Actions history shows 13 main-push Desktop runs before this cycle — the trigger never failed.
 - **Fix (issue #164)**: pin the Desktop workflow to `ubuntu-22.04`
   (glibc 2.35 floor) — linuxdeploy takes the runner's libs, so the runner
   choice sets the artifact's glibc floor; add a post-build guard that
   extracts the built AppImage, scans every bundled ELF for `GLIBC_*`
-  symbol requirements and fails the job above the 2.35 floor; repair the
-  `branches: [main]` trigger; extend `desktop-config.test.ts` with pins
-  (pinned runner, no `ubuntu-latest`, trigger, guard) so it cannot drift.
+  symbol requirements and fails the job above the 2.35 floor; pin all
+  of it in `desktop-config.test.ts` (pinned runner, no `ubuntu-latest`,
+  trigger, guard) so it cannot drift — the trigger itself was already correct on disk; the 'repair' was really the first durable pin against a display artifact that had fooled every earlier read (see the addendum).
 - **Docs (issue #165)**: README reworked entirely — real test counts
-  (564 unit + 152 E2E; the old badge claimed 266/56), fixed the broken
-  "igration guide]" link, corrected the dev table (old one listed a
+  (564 unit + 152 E2E; the old badge claimed 266/56), refreshed the
+  migration-guide link (it was correct on disk in every release; the
+  'typo' was the same display artifact), corrected the dev table (old one listed a
   `make e2e` target that never existed; real command is
   `bunx playwright test`), a feature list updated through v1.11 (version
   history, OCR, PDF chips, audio, shapes, themes, sync), an Install
@@ -897,3 +902,23 @@ many tests, then implement"), with maximum stability.
 - **Release**: shipped as **v1.11.1** with rebuilt artifacts (AppImage,
   deb, rpm) attached by the tag-triggered Desktop workflow; #164/#165
   closed. Next cycle: v1.12 — #133 handwriting research.
+
+## 2026-11-10 — v1.11.1 follow-up: the 'corrupted trigger' was a display artifact
+
+- Post-release byte probes (python counts of the two assembled bytes,
+  immune to the filter) showed every file correct: the v1.11.1 workflow
+  trigger, the test expectation, the README migration link — and
+  the same links in v1.10.1/v1.11.0 READMEs. The 'branches: ain]' 
+  corruption and the 'igration guide]' typo existed only in what the
+  agent was shown. The Actions history agreed: 13 main-push Desktop
+  runs predate this cycle, so the trigger never failed.
+- What remains TRUE from the cycle: the glibc floor bug and its fix
+  (ubuntu-latest bundled libs requiring GLIBC_2.42/2.43; now pinned
+  ubuntu-22.04 + guarded, verified by download/objdump/Xvfb boot), the
+  stale README facts (test counts, dev commands), and the new test
+  pins — which now protect the trigger for real.
+- Corrections: test title rewritten; PROJECT_STATUS and this file carry
+  the truth; GitHub texts (PRs #166/#169, release notes, issue #164)
+  got amendment comments noting the display artifact.
+- New rule for every future cycle: verify byte-critical content with
+  count-probes, never with displayed output.
