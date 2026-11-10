@@ -1223,3 +1223,42 @@ brackets — and fix whatever breaks.
   degradation and the sync-boundary rejections are typed
   SyncFormatErrors naming the offending file. README badge and counts
   updated (858 unit).
+
+## 2026-11-11 — README rework with a scripted screenshot pipeline; dark-canvas fix found on the way
+
+- **README reworked end to end** (this cycle): new hero (logo, badges,
+  tagline), a Highlights table for the 30-second reader, a 7-shot
+  screenshot gallery with captions, a Privacy section (local-first by
+  architecture: no server/account/telemetry; OCR + handwriting models run
+  on-device), a Roadmap pointer (shipped vs next), and a "refresh the
+  README screenshots" note documenting the capture pipeline. Fixed the
+  broken "igration guide" link text that had been in the Screenshots
+  section since the open-sourcing commit.
+
+- **New screenshots** (assets/screenshots/: hero-light, hero-dark,
+  handwriting, search, version-history, themes, mobile — the stale
+  light/dark pair from the open-sourcing commit removed): captured from
+  the REAL app by scripts/capture-readme-shots.mjs (Playwright, 2x DPR),
+  which seeds a realistic notebook tree (Work/Planning, Research/Field
+  notes with tags), imports three generated .excalidraw scenes
+  (scripts/gen-readme-scenes.py), runs the REAL handwriting engine on an
+  ink page so the success toast is authentic, then shoots light hero,
+  search ("cat" — finds the recognized handwriting), version history,
+  themes gallery, dark hero and the mobile drawer. Scenes are resized to
+  README widths by scripts/install-readme-shots.py.
+
+- **Real bug found by the capture pass, fixed (#186)**: dark mode painted
+  a washed-out light-gray canvas. Root cause: Excalidraw 0.18 renders
+  dark mode by inverting the canvas pixels (`.theme--dark canvas { filter:
+  invert(93%) hue-rotate(180deg) }`) while the app painted a DARK
+  viewBackgroundColor (#1e1e1e) — double inversion. Fix: paint white paper
+  in both themes (white inverts to ~#121212), matching every export path,
+  which already pinned #ffffff / exportWithDarkMode:false. The e2e theme
+  spec asserted the raw viewBackgroundColor flips on toggle (it encoded
+  the bug); it now asserts appState.theme via a new canvasTheme() helper.
+
+- **Verification (actual runs)**: unit 858/858 across 68 files; lint +
+  typecheck clean; e2e theme-mobile/background/canvas specs green locally
+  (17 checks); `bunx playwright test --list` = 156 tests in 36 files
+  (README badge matches). Screenshot capture pipeline committed under
+  scripts/ so the next cycle can refresh shots in one command.
