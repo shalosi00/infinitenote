@@ -116,11 +116,26 @@ milestones/issues. This file is the plan; the status file is the reality.
 - [x] Fix: clicks right after closing a dialog are no longer swallowed
       (Radix body pointer-events + closed-overlay guard; regression-pinned)
 
-## v1.12 — Handwriting recognition (research; current)
+## v1.12 — Handwriting recognition (research; shipped 2026-11-10)
 
-- [ ] Handwriting recognition research: on-device HTR options for the
+- [x] Handwriting recognition research: on-device HTR options for the
       offline-first PWA + Android wrapper, data flow from freedraw strokes,
-      privacy stance, recommendation + phased plan (issue #133)
+      privacy stance, recommendation + phased plan (issue #133) —
+      [docs/handwriting-research.md](handwriting-research.md);
+      recommendation: pursue in phases — Phase A handwriting search via
+      trocr-small-handwritten (≈64 MB quantized ONNX, MIT, lazy-loaded),
+      Phase B ink-to-text gated on Phase A accuracy; cloud, proprietary
+      (MyScript) and OS-API-only (WICG) paths rejected; CJK deferred
+
+## v1.13 — Handwriting search (candidate; next)
+
+- [ ] Phase A — handwriting search (metadata-only): explicit per-page
+      "Recognize handwriting" action, line segmentation from freedraw
+      geometry, trocr-small-handwritten ONNX (~64 MB lazy, English),
+      recognized text stored as machine-generated metadata and indexed by
+      the existing full-text search (docs/handwriting-research.md §4)
+- [ ] Phase B — ink-to-text conversion (only after Phase A accuracy
+      proves out in dogfooding) (docs/handwriting-research.md §4)
 
 ## v1.7 — Internationalization & polish (shipped in v1.7.0)
 
@@ -141,4 +156,5 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 ## Backlog (unscheduled)
 
-- (empty — handwriting recognition research lives in v1.12, issue #133)
+- (empty — handwriting phases live under the v1.13 candidate, see
+  docs/handwriting-research.md)
