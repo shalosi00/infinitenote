@@ -4,6 +4,7 @@
   "model": "Xenova/trocr-small-handwritten",
   "modelPrecision": "q8",
   "language": "eng",
+  "transformersJsOriginalSha256": "9335663d763e2263233f9f5acd712a7f9f490e45a7d8431b663635dcac128e02",
   "files": {
     "models/trocr-small-handwritten/config.json": {
       "sha256": "ab388d889bdead2a554fc77ae4899caabdb279318e660b457afd29394e8ee43d",
@@ -44,6 +45,10 @@
     "ort/ort-wasm-simd-threaded.asyncify.wasm": {
       "sha256": "49871f5a4409519797e127440868a6d1923339d9185907f301a5b2a1d90af082",
       "bytes": 26861777
+    },
+    "transformers.web.bundle.js.gz": {
+      "sha256": "bebb8a9a9d4d394e82a61d7ab07c5e4c487206096565ac149913b180ff82a039",
+      "bytes": 219763
     }
   }
 }

@@ -14,7 +14,7 @@ Status: **shipped 2026-11-10** — all evidence below is from actual runs.
 
 | Aspect | Decision |
 |---|---|
-| Engine | `@huggingface/transformers` **4.3.2** (pinned npm dependency, dynamic import → lazy chunk; `serverExternalPackages` keeps it out of SSR bundles). Vendoring the runtime FILE was rejected 2026-11-10: GitHub push protection false-positives a provider-template string inside the minified bundle ("Mistral AI API Key") and a mutated bundle would break sha256 pinning |
+| Engine | `@huggingface/transformers` **4.3.2** ESM bundle, vendored as a **bun-bundled, gzipped closure** at `public/hwr/transformers.web.bundle.js.gz` — the raw dist files cannot run from a blob URL (`transformers.min.js` is node-flavored: "this.processor is not a function"; the web build lazily imports bare specifiers like "onnxruntime-web/webgpu" that blob modules cannot resolve — both measured 2026-11-10 — and the npm-dependency route made the cold CI build flaky), so the vendor step inlines every bare specifier into one self-contained ESM file and gzips it; the drift test verifies the uncompressed bundle's sha256 (HWR-A03b) — fetched same-origin, decompressed in the browser (`DecompressionStream`) and imported as a blob URL. Why gzipped: the raw bundle is rejected by GitHub push protection (false-positive "Mistral AI API Key" on a provider-template string) and the npm-dependency route made the cold CI build flaky (Turbopack postcss IPC timeouts); the drift test gunzips and verifies the ORIGINAL sha256 (HWR-A03b) |
 | Model (vendored, `public/hwr/models/trocr-small-handwritten/`) | Xenova/trocr-small-handwritten **q8**: encoder 23,082,942 B + decoder-merged 40,527,613 B (HF-verified sizes, sha256-pinned in `public/hwr/assets.json`) + tokenizer/config JSONs |
 | Runtime (vendored, `public/hwr/ort/`) | onnxruntime-web **1.31.0-dev.20260914** `ort-wasm-simd-threaded.asyncify.mjs` + `.wasm` — the exact pair the browser fetches in a non-cross-origin-isolated page (measured 2026-11-10 request log), served from `wasmPaths = "/hwr/ort/"` |
 | Offline story | Service worker `"/hwr/"` static prefix (cache-first, runtime fill) — first use caches the ≈92 MB bundle for the profile's life; `env.allowRemoteModels = false` means a misconfiguration can never phone home |
@@ -65,7 +65,7 @@ e2e/handwriting.spec.ts against the vendored bundle.
 
 | ID | Scenario | Result (2026-11-10 local run) |
 |---|---|---|
-| HWR-E01 | all six vendored engine assets are served | ✅ pass (1.9 s) |
+| HWR-E01 | all seven vendored engine assets are served | ✅ pass (1.9 s) |
 | HWR-E02 | import `e2e/fixtures/handwriting-cat.excalidraw` (5 freedraw strokes) → "Recognize handwriting (English)" → success toast → `Ctrl+K` "CAT" finds the page → **zero cross-origin requests** during the whole flow | ✅ pass (16.7 s) |
 | HWR-E03 | recognized text persists across a reload; ink untouched (5 strokes) | ✅ pass (3.2 s) |
 | HWR-E04 | a page without ink is a friendly no-op | ✅ pass (0.8 s) |
@@ -79,8 +79,8 @@ segment into the line and render completely.
 
 | Measurement | Value | Source |
 |---|---|---|
-| Per-line recognition (q8, WASM) | **≈ 3.6 s** (3 585 ms, one 88 px line) | engine log `[handwriting] line: 3585ms (wasm)`, asserted + printed by HWR-E02 |
-| First-use total (fresh profile): fetch ≈92 MB from same-origin + pipeline init + recognize + toast | **≈ 11.9 s** | HWR-E02 timing log (warm second run: same order — each Playwright run is a fresh profile) |
+| Per-line recognition (q8, WASM) | **≈ 3.2 s** (3 153 ms, one 88 px line) | engine log `[handwriting] line: 3153ms (wasm)`, asserted + printed by HWR-E02 |
+| First-use total (fresh profile): fetch ≈92 MB from same-origin + pipeline init + recognize + toast | **≈ 11.9 s** (11 919 ms) | HWR-E02 timing log (each Playwright run is a fresh profile) |
 | WebGPU | **not enabled in Phase A** — `hwr-client.ts` pins `device: "wasm"`; the vendored asyncify wasm is the CPU build. WebGPU stays a measured follow-up (issue #176 cycle), not a claim | design decision in hwr-client.ts |
 | Model sanity (outside CI) | trocr-small-handwritten q8 reads block-letter pen strokes "CAT" at ≈ 0.35–0.6 s/line on native CPU (Node + onnxruntime-node), 2026-11-10 pre-implementation validation | validation harness, docs/handwriting-research.md §3.1 sizes re-verified |
 

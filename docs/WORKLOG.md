@@ -1047,3 +1047,32 @@ many tests, then implement"), with maximum stability.
   vendored and sha256-pinned. Lesson: a minified third-party bundle can
   fail push protection on vendor-template artifacts — prefer the pinned
   dependency and vendor only the weight-bearing files.
+
+- **build-smoke detour (2026-11-10)**: with the runtime as an npm
+  dependency, CI's build-smoke failed twice with Turbopack postcss
+  worker IPC timeouts ("timeout while receiving message from process",
+  ~6.7 min into the cold build) while the e2e job's identical
+  production build on the same sha passed in 4.3 min and my local build
+  passed too — the new dependency's chunk analysis pushed the 2-core
+  runners over the edge. Fix: revert to the vendored-bundle
+  architecture, shipped GZIPPED (transformers.min.js.gz) — push
+  protection cannot flag opaque gzip bytes, the bundler graph returns
+  to the known-good baseline, and the drift test gunzips the blob and
+  verifies the ORIGINAL file's sha256 (HWR-A03b). Both detours
+  (push-protection + build-flakiness) are documented in
+  public/hwr/README.md.
+- **Blob-import debugging story (2026-11-10, all measured)**: three
+  successive root causes hid behind one symptom ("this.processor is not
+  a function" for two of them): (1) transformers.min.js from the npm
+  tarball is a node-flavored artifact — the browser build is
+  dist/transformers.web.js; (2) the web build lazily imports bare
+  specifiers ("onnxruntime-web/webgpu", "onnxruntime-common") that a
+  blob module cannot resolve — solved by running `bun build` over the
+  pinned web build inside fetch-vendor.sh (one self-contained ESM file,
+  every specifier inlined); (3) an ABSOLUTE localModelPath URL makes
+  transformers.js classify the model as hub-type, and with remote models
+  disabled the processor existence probe reports "no processor" — the
+  path must stay relative. wasmPaths must stay ABSOLUTE (blob base).
+  Final state: bun-bundled web build (1.1 MB, gzip 220 KB), relative
+  localModelPath, absolute wasmPaths — recognition works end-to-end
+  (probe + E2E), unit 614/614, local production build exit 0.

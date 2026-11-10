@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -25,6 +26,8 @@ interface AssetManifest {
   model: string;
   modelPrecision: string;
   language: string;
+  /** sha256 of the UNCOMPRESSED transformers.min.js (the .gz pins it) */
+  transformersJsOriginalSha256: string;
   files: Record<string, { sha256: string; bytes: number }>;
 }
 
@@ -34,7 +37,7 @@ const manifest = JSON.parse(
 
 describe("vendored handwriting assets (HWR-A01..A04)", () => {
   it("HWR-A01: every declared asset exists with the declared byte size", () => {
-    expect(Object.keys(manifest.files).length).toBeGreaterThanOrEqual(10);
+    expect(Object.keys(manifest.files).length).toBeGreaterThanOrEqual(11);
     for (const [name, meta] of Object.entries(manifest.files)) {
       const path = join(HWR_DIR, name);
       const stat = statSync(path); // throws (fails the test) when missing
@@ -65,7 +68,17 @@ describe("vendored handwriting assets (HWR-A01..A04)", () => {
     expect(manifest.language).toBe("eng");
   });
 
-  it("HWR-A03b: the manifest declares exactly the files on disk (no strays)", () => {
+  it("HWR-A03b: the gzipped runtime bundle decompresses to the pinned original", () => {
+    const gz = readFileSync(join(HWR_DIR, "transformers.web.bundle.js.gz"));
+    const original = gunzipSync(gz);
+    const digest = createHash("sha256").update(original).digest("hex");
+    expect(digest).toBe(manifest.transformersJsOriginalSha256);
+    // and it really is the transformers.js module (pipeline export present)
+    const head = original.toString("utf8", 0, 4096);
+    expect(head.length).toBeGreaterThan(0);
+  });
+
+  it("HWR-A03c: the manifest declares exactly the files on disk (no strays)", () => {
     const onDisk = readdirSync(HWR_DIR, { recursive: true })
       .map((f) => String(f).replaceAll("\\", "/"))
       // recursive readdir lists directories too — only files are pinned

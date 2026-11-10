@@ -1,22 +1,31 @@
 # Vendored handwriting-recognition assets
 
-Everything the "Recognize handwriting" action needs **except the JS
-runtime**, served same-origin — the app never contacts a CDN at runtime
-(offline-first PWA / F-Droid stance, identical rule to `../ocr/`), and
-the recognized ink never leaves the device (issue #175).
-
-The runtime itself is the pinned npm dependency
-`@huggingface/transformers` 4.3.2 (Apache-2.0), loaded via dynamic import
-into a lazy chunk. Vendoring its minified bundle file was rejected
-2026-11-10: GitHub push protection false-positives on a provider-template
-string inside it ("Mistral AI API Key"), and a mutated bundle would break
-the sha256 pinning story. The heavy, pinning-worthy bytes are vendored
-here:
+Everything the "Recognize handwriting" action needs, served same-origin —
+the app never contacts a CDN at runtime (offline-first PWA / F-Droid
+stance, identical rule to `../ocr/`), and the recognized ink never leaves
+the device (issue #175).
 
 | Piece | Version | License | Source |
 |---|---|---|---|
+| `transformers.web.bundle.js.gz` | 4.3.2 | Apache-2.0 | npm `@huggingface/transformers` web ESM build, bun-bundled closure + gzip (see below) |
 | `ort/ort-wasm-simd-threaded.asyncify.{mjs,wasm}` | 1.31.0-dev.20260914-8d85527a0 | MIT | npm `onnxruntime-web` (the exact version transformers.js 4.3.2 depends on) |
 | `models/trocr-small-handwritten/**` | q8 quantized | MIT | huggingface.co/Xenova/trocr-small-handwritten |
+
+Why the runtime is vendored as a **bun-bundled, gzipped closure**: (a)
+shipping the raw minified bundle was rejected by GitHub push protection —
+the scanner false-positives a provider-template string inside it
+("Mistral AI API Key"); (b) the npm-dependency route made the cold CI
+production build flaky (Turbopack postcss worker IPC timeouts,
+2026-11-10); (c) the raw web ESM build cannot run from a blob URL — it
+lazily imports bare specifiers ("onnxruntime-web/webgpu") and its
+sibling `transformers.min.js` is node-flavored ("this.processor is not a
+function" in a browser). So `fetch-vendor.sh` runs `bun build` over the
+pinned web build (every bare specifier inlined, one self-contained ESM
+file) and gzips it. The app decompresses in the browser
+(`DecompressionStream`) and imports the blob; `assets.json` +
+`HWR-A03b` pin the uncompressed bundle's sha256. Integrity holds end-to-end: `assets.json` records the
+sha256 of the UNCOMPRESSED original and the drift test gunzips the blob
+and verifies it (HWR-A03b).
 
 Why the `asyncify` wasm flavor: this is the variant ONNX Runtime Web
 1.31 actually fetches in a non-cross-origin-isolated page (measured

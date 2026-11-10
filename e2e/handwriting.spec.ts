@@ -19,6 +19,7 @@ import {
 } from "./helpers";
 
 const ASSETS = [
+  "/hwr/transformers.web.bundle.js.gz",
   "/hwr/ort/ort-wasm-simd-threaded.asyncify.mjs",
   "/hwr/ort/ort-wasm-simd-threaded.asyncify.wasm",
   "/hwr/models/trocr-small-handwritten/config.json",

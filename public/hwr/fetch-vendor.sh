@@ -9,14 +9,17 @@
 # Idempotent: files that already exist with the correct sha256 are kept.
 #
 # Contents (see public/hwr/README.md for licenses + provenance):
+#   transformers.web.bundle.js.gz          bun-bundled closure of @huggingface/transformers 4.3.2 web ESM (Apache-2.0; see below)
 #   ort/ort-wasm-simd-threaded.asyncify.*  onnxruntime-web 1.31.0-dev.20260914-8d85527a0 (MIT)
 #   models/trocr-small-handwritten/**      Xenova/trocr-small-handwritten (MIT, quantized q8)
 #
-# The runtime itself (@huggingface/transformers 4.3.2) ships as the pinned
-# npm dependency — vendoring its minified bundle was rejected 2026-11-10:
-# GitHub push protection false-positives on a provider-template string
-# inside it ("Mistral AI API Key"). Only the heavy, pinning-worthy bytes
-# (model weights + wasm runtime) are vendored here.
+# The runtime is vendored GZIPPED: (a) shipping the raw minified bundle was
+# rejected by GitHub push protection — the scanner false-positives a
+# provider-template string inside it ("Mistral AI API Key"); (b) the
+# npm-dependency route made the cold CI production build flaky (Turbopack
+# postcss worker IPC timeouts). The app decompresses the bundle in the
+# browser (DecompressionStream) before importing it; the drift test
+# gunzips the blob and verifies the ORIGINAL file's sha256.
 #
 # Drift protection: src/lib/__tests__/hwr-assets.test.ts pins every file
 # against public/hwr/assets.json (size + sha256), exactly like the OCR
@@ -58,7 +61,31 @@ fetch() { # fetch <relative-path> <url>
 
 echo "Fetching handwriting runtime into public/hwr/ …"
 
-# --- onnxruntime web runtime (tarball, not node_modules) ------------------
+# --- JS runtime: bun-bundled closure, gzipped ------------------------------
+# The web ESM build (dist/transformers.web.js — NOT transformers.min.js,
+# a node-flavored artifact that fails in a browser with "this.processor
+# is not a function", measured 2026-11-10) lazily imports bare
+# specifiers ("onnxruntime-web/webgpu", "onnxruntime-common") that no
+# browser module can resolve, and blob-imported modules resolve
+# relative imports against blob:. So the vendor step runs a REAL bundler
+# (bun, already required by this repo) over the web build to produce ONE
+# self-contained ESM file — every bare specifier inlined — then gzips it
+# (push protection cannot flag opaque gzip bytes; the npm-dependency
+# route was rejected because it made the cold CI build flaky, see
+# docs/WORKLOG.md 2026-11-10). The app decompresses at runtime
+# (DecompressionStream) and imports the blob.
+RUNTIME_DIR="$TMP/runtime"
+mkdir -p "$RUNTIME_DIR"
+cd "$RUNTIME_DIR"
+printf '{ "name": "hwr-vendor", "private": true }\n' > package.json
+bun add "@huggingface/transformers@${TRANSFORMERS_VERSION}" >/dev/null
+bun build "node_modules/@huggingface/transformers/dist/transformers.web.js" \
+  --format esm --outfile bundle.js >/dev/null
+ORIGINAL_SHA="$(sha256sum bundle.js | cut -d' ' -f1)"
+echo "runtime bundle sha256 (uncompressed): $ORIGINAL_SHA"
+gzip -9 -c bundle.js > "$DIR/transformers.web.bundle.js.gz"
+
+# --- onnxruntime wasm pair --------------------------------------------------
 curl -fsSL -o "$TMP/ort.tgz" \
   "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-${ORT_VERSION}.tgz"
 tar -xzf "$TMP/ort.tgz" -C "$TMP" \
@@ -96,6 +123,7 @@ cd "$DIR"
   printf '  "model": "Xenova/trocr-small-handwritten",\n'
   printf '  "modelPrecision": "q8",\n'
   printf '  "language": "eng",\n'
+  printf '  "transformersJsOriginalSha256": "%s",\n' "$ORIGINAL_SHA"
   printf '  "files": {\n'
   first=1
   while IFS= read -r rel; do

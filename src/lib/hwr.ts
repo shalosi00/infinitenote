@@ -331,7 +331,13 @@ export async function recognizeAllHandwriting(
       const dataUrl = await render(line);
       const text = await recognize(dataUrl);
       results.push({ lineIndex: line.index, text, at });
-    } catch {
+    } catch (err) {
+      // visible, not silent: a failing line must be diagnosable from the
+      // console (the toast only carries the count)
+      console.warn(
+        `[handwriting] line ${line.index} failed:`,
+        err instanceof Error ? err.message : err,
+      );
       failed += 1;
     }
     done += 1;
