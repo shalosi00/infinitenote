@@ -12,6 +12,7 @@ export interface NoteE2EHooks {
     setActiveTool: (tool: { type: string }) => void;
     getSceneElements: () => Array<{ type: string }>;
     getAppState: () => {
+      theme: "light" | "dark";
       viewBackgroundColor: string;
       gridModeEnabled: boolean;
       zoom: { value: number };
@@ -89,7 +90,16 @@ export async function setActiveTool(page: Page, type: string): Promise<void> {
 }
 
 export function viewBackgroundColor(page: Page): Promise<string> {
-  return page.evaluate(() => window.__NOTE_E2E__?.excalidraw.getAppState().viewBackgroundColor ?? "");
+  return page.evaluate(
+    () => window.__NOTE_E2E__?.excalidraw.getAppState().viewBackgroundColor ?? "",
+  );
+}
+
+/** The Excalidraw app theme — the authoritative signal for dark mode. */
+export function canvasTheme(page: Page): Promise<"light" | "dark" | ""> {
+  return page.evaluate(
+    () => window.__NOTE_E2E__?.excalidraw.getAppState().theme ?? "",
+  );
 }
 
 /**
