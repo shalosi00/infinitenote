@@ -1124,3 +1124,30 @@ src/lib was fair game. Issue #179 tracks the goal.
   silently drops the new tag when the input list already exceeds
   MAX_TAGS_PER_PAGE (reachable only via imported/persisted data).
   Both are noted for the next cycle; neither is pinned by a test.
+
+## 2026-11-10 — docx-import fix: self-closing <w:p/> duplicated the next paragraph
+
+Found as a suspected bug by the #179 test-writing sweep (documented in
+that cycle's worklog, deliberately not asserted until fixed).
+
+- **Symptom**: a .docx body like `<w:p/><w:p>…real text…</w:p>` imported
+  the real paragraph's content TWICE. Real Word exports emit `<w:p/>`
+  (and `<w:p w:rsid…/>`) for empty paragraphs, so any document with an
+  empty paragraph followed by content could duplicate blocks.
+
+- **Root cause**: `iterateTopLevel` in src/lib/docx-import.ts scans for
+  the next `</w:p>` after each `<w:p` open. A self-closing paragraph has
+  no close tag, so the scan swallowed the FOLLOWING paragraph's
+  `</w:p>` — yielding a hybrid span (self-closing tag + next paragraph)
+  and then the next paragraph again on its own open.
+
+- **Fix**: detect the self-closing form (the open tag's `>` is preceded
+  by `/`) and yield just the bare tag; `paragraphBlock` returns null for
+  it (no runs), so empty paragraphs still contribute nothing. The
+  non-self-closing path is unchanged.
+
+- **Verification (actual run)**: unit suite 815/815 across 67 files
+  (814 + the new regression test) with lint + typecheck clean; the
+  regression test pins both the bare `<w:p/>` and the attributed
+  `<w:p w:rsidR="…"/>` forms and asserts the following paragraph
+  appears exactly once.
