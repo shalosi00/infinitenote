@@ -178,10 +178,22 @@ export async function createTextElement(page: Page, text: string): Promise<void>
   // click RIGHT of the Shapes island — the floating panel overlays the
   // left-center of the canvas and can swallow the pointer event (the 0.35
   // x-ratio flaked exactly there under full-suite load; import-overlay.spec
-  // documented the same hazard for its inline clicks)
-  await page.mouse.click(b.x + b.width * 0.6, b.y + b.height * 0.75);
+  // documented the same hazard for its inline clicks). The click→editor
+  // handshake can also stall on a busy CI runner (state-freshness #79
+  // flaked 4/4 attempts there on 2026-11-11 while passing locally) — so
+  // retry the click instead of trusting one shot.
   const editor = page.locator(".excalidraw textarea").last();
-  await editor.waitFor({ state: "visible", timeout: 10_000 });
+  let opened = false;
+  for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+    await page.mouse.click(b.x + b.width * 0.6, b.y + b.height * 0.75);
+    try {
+      await editor.waitFor({ state: "visible", timeout: 10_000 });
+      opened = true;
+    } catch {
+      // canvas not interactive yet — click again
+    }
+  }
+  if (!opened) throw new Error("text editor never opened after 3 canvas clicks");
   await page.keyboard.type(text, { delay: 20 });
   await page.keyboard.press("Escape");
 }
