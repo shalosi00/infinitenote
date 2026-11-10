@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Last updated** | 2026-11-09 (v1.11.0 release: recoverable & searchable pages) |
-| **Current version** | v1.11.0 — version files bumped on develop; tag + GitHub Release land with the release PR to main (previous tagged release: v1.10.1) |
-| **Phase** | v1.11.0 release in flight — page version history (#154), on-device OCR EN+DE (#155/#158), PDF file chips (#159), investigation-cycle fixes (#147–#153); next: #133 handwriting research (v1.12) |
-| **Overall state** | 564 unit + 152 E2E green (re-verified pre-release 2026-11-09: lint + typecheck clean; CI-mode E2E against the production build, 152 passed in 3.7m; unit 564/564); version history + OCR shipped 2026-11-09 and verified; PDF printouts now land a OneNote-style file chip — right-click menu with byte-exact download (docs/test-plans/pdf-attachment.md); OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs; proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
+| **Last updated** | 2026-11-10 (v1.11.1 patch: desktop glibc fix #164 + README rework #165 — release train) |
+| **Current version** | v1.11.1 (release train; version files at 1.11.1, versionCode 211) |
+| **Phase** | v1.11.0 shipped; **v1.11.1 patch release**: the v1.11.0 desktop AppImage failed to launch on current distros (#164 — bundled libs from ubuntu-latest required GLIBC_2.42/2.43) — fixed by pinning the Desktop workflow to ubuntu-22.04 with a glibc-floor guard (PR #166, verified by a dispatched build: bundle max GLIBC 2.35, boots under Xvfb on a glibc-2.41 host) plus a full README rework (#165); after the patch: v1.12 — #133 handwriting research (milestone open) |
+| **Overall state** | 564 unit + 152 E2E green (re-verified 2026-11-09: lint + typecheck clean; CI-mode E2E against the production build, 152 passed in 3.7m; unit 564/564; the released v1.11.0 tag re-verified from a fresh clone — install/build/boot smoke + 564/564 unit; Desktop artifacts attached to the release); **2026-11-10 incident #164**: the v1.11.0 AppImage silently failed to launch when double-clicked on current LTS distros — linuxdeploy copied webkit2gtk/glib from the ubuntu-latest runner (26.04, glibc 2.43) into the bundle, raising the real floor to GLIBC_2.42+ while the app binary itself only needs 2.39; fix pins the Desktop workflow to ubuntu-22.04 (floor 2.35) and adds a post-build guard that fails the job if any bundled ELF requires GLIBC > 2.35, plus user-facing AppImage troubleshooting (README + docs/desktop.md); also fixed in passing: the workflow's push trigger read `branches: ain]` (never matched — desktop builds only ever ran on tags/dispatch); version history + OCR shipped 2026-11-09 and verified; PDF printouts now land a OneNote-style file chip — right-click menu with byte-exact download (docs/test-plans/pdf-attachment.md); OCR now recognizes German (the one deu fast model covers EN+DE — combination modes proven worse, docs/test-plans/ocr.md evidence table); two dev-mode-only dialog-click E2E flakes hardened (retry-tolerant, assertions unchanged); dialog-close click-swallow fixed (regression-pinned); 0 known bugs (post-#164-fix); proactive investigation cycle 2026-11-09 — full-flow console sweep clean (0 warnings/0 errors across 16 phases), sync out-of-contract-folder healing (#148: deleted rows can no longer resurrect from stale page files + tombstones; the sync folder mirrors the library exactly), overlay + rename focus return (#149/#150: every dialog, the mobile drawer and the rename editor return focus to the pre-open element, WCAG 2.4.3); app-surface sweep 2026-11-08 (all dialogs/menus/popover/drawer audited at 5 viewports, 4 layout/a11y defects fixed); save-indicator calm pass 2026-11-08 (content-gated autosave, tombstone filter, <360px header fix); full manual pass 2026-11-07 — findings #122/#123 fixed |
 
 ## TL;DR
 
@@ -90,11 +90,18 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- PDF file chips (feat/pdf-attachment): OneNote-style file icon on every
-  PDF printout with a right-click menu — View / Download (byte-exact) /
-  Copy file name; 10 MiB attachment cap with skip toast; 564 unit + 152
-  E2E checks green locally (feature specs first-try); CI to confirm.
-  Next per the roadmap: the v1.11 handwriting-recognition research (#133).
+- **v1.11.1 patch — desktop artifact glibc fix (#164) + README rework (#165)**:
+  the v1.11.0 AppImage bundled libraries from the ubuntu-latest runner
+  (glibc 2.43) and failed to launch on Ubuntu 24.04 / Debian 13 / Mint 22
+  (silent dynamic-linker abort — "double-click does nothing"). Fix: Desktop
+  workflow pinned to ubuntu-22.04 (glibc 2.35 floor), a post-build guard that
+  extracts the AppImage and fails on any GLIBC requirement above the floor,
+  the `branches: ain]` → `[main]` trigger repair, unit-test pins for all of
+  it, a full README rework (real test counts, AppImage install +
+  troubleshooting) and an end-user troubleshooting section in docs/desktop.md.
+  Verified by a dispatched Desktop workflow run on the fix branch before
+  merge; shipped as v1.11.1 with rebuilt artifacts.
+  Next per the roadmap: the v1.12 handwriting-recognition research (#133).
 
 ## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 

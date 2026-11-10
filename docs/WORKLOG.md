@@ -78,6 +78,18 @@
   release-critical steps run as a deterministic rebuild loop — fresh branch
   off origin/develop → asserted edits → commit → push → verify remote SHA —
   retried until the remote tip equals the local commit.
+- **Shipped**: release PR #161 squash-merged to main (bacf898), tag v1.11.0
+  pushed and verified, GitHub Release published, milestone 12 (v1.11.0)
+  closed with 23 issues/PRs, #133 moved to the new v1.12.0 milestone (13).
+  main and develop now both carry the 1.11.0 version files — the default
+  branch is the latest release, which is what the user asked for.
+- **Tag verification (fresh clone)**: cloned tag v1.11.0 from GitHub into a
+  clean directory — `bun install --frozen-lockfile` (988 packages, no
+  drift), `bun run build` clean, the standalone production server answered
+  in 2s with the right title, and the unit suite ran 564/564 with 0 fail.
+  The Desktop workflow built the v1.11.0 Linux artifacts (deb / rpm /
+  AppImage) and all three are attached to the release; CI on the main push
+  is green.
 
 ## 2026-11-09 — German OCR + OneNote-style PDF file chips (fully TDD)
 
@@ -838,3 +850,50 @@ many tests, then implement"), with maximum stability.
   build 1200). GitHub API auth needs the user:token pair split from the
   remote URL (`Authorization: token <pass>`); pushes work with the full
   pair in the URL.
+
+## 2026-11-10 — hotfix cycle: desktop AppImage glibc floor (#164) + README rework (#165)
+
+- **User report**: double-clicking the downloaded `.AppImage` does nothing.
+  Diagnosed by downloading the released
+  `InfiniteNote_1.11.0_amd64.AppImage` (105 MB) and dissecting it:
+  - fresh browser download has no executable bit (cause #1 of
+    "double-click does nothing" — needs `chmod +x`);
+  - `--appimage-extract` works FUSE-less; the bundle is well-formed;
+  - **root cause #2**: linuxdeploy-plugin-gtk vendors webkit2gtk/glib/etc.
+    *from the build runner*. The workflow used `runs-on: ubuntu-latest`,
+    which is now Ubuntu 26.04 (glibc 2.43) — the bundled
+    `libglib-2.0.so.0`, `libwebkit2gtk-4.1.so.0`,
+    `libjavascriptcoregtk-4.1.so.0`, `liblcms2.so.2`, `libjxl.so.0.11`
+    require GLIBC_2.42/2.43 while the `infinitenote` binary itself only
+    needs 2.39. Result: silent dynamic-linker abort on Ubuntu 24.04
+    (2.39), Debian 13 (2.41), Mint 22 — i.e. every current LTS distro;
+    launched from a file manager the error is invisible.
+  - Latent bug in the same file: the workflow push trigger literally
+    read `branches: ain]` (a corrupted `[main]` that never matches), so
+    desktop builds only ever ran on `v*` tags and manual dispatch.
+- **Fix (issue #164)**: pin the Desktop workflow to `ubuntu-22.04`
+  (glibc 2.35 floor) — linuxdeploy takes the runner's libs, so the runner
+  choice sets the artifact's glibc floor; add a post-build guard that
+  extracts the built AppImage, scans every bundled ELF for `GLIBC_*`
+  symbol requirements and fails the job above the 2.35 floor; repair the
+  `branches: [main]` trigger; extend `desktop-config.test.ts` with pins
+  (pinned runner, no `ubuntu-latest`, trigger, guard) so it cannot drift.
+- **Docs (issue #165)**: README reworked entirely — real test counts
+  (564 unit + 152 E2E; the old badge claimed 266/56), fixed the broken
+  "igration guide]" link, corrected the dev table (old one listed a
+  `make e2e` target that never existed; real command is
+  `bunx playwright test`), a feature list updated through v1.11 (version
+  history, OCR, PDF chips, audio, shapes, themes, sync), an Install
+  section with per-asset Linux guidance and an AppImage troubleshooting
+  block (exec bit, libfuse2, `--appimage-extract-and-run`, glibc floor).
+  docs/desktop.md gains the supported-distro matrix, the glibc-guard
+  explanation and an end-user troubleshooting section.
+- **Verification**: dispatched the Desktop workflow on the fix branch
+  (ubuntu-22.04) — build green, guard reports the bundle's highest
+  required GLIBC ≤ 2.35; the produced AppImage boots under xvfb on this
+  glibc-2.41 sandbox host (the v1.11.0 one cannot even link). Unit tests
+  green locally including the new workflow pins; CI (lint / typecheck /
+  unit / e2e / build-smoke) green on the PR.
+- **Release**: shipped as **v1.11.1** with rebuilt artifacts (AppImage,
+  deb, rpm) attached by the tag-triggered Desktop workflow; #164/#165
+  closed. Next cycle: v1.12 — #133 handwriting research.
