@@ -29,7 +29,7 @@ import {
   getDataURL,
   MIME_TYPES,
 } from "@excalidraw/excalidraw";
-import { classifyFile, downloadBlob, normalizeImageStatuses, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { classifyFile, downloadBlob, normalizeImageStatuses, parseSceneFileText, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import {
   INHERIT_FILL,
   INHERIT_STROKE,
@@ -641,8 +641,26 @@ export interface ImportedScene {
 
 export async function importExcalidrawFile(file: File): Promise<ImportedScene> {
   const json = await file.text();
-  const data = JSON.parse(json);
-  const restored = restore({ elements: data.elements, appState: data.appState, files: data.files }, null, null);
+  // Fail with the file named and the reason — a truncated download or a
+  // renamed non-scene file must not surface as a bare SyntaxError that
+  // aborts the rest of the import batch with no clue which file broke.
+  let parsed: ReturnType<typeof parseSceneFileText>;
+  try {
+    parsed = parseSceneFileText(json);
+  } catch (e) {
+    throw new Error(`"${file.name}" is not a valid Excalidraw scene: ${(e as Error).message}`);
+  }
+  // the seam stays untyped on purpose — restore() is the element sanitizer,
+  // so junk shapes are its problem, not the parser's
+  const restored = restore(
+    {
+      elements: parsed.elements,
+      appState: parsed.appState,
+      files: parsed.files,
+    } as Parameters<typeof restore>[0],
+    null,
+    null,
+  );
   return { elements: restored.elements as ExcalidrawElement[], files: restored.files };
 }
 
