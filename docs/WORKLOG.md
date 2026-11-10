@@ -922,3 +922,65 @@ many tests, then implement"), with maximum stability.
   got amendment comments noting the display artifact.
 - New rule for every future cycle: verify byte-critical content with
   count-probes, never with displayed output.
+
+## 2026-11-10 — v1.12.0 release: handwriting research (#133) shipped; AppImage re-verified
+
+- **User-facing questions from the morning** ("double-clicking the
+  .appimage does nothing", "rework the .readme entirely") were already
+  answered by the v1.11.1 hotfix train (ubuntu-22.04 pin + glibc-floor
+  guard + README rework, #164/#165). This cycle verified both from
+  scratch instead of shipping anything twice:
+- **v1.11.1 AppImage independently re-verified by a fresh download**:
+  valid type-2 runtime (`--appimage-version` answers
+  `fedfad5`), extracts without FUSE (`--appimage-extract`), objdump scan
+  of every bundled ELF → highest requirement exactly `GLIBC_2.35`
+  (v1.11.0 required 2.42/2.43), embedded `.desktop` entry correct
+  (Exec/Icon/StartupWMClass/Categories). A full GUI boot is untestable
+  in this bare sandbox (host has no libEGL.so.1 and no apt; the AppImage
+  deliberately does not bundle the host's GL/mesa stack) — consistent
+  with the recorded Xvfb boot on a glibc-2.41 host. The exec-bit-on-
+  fresh-download behavior (`-rw-rw-r--` before `chmod`) was reproduced
+  locally, matching the README troubleshooting text.
+- **README re-check before rewriting anything**: a suspected broken
+  "igration guide]" link turned out to be the same display artifact
+  class documented in the previous entry (the shell output strips
+  bracket + lowercase m). The Read tool and a python repr byte probe
+  show `[migration guide](docs/onenote-migration.md)` intact; every
+  link target in the README exists, and every `make` target in the dev
+  table exists in the Makefile. No README defect — nothing to fix.
+- **Issue #133 (v1.12.0) shipped as research**: `docs/handwriting-
+  research.md` — survey of on-device HTR options with all sizes/licenses
+  verified from primary sources on the day (HF API): trocr-small-
+  handwritten quantized 23,082,942 B encoder + 40,527,613 B decoder
+  (≈64 MB total) vs trocr-base quantized ≈337 MB (not shippable; fp32
+  1.33 GB); microsoft/trocr-base-handwritten is MIT, Transformers.js is
+  Apache-2.0; tesseract.js ruled out for handwriting per the upstream
+  FAQ ("designed for printed text"); cloud ink APIs rejected (local-
+  first; Aimultiple benchmark cited as the quality reference point);
+  MyScript rejected (per-device certificate, 100 × €12 packs); WICG
+  Handwriting Recognition API rejected as a foundation (Draft 2025-07-
+  09, OS engines only — no Linux engine); ML Kit Digital Ink noted as a
+  TWA-side-only option (on-device, 300+ languages). Recommendation:
+  pursue, phased — Phase A metadata-only handwriting search, Phase B
+  ink-to-text gated on Phase A accuracy; CJK deferred. ROADMAP: v1.12
+  checked off, v1.13 candidate section added.
+- **Test counts re-verified by actual runs** (the brief requires real
+  numbers): gate run 567/567 unit across 43 files (564 recorded before
+  + 3 trigger-pin tests from #170), full E2E 152/152 in 6.8m after
+  reinstalling chromium-headless-shell (cache had v1200, Playwright
+  wanted v1248 — known sandbox-restart hazard). README badge refreshed
+  564 → 567.
+- **PR #172** (docs: handwriting recognition research) — gate green
+  locally, all 3 required CI checks green, squash-merged as 93275df;
+  issue #133 closed via API with a link comment (Closes-keyword in a
+  squash merge into develop does not auto-close — hazard 2).
+- **Release train v1.12.0** (docs-only): bump PR #173 (package.json /
+  twa-manifest / gradle / tauri.conf / Cargo.toml at 1.12.0, versionCode
+  220, F-Droid Builds entry; fdroid parity tests green), release PR
+  #174 develop→main merged as merge commit dbdd5c2, tag v1.12.0 +
+  GitHub Release with notes. Milestone v1.12.0 (id 13) closed; v1.13.0
+  (id 14) opened with issues #175 (Phase A) and #176 (Phase B) from the
+  ROADMAP candidates.
+- State after this cycle: 567 unit + 152 E2E green, 0 known bugs, all 3
+  required CI checks green on #172/#173/#174; next: #175 Phase A.
+
