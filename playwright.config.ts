@@ -39,12 +39,19 @@ export default defineConfig({
   webServer: {
     command: isCI
       ? // NEXT_PUBLIC_E2E=1 compiles the test hooks into this build only —
-        // ordinary production builds never ship them (issue #102)
-        "NEXT_PUBLIC_E2E=1 bun run build && bun .next/standalone/server.js"
+        // ordinary production builds never ship them (issue #102). The build
+        // is retried twice: Turbopack's PostCSS worker IPC intermittently
+        // panics ("Failed to write app endpoint /page") on busy shared
+        // runners — a retry has always cleared it (2026-11-11).
+        "NEXT_PUBLIC_E2E=1 bun run build || NEXT_PUBLIC_E2E=1 bun run build || NEXT_PUBLIC_E2E=1 bun run build && bun .next/standalone/server.js"
       : "bun run dev:e2e",
     url: BASE_URL,
     reuseExistingServer: !isCI,
-    timeout: 300_000,
+    // the CI webServer command includes the FULL production build (+ up to
+    // two retries for the flaky Turbopack panic) — a single slow build
+    // measured 6m42s on a busy shared runner (2026-11-11), so the budget
+    // must fit several attempts; the suite itself is unaffected
+    timeout: 1_500_000,
     stdout: "ignore",
     stderr: "pipe",
   },

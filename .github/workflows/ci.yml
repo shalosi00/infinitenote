@@ -53,7 +53,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Production build (standalone)
-        run: bun run build
+        # retry twice: Turbopack's PostCSS worker IPC intermittently panics
+        # ("Failed to write app endpoint /page") on busy shared runners —
+        # a retry has always cleared it (2026-11-11)
+        run: bun run build || bun run build || bun run build
       - name: Boot smoke test
         run: |
           (bun run start &) 
