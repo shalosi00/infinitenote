@@ -23,6 +23,7 @@ import type { CanvasApi } from "@/lib/excalidraw-utils";
 import { sanitizeScene, sceneSignature, structuralSceneJson, downloadBlob } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
+  convertHandwritingToText,
   getScenePayload,
   insertShapeById,
   importExcalidrawFile,
@@ -560,6 +561,8 @@ export default function ExcalidrawCanvas({
             onToast("Unknown shape");
           }
         },
+        // issue #176 Phase B: recognized handwriting → editable text
+        convertHandwriting: () => convertHandwritingToText(api),
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),

@@ -284,6 +284,45 @@ describe("applyHwrResults (HWR-P30..P36)", () => {
     const { payload: next } = applyHwrResults(payload, [{ ...lines()[1], index: 0 }], [{ lineIndex: 0, text: "  spaced\t out ", at: 1 }]);
     expect((next.elements[0] as { customData?: { hwrText?: string } }).customData?.hwrText).toBe("spaced out");
   });
+
+  it("HWR-P37: a partially failed re-run strips stale metadata from lines without results", () => {
+    const payload = scene([
+      ink("l1", [[0, 100], [60, 140]], { customData: { hwrText: "stale-one", hwrAt: 1 } }),
+      ink("l2", [[40, 110], [100, 130]]),
+    ]);
+    // line 0 re-recognizes and only it gets a result: its old text must be
+    // replaced, the non-carrier stroke stays clean, no stale metadata
+    // survives anywhere
+    const { payload: next, applied } = applyHwrResults(
+      payload,
+      [{ index: 0, strokes: [line("l1", 0), line("l2", 40)], x0: 0, y0: 100, x1: 100, y1: 140 }],
+      [{ lineIndex: 0, text: "fresh", at: 11 }],
+    );
+    expect(applied).toBe(1);
+    const byId = new Map(
+      (next.elements as Array<{ id: string; customData?: Record<string, unknown> }>).map((e) => [e.id, e]),
+    );
+    expect(byId.get("l1")?.customData?.hwrText).toBe("fresh");
+    expect(byId.get("l2")?.customData).toBeUndefined();
+  });
+
+  it("HWR-P38: a fully failed re-run strips ALL stale recognition metadata (empty bag dropped)", () => {
+    const payload = scene([
+      ink("m1", [[0, 200], [60, 240]], {
+        customData: { hwrText: "old", hwrAt: 1 },
+      }),
+    ]);
+    const { payload: next } = applyHwrResults(payload, [{ ...lines()[1], index: 0 }], []);
+    const el = next.elements[0] as { customData?: Record<string, unknown> };
+    // the bag's VALUE is dropped (JSON.stringify serializes the element
+    // without the key — the stored form is back to pre-recognition bytes).
+    // Fixed while writing the Phase B tests: the old
+    // `applied ? mapped : original` shortcut returned the ORIGINAL payload
+    // whenever no line carried a result, keeping stale metadata on the
+    // strokes (a fully failed re-run behaved differently from a partially
+    // successful one — one uniform lifecycle now).
+    expect(el.customData).toBeUndefined();
+  });
 });
 
 /* ------------------------------ hwrStatus ------------------------------- */
