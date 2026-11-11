@@ -43,6 +43,65 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-12 — v1.13.0 desktop artifact verification (issue #194) + v1.14 kickoff
+
+- **State found at session start**: v1.13.0 fully released — tag `v1.13.0`
+  on merge commit 408dee9, GitHub Release published with AppImage/deb/rpm,
+  milestone #14 closed, post-release docs PR #192 merged; v1.14.0 milestone
+  #15 open with issues #193 (WebGPU acceleration, measure-first) and #194
+  (artifact verification). ROADMAP had no v1.14 section yet.
+- **This session executed #194 end to end**: fresh AppImage download from
+  the release page (152,889,848 bytes, sha256 `bc5102ade5aad106c0…`),
+  type-2 magic at offset 8 + FUSE-less `--appimage-extract` OK; objdump
+  scan of **all 174 bundled ELFs** — overall max **GLIBC_2.35** (webkit
+  stack: libcairo/libjavascriptcoregtk/libwebkit2gtk from the pinned
+  ubuntu-22.04 runner), main app binary max **GLIBC_2.34**, nothing over
+  the floor; embedded .desktop entry + hicolor icons correct; versionCode
+  230 / 1.13.0 parity across package.json, android-twa gradle + manifest,
+  src-tauri Cargo.toml + tauri.conf.json, F-Droid recipe (commit
+  `v1.13.0`); and a new verification dimension for this release: the
+  vendored handwriting model confirmed **embedded in the Tauri binary**
+  (all 10 `public/hwr/` asset paths present in `usr/bin/infinitenote` —
+  Tauri v2 embeds the whole frontendDist export; nothing downloads at
+  runtime). Evidence table: docs/desktop.md "Artifact verification log".
+- **Docs sync in this PR**: ROADMAP gained the v1.14 section and v1.13 is
+  re-labeled shipped; this journal was missing the 11-10/11-11 sessions —
+  concise backfill entries added below (the detailed records live in
+  PROJECT_STATUS.md, per the protocol).
+- **Gate**: docs-only PR — lint + typecheck + unit suite re-run green at 886/886 across 69 files (same suite size as at release, as expected for a no-code-change cycle).
+- **v1.14 next**: #193 WebGPU — build the WASM-vs-WebGPU benchmark harness
+  and the evidence table first; no WebGPU path ships without a measured
+  win (issue's own gating).
+
+## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
+
+- Phase B ink-to-text conversion shipped (#176 via PR #188): recognized
+  handwriting converts to real editable text at the ink's position,
+  metadata-only, structural idempotency, one native undo step; three real
+  findings fixed and documented (stale-metadata return path in
+  applyHwrResults, Excalidraw 0.18 captureUpdate EVENTUALLY→IMMEDIATELY,
+  post-undo store quirk with workaround).
+- CI hardened: Turbopack's postcss worker IPC deadline failed 9 consecutive
+  CI builds on slower runners — production build moved to webpack
+  (`next build --webpack`, PR #190).
+- Release train: version bump 1.13.0 / versionCode 230 (PR #189), release
+  PR #191 merged as merge commit 408dee9, tag `v1.13.0` + GitHub Release
+  with AppImage/deb/rpm, post-release docs PR #192, milestone #14 closed.
+  Suite at release: 886 unit + 156 E2E.
+
+## 2026-11-10 — handwriting Phase A, test growth, hardening (backfill; details in PROJECT_STATUS.md)
+
+- Handwriting Phase A shipped (#175 via PR #178): trocr-small-handwritten
+  q8 vendored under public/hwr/ (sha256-pinned, no CDN), union-find line
+  segmentation, height-normalized rasterizer, per-line stroke metadata,
+  Ctrl+K search indexing; measured ≈3.2 s per line WASM; zero
+  cross-origin requests asserted by E2E.
+- Test-growth cycle (PR #180): +200 unit tests in 21 new files closing the
+  src/lib coverage gaps from a LOC-vs-tests survey.
+- Corrupt-input hardening: 5 real defects fixed at the sync/backup/search/
+  tag boundaries (+43 adversarial tests); v1.11.1 AppImage independently
+  re-verified (issue #164 evidence).
+
 ## 2026-11-09 — v1.11.0 release: main catches up with develop
 
 - **User question answered first**: "Is main updated / the latest version the
