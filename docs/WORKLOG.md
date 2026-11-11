@@ -1224,6 +1224,72 @@ brackets — and fix whatever breaks.
   SyncFormatErrors naming the offending file. README badge and counts
   updated (858 unit).
 
+## 2026-11-11 — Phase B ink-to-text conversion (issue #176): handwriting becomes editable text
+
+- **Shipped**: "Convert handwriting to text" in the Page-actions menu —
+  each recognized handwriting line becomes a REAL, editable Excalidraw
+  text element at the ink's position while the strokes are KEPT (OneNote
+  behavior). Per-page (no selection) and per-group (ink selected — any
+  member stroke pulls in its whole line). No new model, no engine calls:
+  conversion only reads the metadata recognition stored. Text sizing =
+  inkHeight / 1.25 clamped 12–96; clean fontFamily 2; stroke color = the
+  user's current toolbar color (INHERIT_STROKE sentinel). Undo-safety via
+  ONE native `updateScene` with `CaptureUpdateAction.IMMEDIATELY`.
+
+- **Three real findings from building it test-first** (the cycle's actual
+  value — two product bugs + one design flaw, all fixed):
+  1. `applyHwrResults` returned the ORIGINAL payload whenever NO line
+     carried a result (`applied ? mapped : original` shortcut) — a fully
+     failed re-recognition kept stale text metadata on the strokes while
+     a partially successful run stripped it (HWR-P38; uniform lifecycle
+     fix + regression tests).
+  2. Excalidraw 0.18's default `captureUpdate: EVENTUALLY` defers the
+     history capture, and after the next interaction the deferred capture
+     is reconciled away — the inserted text silently vanished ~1 s after
+     `updateScene` (scene probes: 6 elements at +0/+800 ms, 5 at +1200 ms,
+     no tombstone). Fixed with `CaptureUpdateAction.IMMEDIATELY`.
+  3. Excalidraw's undo does NOT revert `customData` (HWR-E06 finding: the
+     undo removed the converted text but kept a `hwrConvertedAt` flag) —
+     so the flag-based idempotency design was replaced by STRUCTURAL
+     detection: a line is converted when a text element sits at its ink
+     position (12 px epsilon — the created text carries ~8 px of
+     text-box padding, measured). Undo or deleting the text block makes
+     the line convertible again; no flag can ever lie.
+  A known Excalidraw 0.18 store limitation remains documented in
+  docs/test-plans/handwriting.md: a conversion issued immediately after
+  undoing a previous conversion can still be dropped by the store; the
+  reliable path is re-recognizing first (remounts the canvas).
+
+- **Scope decision found by E2E (HWR-E05)**: the conversion auto-selects
+  its own text output; with selection-based per-group scoping, the NEXT
+  conversion would enter group mode with no ink selected ("No selected
+  handwriting…" right after "Converted 1 line…"). The scope decision now
+  counts FREEDRAW ink only.
+
+- **Tests**: +27 unit tests in `src/lib/__tests__/hwr-convert.test.ts`
+  (HWR-C01..C52: font sizing, plan scoping, structural idempotency,
+  skeletons, toast copy, round-trips) + 2 reworked `applyHwrResults`
+  regression tests — **886 unit tests across 69 files**, lint + typecheck
+  clean. E2E: `e2e/handwriting.spec.ts` grows to 7 checks — E05 (convert,
+  ink kept, position anchor, honest no-op re-run), E06 (one Ctrl+Z removes
+  the text; the undone scene persists across a reload), E07 (per-group
+  conversion via live selection + the never-recognized guidance toast) —
+  7/7 in isolation across three runs; the full-suite run in the 4 GB
+  sandbox crashed a tab inside the real-engine test (memory ceiling,
+  environment — the test passes isolated; CI validates the full suite).
+
+- **E2E mechanics lessons** (hard-won): sonner toasts (bottom-center) hold
+  keyboard focus and swallow canvas clicks for ~4 s — wait for
+  `[data-sonner-toast]` detach before focusing the canvas; focus the
+  canvas via an elementFromPoint hit-test scan (fixed ratios hit Excalidraw
+  islands or the toast); Excalidraw's undo needs lowercase
+  `Control+z` (the keyTest matches the lowercase key); the dev server
+  module cache can serve a stale `excalidraw-client.ts` after edits —
+  restart with a `.next` wipe before trusting a run.
+
+- **PR**: to develop with `Closes #176` — completes the v1.13.0
+  milestone (release flow next).
+
 ## 2026-11-11 — README rework with a scripted screenshot pipeline; dark-canvas fix found on the way
 
 - **README reworked end to end** (this cycle): new hero (logo, badges,

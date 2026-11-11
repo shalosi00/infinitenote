@@ -8,6 +8,7 @@
  */
 import type { ScenePayload } from "./types";
 import { isAudioFile } from "./audio-notes";
+import type { HwrConvertOutcome } from "./hwr-convert";
 
 /** Imperative surface the canvas exposes to the rest of the app. */
 export interface CanvasApi {
@@ -24,6 +25,12 @@ export interface CanvasApi {
   focusContent: () => void;
   /** Insert one curated library shape by id (issue #65). */
   insertShape: (shapeId: string) => void;
+  /**
+   * Convert recognized handwriting to editable text (issue #176 Phase B):
+   * per-group when ink is selected, whole page otherwise; returns the
+   * counts the completion toast needs.
+   */
+  convertHandwriting: () => HwrConvertOutcome;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
   /** True while the canvas holds un-saved edits (autosave debounce pending). */

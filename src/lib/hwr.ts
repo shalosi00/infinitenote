@@ -219,13 +219,20 @@ export function normalizeHwrText(raw: string): string {
 /**
  * Merge recognition results into a NEW payload. Every live freedraw
  * element first loses stale `customData.hwrText`/`hwrAt` (re-running is
- * idempotent — no orphaned annotations survive an ink edit), then each
- * recognized line's FIRST stroke (leftmost) carries the line's text.
+ * idempotent — no orphaned annotations survive an ink edit), then each recognized
+ * line's FIRST stroke (leftmost) carries the line's text.
  * Per-line annotation (not per-page) keeps deletion honest: erase one
  * word of a line and re-run, and only that line's metadata changes.
  * `null` text (a failed line) is not stored at all; empty text IS stored
  * — recognized-but-blank must stay distinguishable from never-run (OCR
  * precedent). Other customData fields are always preserved.
+ *
+ * The stripped map is returned UNCONDITIONALLY (fixed while writing the
+ * Phase B tests, HWR-P38): the old `applied ? mapped : original` shortcut
+ * threw the stripping away whenever NO line carried a result — a fully
+ * failed re-recognition left stale text/conversion metadata on the
+ * strokes while a partially successful run removed it. Failed lines now
+ * lose their stale metadata in both cases: one uniform lifecycle.
  */
 export function applyHwrResults(
   payload: ScenePayload,
@@ -243,7 +250,8 @@ export function applyHwrResults(
   const elements = payload.elements.map((el) => {
     const e = el as FreedrawLike & { customData?: Record<string, unknown> | null };
     if (!e || e.isDeleted || e.type !== "freedraw") return el;
-    const had = e.customData && ("hwrText" in e.customData || "hwrAt" in e.customData);
+    const had =
+      e.customData && ("hwrText" in e.customData || "hwrAt" in e.customData);
     const result = resultByFirstStroke.get(e.id ?? "");
     const carries = result !== undefined;
     if (!had && !carries) return el;
@@ -263,7 +271,7 @@ export function applyHwrResults(
         undefined;
     return { ...(el as Record<string, unknown>), customData: rest };
   });
-  return { payload: applied ? { ...payload, elements } : { ...payload }, applied };
+  return { payload: { ...payload, elements }, applied };
 }
 
 /** How much of a page's ink has been recognized. */

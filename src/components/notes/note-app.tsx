@@ -30,6 +30,7 @@ import {
   Square,
   Sun,
   Tags,
+  Type,
   Upload,
   X,
 } from "lucide-react";
@@ -73,6 +74,7 @@ import {
   HWR_ERROR_MESSAGES,
   HwrError,
 } from "@/lib/hwr";
+import { hwrConvertSummary } from "@/lib/hwr-convert";
 import {
   addTagWithResult,
   collectTags,
@@ -691,6 +693,38 @@ export default function NoteApp() {
     }
   }, [hwrRunning]);
 
+  /** True while a handwriting conversion is in flight — disables the menu item. */
+  const [hwrConverting, setHwrConverting] = useState(false);
+
+  /**
+   * "Convert handwriting to text" (Phase B, issue #176): reuses the stored
+   * recognition metadata — no engine call. Real, editable text elements
+   * land on top of the ink (strokes are KEPT, OneNote behavior) via ONE
+   * native scene update, so a single Ctrl+Z undoes it. Per-group when ink
+   * is selected, whole page otherwise. Honest toasts for the empty cases.
+   */
+  const handleConvertHwr = useCallback(async () => {
+    if (hwrConverting) return;
+    if (!canvasApi.current) {
+      toast.error("Open a page first, then convert handwriting to text.");
+      return;
+    }
+    setHwrConverting(true);
+    try {
+      const result = canvasApi.current.convertHandwriting();
+      if (result.converted === 0) {
+        toast(hwrConvertSummary(result));
+      } else {
+        toast.success(hwrConvertSummary(result));
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Handwriting conversion failed.");
+    } finally {
+      setHwrConverting(false);
+    }
+  }, [hwrConverting]);
+
   /* ------------------------------ version history --------------------- */
 
   /**
@@ -1160,6 +1194,14 @@ export default function NoteApp() {
                     >
                       <Signature />
                       {hwrRunning ? "Recognizing handwriting…" : "Recognize handwriting (English)"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="convert-hwr"
+                      disabled={hwrConverting}
+                      onClick={() => void handleConvertHwr()}
+                    >
+                      <Type />
+                      {hwrConverting ? "Converting handwriting…" : "Convert handwriting to text"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
