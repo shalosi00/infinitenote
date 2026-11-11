@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import {
   attachErrorCollector,
+  canvasTheme,
   expectCount,
   resetToSeed,
-  viewBackgroundColor,
 } from "./helpers";
 
 test.describe.serial("theme and mobile layout", () => {
@@ -22,14 +22,17 @@ test.describe.serial("theme and mobile layout", () => {
     await page.close();
   });
 
-  test("canvas background follows the theme toggle", async () => {
-    const before = await viewBackgroundColor(page);
+  test("canvas follows the theme toggle", async () => {
+    // The theme is the authoritative signal: the canvas paints white paper in
+    // both themes (Excalidraw's dark-mode CSS filter inverts it into the dark
+    // look), so the raw viewBackgroundColor no longer flips on toggle.
+    const before = await canvasTheme(page);
     await page.getByRole("button", { name: "Toggle theme" }).click();
-    await expect.poll(() => viewBackgroundColor(page)).not.toBe(before);
+    await expect.poll(() => canvasTheme(page)).not.toBe(before);
     await page.screenshot({ path: "e2e-artifacts/e2e-dark-mode.png" });
 
     await page.getByRole("button", { name: "Toggle theme" }).click();
-    await expect.poll(() => viewBackgroundColor(page)).toBe(before);
+    await expect.poll(() => canvasTheme(page)).toBe(before);
   });
 
   test("mobile viewport navigates via the drawer", async () => {

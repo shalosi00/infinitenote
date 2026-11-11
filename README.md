@@ -1,21 +1,55 @@
 <div align="center">
 
+<img src="public/icons/icon-512.png" alt="InfiniteNote logo" width="80" />
+
 # InfiniteNote
 
-**Your notes, your canvas — a free, open-source OneNote-style notebook for Linux and Android.**
+**Your notes, your canvas — a free, open-source OneNote-style notebook
+for Linux and Android.**
 
 [![CI](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/ci.yml)
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-567%20unit%20%2B%20152%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-858%20unit%20%2B%20156%20E2E-brightgreen)](PROJECT_STATUS.md)
+
+**Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
+all on-device · no account, no cloud, no lock-in**
 
 </div>
 
-OneNote is a great notebook — but it is closed-source, tied to Microsoft's cloud,
-and has no Linux client. InfiniteNote is the open answer: an infinite-canvas
-notebook you can install on Linux and Android, use completely offline, and keep
-full ownership of your data. No account, no cloud, no lock-in.
+<img src="assets/screenshots/hero-light.png" alt="InfiniteNote — a planning page on the infinite canvas, with notebooks, sections and tagged pages in the sidebar" width="100%" />
+
+OneNote is a great notebook — but it is closed-source, tied to Microsoft's
+cloud, and has no Linux client. InfiniteNote is the open answer: an
+infinite-canvas notebook that runs on Linux and Android, works completely
+offline, and keeps full ownership of your data in files you can read, back up
+and sync yourself. No account, no telemetry, no lock-in.
+
+---
+
+## Highlights
+
+| | |
+|---|---|
+| **OneNote-style notebooks** | Notebooks → sections → pages, with colors, drag order, duplicate, trash with restore, and up to 25 restore-able versions per page. |
+| **Infinite canvas** | Draw, handwrite and type anywhere (Excalidraw engine) — ink overlays text, images, audio players and PDF printouts on the same page. |
+| **Search everything** | `Ctrl+K` full-text search across every page — including text recognized in images (OCR) and in your handwriting. |
+| **On-device intelligence** | "Recognize text in images" (tesseract.js, English + German) and "Recognize handwriting (English)" (TrOCR model, ≈64 MB, downloaded once) run 100% locally. Your ink and images never leave the device. |
+| **Import almost anything** | Images, plain text, Markdown, Word documents, PDF printouts (multi-page, with byte-exact file chips), OneNote-exported HTML, OneNote `.mht` pages, `.excalidraw` scenes and audio files. |
+| **Export and own your data** | PNG, SVG, scene JSON, paginated A4 PDF with selectable vector text — or a full notebook backup file. File-based sync (folder or ZIP) with page-granular three-way merge, conflict copies and tombstones. |
+
+## Screenshots
+
+| Light canvas | Dark mode |
+|:---:|:---:|
+| <img src="assets/screenshots/hero-light.png" alt="Light mode — planning page" width="100%" /> | <img src="assets/screenshots/hero-dark.png" alt="Dark mode — field notes page" width="100%" /> |
+| **Search across handwriting** | **Handwriting recognition** |
+| <img src="assets/screenshots/search.png" alt="Search palette finding the recognized word CAT on an ink page" width="100%" /> | <img src="assets/screenshots/handwriting.png" alt="Handwriting recognition toast on an ink sketchbook page" width="100%" /> |
+| **Page version history** | **Six accent themes** |
+| <img src="assets/screenshots/version-history.png" alt="Version history dialog with manual and automatic snapshots" width="100%" /> | <img src="assets/screenshots/themes.png" alt="Themes gallery — six accent themes over light and dark mode" width="100%" /> |
+| **Mobile** | |
+| <img src="assets/screenshots/mobile.png" alt="Mobile layout with the notebook drawer open" width="55%" /> | |
 
 ## Features
 
@@ -61,6 +95,10 @@ full ownership of your data. No account, no cloud, no lock-in.
   or copy the file name.
 - **OCR** — "Recognize text in images" runs fully on-device (tesseract.js,
   English + German) and makes recognized text searchable.
+- **Handwriting search** — "Recognize handwriting (English)" recognizes freehand
+  ink on-device (TrOCR model, ≈64 MB, downloaded once and cached) and makes the
+  recognized text searchable — your ink is never modified and nothing leaves
+  the device.
 - **Export** — PNG, SVG, scene JSON, paginated **PDF (A4 portrait/landscape)**
   with selectable vector text, or a full notebook backup file.
 - **File-based sync (phase 1)** — point the app at a sync folder (or merge via
@@ -75,13 +113,17 @@ full ownership of your data. No account, no cloud, no lock-in.
 - **English UI** — one focused language; CJK text in titles, tags and notes is
   fully supported (IME-safe input, CJK-aware layout and PDF footers).
 
-## Screenshots
+## Privacy
 
-| Light | Dark |
-|:---:|:---:|
-| ![Light mode](assets/screenshots/light.png) | ![Dark mode](assets/screenshots/dark.png) |
+InfiniteNote is local-first by architecture, not by policy checkbox:
 
-![Mobile](assets/screenshots/mobile.png)
+- Your notes live in your browser's IndexedDB on your device — there is no
+  server, no account and no telemetry anywhere in the codebase.
+- OCR and handwriting recognition run entirely on-device. The handwriting
+  model (≈64 MB) is downloaded once from the app itself and cached; after
+  that, recognition works offline and sends nothing anywhere.
+- Sync is a folder you point the app at (your own disk, your own cloud drive);
+  backups are plain files you can inspect.
 
 ## Install
 
@@ -171,9 +213,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server (`http://localhost:3000`) |
-| `make test` | Unit tests (564, bun test) |
+| `make test` | Unit tests (858, bun test) |
 | `make lint` / `make typecheck` | ESLint / TypeScript check |
-| `bunx playwright test` | Playwright E2E suite (152 checks; boots the app automatically) |
+| `bunx playwright test` | Playwright E2E suite (156 checks; boots the app automatically) |
 | `make build` / `make start` | Production build / boot the standalone server |
 | `make status` | Quick "where do things stand" snapshot |
 
@@ -182,12 +224,35 @@ the full browser E2E suite on every PR — all required checks before merge. The
 separate Desktop workflow builds the Linux installers on every release tag and
 guards their glibc floor.
 
+Refresh the README screenshots after significant UI changes with the
+capture pipeline (a production `NEXT_PUBLIC_E2E=1` build, generated
+`.excalidraw` scenes, and a scripted Playwright run that exercises the real
+handwriting engine):
+
+```bash
+python3 scripts/gen-readme-scenes.py        # scene files → /tmp/shots/
+bun scripts/capture-readme-shots.mjs        # drives the app → /tmp/shots/out/
+python3 scripts/install-readme-shots.py     # resizes + installs into assets/screenshots/
+```
+
+## Documentation
+
 - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** — read this first: current state, in-flight work, next up
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — stack, modules, data flow
 - **[docs/PIPELINE.md](docs/PIPELINE.md)** — branching, PRs, releases; see also [CONTRIBUTING.md](CONTRIBUTING.md)
 - **[docs/ROADMAP.md](docs/ROADMAP.md)** and **[docs/DECISIONS.md](docs/DECISIONS.md)** — what is next and why things are the way they are
+- **[docs/onenote-migration.md](docs/onenote-migration.md)** — moving from OneNote
 - **[docs/desktop.md](docs/desktop.md)** — the Linux desktop shell: build, packaging, troubleshooting
 - **[AGENTS.md](AGENTS.md)** — guide for AI agents and contributors
+
+## Roadmap
+
+Shipped most recently: handwriting search Phase A (on-device ink recognition,
+indexed for search), the corrupt-input hardening wave, and +200 adversarial
+unit tests. Next up on the
+[roadmap](docs/ROADMAP.md) / [milestones](https://github.com/shalosi00/infinitenote/milestones):
+**ink-to-text conversion** (Phase B — turn recognized ink into editable text),
+then sync & collaboration research.
 
 ## Acknowledgements
 
@@ -195,8 +260,9 @@ Built on outstanding open source: [Excalidraw](https://excalidraw.com) (canvas),
 [Tauri](https://tauri.app) (desktop shell), [Dexie](https://dexie.org)
 (IndexedDB), [pdf.js](https://mozilla.github.io/pdf.js/),
 [tesseract.js](https://tesseract.projectnaptha.com) (OCR),
-[jsPDF](https://parall.ax/products/jspdf) (PDF export),
-[fflate](https://github.com/101arrowz/fflate) (.docx unzip),
+[transformers.js](https://huggingface.co/docs/transformers.js) (on-device
+handwriting recognition), [jsPDF](https://parall.ax/products/jspdf) (PDF
+export), [fflate](https://github.com/101arrowz/fflate) (.docx unzip),
 [shadcn/ui](https://ui.shadcn.com), [Next.js](https://nextjs.org) and
 [bun](https://bun.sh).
 Inspired by Microsoft OneNote; not affiliated with or endorsed by Microsoft.

@@ -23,6 +23,7 @@ import type { CanvasApi } from "@/lib/excalidraw-utils";
 import { sanitizeScene, sceneSignature, structuralSceneJson, downloadBlob } from "@/lib/excalidraw-utils";
 import {
   classifyFile,
+  convertHandwritingToText,
   getScenePayload,
   insertShapeById,
   importExcalidrawFile,
@@ -560,6 +561,8 @@ export default function ExcalidrawCanvas({
             onToast("Unknown shape");
           }
         },
+        // issue #176 Phase B: recognized handwriting → editable text
+        convertHandwriting: () => convertHandwritingToText(api),
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),
@@ -593,13 +596,23 @@ export default function ExcalidrawCanvas({
 
   /* ----------------------------- lifecycle ----------------------------- */
 
-  // keep the canvas background in sync with the app theme + page paper
+  // Keep the page paper in sync with the app theme + paper style.
+  //
+  // Excalidraw 0.18 renders dark mode by INVERTING the canvas pixels
+  // (`.theme--dark canvas { filter: invert(93%) hue-rotate(180deg) }`) — the
+  // scene itself must stay authored in light colors. Painting a dark
+  // viewBackgroundColor here would be inverted AGAIN into a washed-out light
+  // gray (observed in the v1.13 screenshot pass), so both themes paint white
+  // paper and the filter produces the dark look. All export paths already
+  // force a white background (excalidraw-client.ts, pdf-export.ts), which
+  // this now matches; the grid pattern is drawn into the canvas and inverts
+  // to light-on-dark automatically.
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
     api.updateScene({
       appState: {
-        viewBackgroundColor: theme === "dark" ? "#1e1e1e" : "#ffffff",
+        viewBackgroundColor: "#ffffff",
         gridModeEnabled: background === "grid",
       },
     });
@@ -758,7 +771,10 @@ export default function ExcalidrawCanvas({
     [theme]
   );
 
-  const viewBackgroundColor = theme === "dark" ? "#1e1e1e" : "#ffffff";
+  // white paper in BOTH themes — Excalidraw's dark-mode CSS filter inverts
+  // the canvas, so painting white is what renders as dark (see the sync
+  // effect above)
+  const viewBackgroundColor = "#ffffff";
   const ruledColor = theme === "dark" ? "rgba(120, 120, 128, 0.35)" : "rgba(82, 82, 91, 0.25)";
 
   return (

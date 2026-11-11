@@ -49,7 +49,10 @@ describe("tauri.conf.json", () => {
 describe("desktop build path", () => {
   it("exposes build:desktop and the tauri CLI script", () => {
     const pkg = readJson("package.json");
-    expect(pkg.scripts["build:desktop"]).toBe("NEXT_OUTPUT_MODE=export next build");
+    // --webpack pinned: Turbopack's postcss worker IPC deadline elapsed
+    // deterministically on slower CI runners (2026-11-11) — the desktop
+    // export build shares the webpack compiler (fix/webpack-ci-build)
+    expect(pkg.scripts["build:desktop"]).toBe("NEXT_OUTPUT_MODE=export next build --webpack");
     expect(pkg.scripts.tauri).toContain("@tauri-apps/cli");
   });
 

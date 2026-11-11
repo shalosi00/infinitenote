@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import { byOrder } from "../types";
 import { generatedNames } from "../generated-names";
+import { safeTags } from "../tags";
 
 export const MANIFEST_PATH = "manifest.json";
 export const TRASH_PATH = "trash.jsonl";
@@ -236,6 +237,35 @@ export function buildSyncFolderFiles(
 
 const PAGE_FILE_RE = /^pages\/[0-9A-Za-z_-]+\.json$/;
 
+/**
+ * Shape-check a hand-editable `scene` field. The folder is documented as
+ * human-inspectable JSON ("see and rescue your data with a text editor"),
+ * so page files get edited by hand — and a truncated or type-confused
+ * `scene` (42, "…", [], {"elements": 42}) must fail HERE with the file
+ * named in the error, not deep inside the search index or the canvas as
+ * an unattributed TypeError. A minimal hand-written scene ({} or
+ * {"elements": []}) stays importable; `files`, when present, must be an
+ * object and `elements`, when present, an array.
+ */
+function assertValidScene(path: string, scene: unknown): asserts scene is ScenePayload | null {
+  // absent and null are the documented empty page — only a PRESENT,
+  // wrong-typed value is corruption
+  if (scene === null || scene === undefined) return;
+  if (typeof scene !== "object" || Array.isArray(scene)) {
+    throw new SyncFormatError(
+      `${path}: "scene" must be an object or null, got ${scene === null ? "null" : typeof scene}`,
+      "badPageFile"
+    );
+  }
+  const s = scene as { elements?: unknown; files?: unknown };
+  if (s.elements !== undefined && !Array.isArray(s.elements)) {
+    throw new SyncFormatError(`${path}: scene "elements" must be an array`, "badPageFile");
+  }
+  if (s.files !== undefined && (typeof s.files !== "object" || s.files === null || Array.isArray(s.files))) {
+    throw new SyncFormatError(`${path}: scene "files" must be an object`, "badPageFile");
+  }
+}
+
 /** Union many trash entries by id: latest `at` wins, `purged` is sticky. */
 export function reduceTrash(entries: readonly TrashEntry[]): Map<string, TrashEntry> {
   const out = new Map<string, TrashEntry>();
@@ -300,6 +330,12 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
     if (typeof file?.id !== "string" || typeof file?.sectionId !== "string") {
       throw new SyncFormatError(`${path} is missing id/sectionId`, "badPageFile");
     }
+    assertValidScene(path, file.scene);
+    // tags are cosmetic and easily re-applied by hand, so a malformed field
+    // ("tags": "work", "tags": [1,2]) degrades to dropping the bad entries
+    // instead of failing the whole sync — unlike scene content, nothing of
+    // substance is lost.
+    const tags = safeTags(file.tags);
     pages.set(file.id, {
       id: file.id,
       sectionId: file.sectionId,
@@ -309,7 +345,7 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
       updatedAt: typeof file.updatedAt === "number" ? file.updatedAt : 0,
       deletedAt: null,
       background: file.background,
-      tags: file.tags?.length ? file.tags : undefined,
+      tags: tags.length ? tags : undefined,
       content: file.scene ? JSON.stringify(file.scene) : null,
     });
   }

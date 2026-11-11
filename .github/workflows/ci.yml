@@ -53,7 +53,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Production build (standalone)
-        run: bun run build
+        # retry twice for belt-and-braces (a 2026-11-11 wave of 9 consecutive
+        # e2e/build-smoke panics was fixed by moving the build to webpack —
+        # Turbopack's PostCSS worker IPC deadline elapsed deterministically
+        # on slower shared runners; the retries stay in case the runner pool
+        # misbehaves again)
+        run: bun run build || bun run build || bun run build
       - name: Boot smoke test
         run: |
           (bun run start &) 

@@ -55,7 +55,7 @@ describe("com.infinitenote.app.metainfo.xml", () => {
   });
 
   it("references only real repo assets in screenshots", () => {
-    for (const shot of ["light.png", "dark.png", "mobile.png"]) {
+    for (const shot of ["hero-light.png", "hero-dark.png", "mobile.png"]) {
       expect(xml).toContain(
         `https://raw.githubusercontent.com/shalosi00/infinitenote/main/assets/screenshots/${shot}`,
       );

@@ -28,14 +28,16 @@ import {
   getCommonBounds,
   getDataURL,
   MIME_TYPES,
+  CaptureUpdateAction,
 } from "@excalidraw/excalidraw";
-import { classifyFile, downloadBlob, normalizeImageStatuses, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { classifyFile, downloadBlob, normalizeImageStatuses, parseSceneFileText, sanitizeScene, titleToFilename } from "./excalidraw-utils";
 import {
   INHERIT_FILL,
   INHERIT_STROKE,
   getShapeDef,
   type ShapeSkeleton,
 } from "./shape-library";
+import { conversionSkeletons, planHwrConversion, type HwrConvertOutcome } from "./hwr-convert";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
@@ -641,8 +643,26 @@ export interface ImportedScene {
 
 export async function importExcalidrawFile(file: File): Promise<ImportedScene> {
   const json = await file.text();
-  const data = JSON.parse(json);
-  const restored = restore({ elements: data.elements, appState: data.appState, files: data.files }, null, null);
+  // Fail with the file named and the reason — a truncated download or a
+  // renamed non-scene file must not surface as a bare SyntaxError that
+  // aborts the rest of the import batch with no clue which file broke.
+  let parsed: ReturnType<typeof parseSceneFileText>;
+  try {
+    parsed = parseSceneFileText(json);
+  } catch (e) {
+    throw new Error(`"${file.name}" is not a valid Excalidraw scene: ${(e as Error).message}`);
+  }
+  // the seam stays untyped on purpose — restore() is the element sanitizer,
+  // so junk shapes are its problem, not the parser's
+  const restored = restore(
+    {
+      elements: parsed.elements,
+      appState: parsed.appState,
+      files: parsed.files,
+    } as Parameters<typeof restore>[0],
+    null,
+    null,
+  );
   return { elements: restored.elements as ExcalidrawElement[], files: restored.files };
 }
 
@@ -729,6 +749,77 @@ export function insertShapeById(
     },
   });
   return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* handwriting → text conversion (issue #176, Phase B)                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Convert recognized handwriting into editable text elements (Phase B,
+ * issue #176). Reads the LIVE scene and, when freedraw ink is selected,
+ * converts only lines overlapping the selection (per-group — any member
+ * stroke in the selection pulls in its whole line); without a selection
+ * the whole page converts (per-page). The scope decision counts INK only:
+ * a conversion auto-selects its own text output, and that must not hijack
+ * the NEXT conversion into group mode (found by HWR-E05, fixed 2026-11-11).
+ * OneNote behavior: the text lands at the ink's position on TOP of the
+ * z-order and the original strokes are KEPT. Re-runs are no-ops by
+ * structural detection (a text element at the line's position already
+ * counts as converted), so undoing or deleting the text block makes the
+ * line convertible again, and a fresh recognition run simply updates the
+ * stored metadata.
+ *
+ * One native `updateScene` call = one undo step (Ctrl+Z removes the
+ * inserted text and un-marks the ink) and one autosave cycle. Returns the
+ * counts the toast needs; never throws for a legitimately empty scene —
+ * an empty result means "nothing recognized yet".
+ */
+export function convertHandwritingToText(api: ExcalidrawImperativeAPI): HwrConvertOutcome {
+  const payload = getScenePayload(api);
+  const appState = api.getAppState();
+  const inkIds = new Set(
+    (payload.elements as Array<{ id?: unknown; type?: unknown; isDeleted?: unknown }>)
+      .filter((e) => e && e.type === "freedraw" && !e.isDeleted && typeof e.id === "string")
+      .map((e) => e.id as string),
+  );
+  const selectedIds = new Set(
+    Object.keys(appState.selectedElementIds ?? {}).filter((id) => inkIds.has(id)),
+  );
+  const selected = selectedIds.size > 0;
+  const plan = planHwrConversion(payload, selected ? selectedIds : undefined);
+  if (!plan.targets.length) {
+    return { converted: 0, alreadyConverted: plan.alreadyConverted, selected };
+  }
+  // fresh ids per conversion — placeholder skeleton ids must never reach
+  // the live scene twice (insertShapeById precedent)
+  const skeletons = conversionSkeletons(plan.targets).map((s) => ({
+    ...s,
+    id: crypto.randomUUID(),
+    strokeColor:
+      s.strokeColor === INHERIT_STROKE
+        ? (appState.currentItemStrokeColor ?? "#1e1e1e")
+        : s.strokeColor,
+  }));
+  const created = convertToExcalidrawElements(
+    skeletons as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawElement[];
+  // Pure append — exactly the proven shape-library insertion pattern. No
+  // customData flag on the strokes: Excalidraw's undo does not revert
+  // customData (measured 2026-11-11, HWR-E06), so a flag would survive the
+  // undo that removed the text and "already converted" would lie. Idempotency
+  // is structural instead (planHwrConversion matches a text element at the
+  // line's position), so undoing or deleting the text makes the line
+  // convertible again.
+  api.updateScene({
+    elements: [...api.getSceneElements(), ...created] as ExcalidrawElement[],
+    appState: {
+      selectedElementIds: Object.fromEntries(created.map((e) => [e.id, true])),
+    },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  return { converted: plan.targets.length, alreadyConverted: plan.alreadyConverted, selected };
 }
 
 /* ------------------------------------------------------------------ */
