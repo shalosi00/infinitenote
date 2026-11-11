@@ -127,7 +127,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       Phase B ink-to-text gated on Phase A accuracy; cloud, proprietary
       (MyScript) and OS-API-only (WICG) paths rejected; CJK deferred
 
-## v1.13 — Handwriting search (current)
+## v1.13 — Handwriting search (shipped in v1.13.0)
 
 - [x] Phase A — handwriting search (metadata-only): explicit per-page
       "Recognize handwriting (English)" action, union-find line
@@ -146,6 +146,25 @@ milestones/issues. This file is the plan; the status file is the reality.
       native scene update = one undo step (docs/test-plans/handwriting.md
       Phase B section, incl. the measured Excalidraw 0.18 captureUpdate
       and post-undo store findings)
+
+## v1.14 — Hardening & acceleration (current)
+
+- [x] Independent verification of the v1.13.0 desktop artifacts (issue #194,
+      shipped 2026-11-12): fresh AppImage download re-verified — valid type-2
+      runtime + FUSE-less extraction, 174 bundled ELFs objdump-scanned with
+      overall max GLIBC_2.35 (main app binary 2.34, nothing over the floor),
+      .desktop entry + icons correct, versionCode 230 / 1.13.0 parity across
+      all six version files, and the vendored handwriting model confirmed
+      embedded in the Tauri binary (all 10 public/hwr/ asset paths — the
+      model ships with the app, nothing downloads at runtime). Evidence
+      table: docs/desktop.md "Artifact verification log"
+- [ ] WebGPU handwriting acceleration — measure first, gate on capability
+      (issue #193): benchmark per-line recognition WASM vs WebGPU on
+      representative hardware and record the evidence table before any
+      WebGPU path ships; `navigator.gpu` adapter probe with silent WASM
+      fallback (identical results either way); on-device privacy invariant
+      and the zero-cross-origin E2E tripwire unchanged; non-goals: CJK
+      (deferred), vendored model unchanged
 
 ## v1.7 — Internationalization & polish (shipped in v1.7.0)
 
