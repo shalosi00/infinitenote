@@ -1224,6 +1224,29 @@ brackets — and fix whatever breaks.
   SyncFormatErrors naming the offending file. README badge and counts
   updated (858 unit).
 
+## 2026-11-11 — CI hardening: the production build moved to webpack
+
+- **What happened**: the release flow's e2e checks failed 9 consecutive
+  times with Turbopack's FATAL postcss panic ("Failed to write app
+  endpoint /page … PostCssTransformedAsset::process … evaluate_webpack_
+  loader … timeout while receiving message from process — deadline has
+  elapsed"). Every attempt died at ~6m42s (a fixed IPC deadline), while a
+  fast runner finished the same build in 5m01s — build-smoke kept passing
+  on the same shas (runner lottery with a thin margin). Retries stopped
+  clearing it.
+- **The fix**: `next build --webpack` in both build scripts (web + desktop
+  export) — a supported Next 16 flag, documented upstream as the verified
+  fix for exactly this failure mode (the postcss transform runs in a
+  separate process behind a fixed deadline; slower machines stop answering
+  in time). Webpack was the project's build path through v1.11.x, so this
+  restores the proven pipeline; the retry chains stay as belt-and-braces.
+- **Verification**: local `bun run build` (webpack) completes; the unit
+  pin for `build:desktop` updated to the new exact command (intentional
+  change, still pinned); 886/886 unit, lint + typecheck clean. The e2e
+  checks on this PR run the new webpack build end to end.
+- **PR**: to develop — unblocks the v1.13.0 release flow (bump PR #189's
+  e2e re-runs on the fixed develop).
+
 ## 2026-11-11 — Phase B ink-to-text conversion (issue #176): handwriting becomes editable text
 
 - **Shipped**: "Convert handwriting to text" in the Page-actions menu —

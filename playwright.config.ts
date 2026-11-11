@@ -40,9 +40,11 @@ export default defineConfig({
     command: isCI
       ? // NEXT_PUBLIC_E2E=1 compiles the test hooks into this build only —
         // ordinary production builds never ship them (issue #102). The build
-        // is retried twice: Turbopack's PostCSS worker IPC intermittently
-        // panics ("Failed to write app endpoint /page") on busy shared
-        // runners — a retry has always cleared it (2026-11-11).
+        // is retried twice (belt-and-braces): on 2026-11-11 Turbopack's
+        // PostCSS worker IPC deadline elapsed deterministically on slower
+        // shared runners — 9 consecutive FATAL panics ("Failed to write app
+        // endpoint /page") — fixed by moving the build script to webpack
+        // (`next build --webpack`), a supported Next 16 flag.
         "NEXT_PUBLIC_E2E=1 bun run build || NEXT_PUBLIC_E2E=1 bun run build || NEXT_PUBLIC_E2E=1 bun run build && bun .next/standalone/server.js"
       : "bun run dev:e2e",
     url: BASE_URL,
