@@ -1310,8 +1310,11 @@ brackets — and fix whatever breaks.
   module cache can serve a stale `excalidraw-client.ts` after edits —
   restart with a `.next` wipe before trusting a run.
 
-- **PR**: to develop with `Closes #176` — completes the v1.13.0
-  milestone (release flow next).
+- **PR #188** merged (squash, `Closes #176` closed via API post-merge).
+  **Release flow**: version bump (#189, rebased onto the webpack fix) →
+  release PR #191 merged as MERGE commit 408dee9 → tag v1.13.0 + GitHub
+  Release published → milestone closed. Desktop artifacts build via the
+  tagged-release Desktop workflow.
 
 ## 2026-11-11 — README rework with a scripted screenshot pipeline; dark-canvas fix found on the way
 
