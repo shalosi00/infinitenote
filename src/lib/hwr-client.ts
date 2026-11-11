@@ -30,6 +30,12 @@
  * failure it is torn down so the next attempt starts clean.
  */
 import { HwrError } from "./hwr";
+import {
+  probeWebGPU,
+  resolveHwrDevice,
+  type GpuNavigatorLike,
+  type HwrDevice,
+} from "./hwr-device";
 
 /** Where the vendored gzip bundle lives (same-origin). */
 const BUNDLE_URL = "/hwr/transformers.web.bundle.js.gz";
@@ -142,6 +148,9 @@ function loadTransformers(): Promise<TransformersLib> {
   return libPromise;
 }
 
+/** The device the ACTIVE pipeline was created with (evidence-locked: "wasm" today). */
+let activeDevice: HwrDevice = "wasm";
+
 /** Lazily-created pipeline singleton (shared across lines and pages). */
 let pipelinePromise: Promise<ImageToTextPipeline> | null = null;
 
@@ -156,12 +165,19 @@ function getPipeline(): Promise<ImageToTextPipeline> {
       throw err;
     }
     try {
-      // device 'wasm' + q8 weights: the validated Phase A configuration
-      // (docs/test-plans/handwriting.md). WebGPU is measured there too
-      // but not enabled in Phase A — see the test plan's latency table.
+      // q8 weights + evidence-locked device selection: the validated Phase A
+      // configuration is wasm; issue #193's gate keeps the engine there
+      // until the jsep (WebGPU EP) runtime assets are vendored AND the
+      // measured WASM-vs-WebGPU table shows a real win. The probe resolves
+      // to "wasm" silently today — behavior is byte-identical to the old
+      // unconditional pin; docs/test-plans/handwriting.md carries the gate.
+      const device = await resolveHwrDevice(
+        await probeWebGPU(navigator as unknown as GpuNavigatorLike | null),
+      );
+      activeDevice = device;
       return await lib.pipeline("image-to-text", MODEL_ID, {
         dtype: { encoder_model: "q8", decoder_model_merged: "q8" },
-        device: "wasm",
+        device,
       });
     } catch (err) {
       pipelinePromise = null;
@@ -186,7 +202,7 @@ export async function recognizeHandwritingLine(dataUrl: string): Promise<string>
     const out = await pipe(dataUrl, { max_new_tokens: 48 });
     // per-line latency log — the recorded evidence for the test plan's
     // latency table (docs/test-plans/handwriting.md)
-    console.info(`[handwriting] line: ${Date.now() - t0}ms (wasm)`);
+    console.info(`[handwriting] line: ${Date.now() - t0}ms (${activeDevice})`);
     const text = out?.[0]?.generated_text;
     return typeof text === "string" ? text : "";
   } catch (err) {

@@ -137,6 +137,55 @@ will find on the page.
 | WebGPU | **not enabled in Phase A** — `hwr-client.ts` pins `device: "wasm"`; the vendored asyncify wasm is the CPU build. WebGPU stays a measured follow-up (issue #176 cycle), not a claim | design decision in hwr-client.ts |
 | Model sanity (outside CI) | trocr-small-handwritten q8 reads block-letter pen strokes "CAT" at ≈ 0.35–0.6 s/line on native CPU (Node + onnxruntime-node), 2026-11-10 pre-implementation validation | validation harness, docs/handwriting-research.md §3.1 sizes re-verified |
 
+## v1.14 — WebGPU follow-up (issue #193): vendored-asset audit + capability gate + measured baseline (2026-11-12)
+
+Issue #193's order of operations: **verify the vendored asset set covers
+WebGPU before promising anything → measure → gate → only ship a WebGPU path
+on a measured win.** Step 1 landed this cycle:
+
+1. **Vendored-asset audit (measured, `public/hwr/assets.json`)**: the vendored
+   onnxruntime-web 1.31.0-dev pair is the CPU asyncify build
+   (`ort/ort-wasm-simd-threaded.asyncify.{mjs,wasm}`) — **no `.jsep`
+   (WebGPU execution-provider) assets are vendored**, and the transformers.js
+   runtime is a wasm-only closure (the un-bundled web build lazily imports
+   `"onnxruntime-web/webgpu"`, which blob modules cannot resolve — measured
+   2026-11-10, see hwr-client.ts). A WebGPU arm therefore requires vendoring
+   the jsep pair + re-bundling the runtime BEFORE any comparison can run.
+2. **Capability gate shipped (`src/lib/hwr-device.ts`)**: pure probe module —
+   `probeWebGPU` (navigator.gpu binding + adapter probe, never throws, silent
+   fallback) and `resolveHwrDevice` (evidence-locked: returns "webgpu" ONLY
+   with an available adapter AND a true evidence gate; the gate
+   `HWR_WEBGPU_EVIDENCE` is false today, so behavior is byte-identical to the
+   old unconditional wasm pin). 17 unit tests (ids HWR-D01–D17). The engine
+   (`hwr-client.ts`) now selects its device through this gate and logs the
+   resolved device per line.
+3. **Measured WASM baseline (2026-11-12, this sandbox, headless Chromium,
+   dev server, q8, one 88 px "CAT" line — `HWR_BENCH=1 bunx playwright test
+   e2e/hwr-bench.spec.ts`, committed benchmark spec skipped in CI)**:
+
+   | Round | Kind | Click→toast total | Engine per-line log |
+   |---|---|---|---|
+   | 1 | cold (incl. first-use model load) | 15 760 ms | 4 452 ms |
+   | 2 | warm | 1 747 ms | 1 144 ms |
+   | 3 | warm | 1 696 ms | 1 124 ms |
+   | 4 | warm | 1 673 ms | 1 113 ms |
+
+   Warm per-line: min 1 113 ms / mean 1 127 ms / max 1 144 ms (3 samples).
+   Environment caveats: shared-sandbox CPU and a dev-mode bundle — this
+   baseline is a trend line, not representative hardware; the 2026-11-10
+   table above (≈3.2 s/line) was measured on a different sandbox allocation.
+   The cold round also exercises the gate for real: headless Chromium in
+   this sandbox has no WebGPU adapter and the engine silently stayed on
+   wasm — the logged `(wasm)` per-line suffix is the gate's observable
+   output.
+4. **Next (blocked on step 1's finding)**: vendor the jsep runtime pair
+   (same-origin, sha256-pinned like every /hwr/ asset), re-bundle the
+   runtime with the webgpu entry resolvable, re-run the benchmark with
+   `device: "webgpu"` on representative hardware, extend this table, and
+   only then flip `HWR_WEBGPU_EVIDENCE` if — and only if — the measurement
+   shows a real win. The privacy invariant (fully on-device, zero
+   cross-origin requests, E2E tripwire) is unchanged by any of this.
+
 ## Non-goals (documented on purpose)
 
 - **CJK / multi-language handwriting** — deferred (no open on-device CJK
