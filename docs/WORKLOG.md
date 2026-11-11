@@ -69,9 +69,15 @@
   concise backfill entries added below (the detailed records live in
   PROJECT_STATUS.md, per the protocol).
 - **Gate**: docs-only PR — lint + typecheck + unit suite re-run green at 886/886 across 69 files (same suite size as at release, as expected for a no-code-change cycle).
-- **v1.14 next**: #193 WebGPU — build the WASM-vs-WebGPU benchmark harness
-  and the evidence table first; no WebGPU path ships without a measured
-  win (issue's own gating).
+- **v1.14 next**: #193 WebGPU — executed the same session, see the next
+  entry.
+
+## 2026-11-12 (2) — issue #193 step 1: capability gate + vendored-asset audit + measured baseline
+
+- **Vendored-asset audit (the issue's own step 0)**: `public/hwr/assets.json` carries onnxruntime-web 1.31.0-dev as `ort-wasm-simd-threaded.asyncify.{mjs,wasm}` — the CPU build; NO `.jsep` (WebGPU EP) assets are vendored and the transformers.js runtime is a wasm-only closure (blob modules cannot resolve "onnxruntime-web/webgpu" — measured 2026-11-10). A WebGPU arm therefore requires vendoring the jsep pair + re-bundling BEFORE any comparison is possible.
+- **Capability gate shipped**: new pure module `src/lib/hwr-device.ts` — probeWebGPU (navigator.gpu binding + adapter probe, never throws, silent fallback) + resolveHwrDevice (returns "webgpu" only with an available adapter AND a true evidence gate; HWR_WEBGPU_EVIDENCE is false today, so behavior is byte-identical to the old unconditional wasm pin). 17 unit tests (HWR-D01–D17); hwr-client.ts now selects its device through the gate and logs the resolved device per line.
+- **Measured WASM baseline** (committed CI-neutral benchmark spec e2e/hwr-bench.spec.ts, runs only with HWR_BENCH=1; 1 cold + 3 warm single-line rounds on the real vendored engine, headless Chromium): cold 15 760 ms total / 4 452 ms per-line (incl. first-use model load); warm 1 747/1 696/1 673 ms click-to-toast with engine per-line 1 144/1 124/1 113 ms (mean 1 127 ms). The gate is observable in production: headless Chromium has no WebGPU adapter and the engine silently stayed on wasm (logged per-line suffix).
+- **Gate**: lint + typecheck + 903/903 unit across 70 files. Suite: 903 unit + 156 E2E. #193 stays open: next is jsep vendoring + representative-hardware measurement before any evidence-gate flip.
 
 ## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
 
