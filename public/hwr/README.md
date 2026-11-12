@@ -28,12 +28,16 @@ sha256 of the UNCOMPRESSED original and the drift test gunzips the blob
 and verifies it (HWR-A03b).
 
 Why the `asyncify` wasm flavor: this is the variant ONNX Runtime Web
-1.31 actually fetches in a non-cross-origin-isolated page (measured
-2026-11-10 — the request log contained exactly
-`ort-wasm-simd-threaded.asyncify.{mjs,wasm}` and nothing else). The
-plain/jsep/jspi variants are not loaded and deliberately not vendored;
-`docs/test-plans/handwriting.md` records the WebGPU (jsep) measurement
-that kept Phase A on WASM.
+1.31 actually fetches — for BOTH devices. Measured 2026-11-12 with
+request-log capture (`e2e/hwr-bench.spec.ts`): the wasm device fetches
+exactly `ort-wasm-simd-threaded.asyncify.{mjs,wasm}`, and so does the
+webgpu device — the bun closure inlines the webgpu-capable
+`onnxruntime-web/webgpu` build (requestDevice/GPUShaderStage markers
+verified in the vendored bytes), and its execution providers run on the
+same asyncify wasm pair. The plain/jsep/jspi variants are never
+requested, so they stay deliberately unvendored — no extra wasm files
+ship for the WebGPU arm (issue #193 asset-audit question, answered
+measured: the vendored set ALREADY covers it).
 
 Model files:
 

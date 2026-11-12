@@ -96,3 +96,35 @@ export function resolveHwrDevice(
   if (!evidenceGate) return "wasm";
   return "webgpu";
 }
+
+/**
+ * Values the verification/benchmark seam may force. Anything else
+ * (including undefined — the production case) means "no override".
+ */
+export type HwrDeviceOverride = HwrDevice | undefined;
+
+/**
+ * Read the verification seam from globalThis. Set ONLY by the committed
+ * benchmark spec (e2e/hwr-bench.spec.ts, HWR_BENCH_DEVICE=webgpu) so the
+ * WebGPU arm can be measured before the evidence gate flips; production
+ * pages never define __HWR_DEVICE__, so the gate alone decides there.
+ * The name is deliberately ugly and undocumented anywhere user-facing.
+ */
+export function readDeviceOverride(g: unknown): HwrDeviceOverride {
+  const v = (g as { __HWR_DEVICE__?: unknown } | null | undefined)?.__HWR_DEVICE__;
+  return v === "wasm" || v === "webgpu" ? v : undefined;
+}
+
+/**
+ * Final device decision: an explicit, valid override wins (verification
+ * seam — measuring the WebGPU arm requires running it); otherwise the
+ * probe + evidence gate decide. Pure and fully unit-tested.
+ */
+export function pickHwrDevice(
+  override: HwrDeviceOverride,
+  probe: WebGPUProbe | null | undefined,
+  evidenceGate: boolean = HWR_WEBGPU_EVIDENCE,
+): HwrDevice {
+  if (override === "wasm" || override === "webgpu") return override;
+  return resolveHwrDevice(probe, evidenceGate);
+}
