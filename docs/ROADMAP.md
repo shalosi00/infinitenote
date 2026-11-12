@@ -147,7 +147,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       Phase B section, incl. the measured Excalidraw 0.18 captureUpdate
       and post-undo store findings)
 
-## v1.14 — Hardening & acceleration (current)
+## v1.14 — Hardening & acceleration (shipped in v1.14.0)
 
 - [x] Independent verification of the v1.13.0 desktop artifacts (issue #194,
       shipped 2026-11-12): fresh AppImage download re-verified — valid type-2
@@ -158,13 +158,31 @@ milestones/issues. This file is the plan; the status file is the reality.
       embedded in the Tauri binary (all 10 public/hwr/ asset paths — the
       model ships with the app, nothing downloads at runtime). Evidence
       table: docs/desktop.md "Artifact verification log"
-- [ ] WebGPU handwriting acceleration — measure first, gate on capability
-      (issue #193): benchmark per-line recognition WASM vs WebGPU on
-      representative hardware and record the evidence table before any
-      WebGPU path ships; `navigator.gpu` adapter probe with silent WASM
-      fallback (identical results either way); on-device privacy invariant
-      and the zero-cross-origin E2E tripwire unchanged; non-goals: CJK
-      (deferred), vendored model unchanged
+- [x] WebGPU handwriting acceleration — measured, decision: stay on WASM
+      (issue #193 steps 1–2, PRs #196/#197, shipped 2026-11-12): capability
+      gate (`probeWebGPU` + evidence-locked `resolveHwrDevice`, byte-identical
+      behavior to the old wasm pin), committed CI-neutral benchmark
+      (`e2e/hwr-bench.spec.ts`, `HWR_BENCH=1`) with both arms, and the
+      measured evidence table — wasm warm mean 1 160 ms/line vs
+      webgpu-on-SwiftShader 77 773 ms/line (≈67× slower on software
+      rendering), recognition identity verified on both arms, and the
+      `webgpu` device fetches exactly the same asyncify wasm pair (the
+      vendored runtime closure already contains the WebGPU EP — no jsep
+      assets needed, none vendored). `HWR_WEBGPU_EVIDENCE` stays false; the
+      representative-hardware run remains open as issue #193, moved to the
+      v1.15.0 milestone (non-goals unchanged: CJK deferred, vendored model
+      unchanged)
+
+## v1.15 — Representative-hardware WebGPU measurement (current)
+
+- [ ] #193 remainder: run the committed benchmark (`HWR_BENCH=1
+      HWR_BENCH_DEVICE=webgpu bunx playwright test e2e/hwr-bench.spec.ts`)
+      on real GPU hardware and record the evidence table in
+      docs/test-plans/handwriting.md; the `HWR_WEBGPU_EVIDENCE` gate flips
+      only on a reproducible win with identical recognition results — until
+      then production stays on WASM. Privacy invariant unchanged (both arms
+      same-origin, request-log verified). Further candidates come from
+      upcoming cycles.
 
 ## v1.7 — Internationalization & polish (shipped in v1.7.0)
 
