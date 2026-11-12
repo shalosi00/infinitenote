@@ -104,3 +104,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.14.0
+    versionCode: 240
+    commit: v1.14.0
+    subdir: android-twa
+    gradle:
+      - yes
