@@ -103,6 +103,30 @@
   representative-hardware run of the committed benchmark showing a real win with identical results —
   nothing else changes; the seam, gate and benchmark ship today. Suite: 908 unit + 156 E2E.
 
+## 2026-11-12 (5) — workspace cleanup: dead-file sweep + local git hygiene (PR #201)
+
+- **Local git hygiene** (nothing published): local main was a sandbox-cron checkpoint commit
+  (scripts only) — reset to origin/main 935c6eb; develop fast-forwarded; 26 stale local branches
+  from the v1.11–v1.14 cycles deleted (all patch-equivalent to merged develop per `git cherry`;
+  remotes already gone); a superseded 2026-11-09 stash (mid-session WIP of the #159 PDF-chip work
+  — develop long carries the same changes) dropped; `git gc` shrank .git 97M→75M.
+- **Tracked-tree audit**: no junk extensions, no empty files except two —
+  mini-services/.gitkeep (wired into .zscripts/build.sh — kept) and src/lib/merge.ts.
+- **PR #201 (merged as f453f54)**: removed scripts/scratch/ — 14 one-off tesseract.js
+  probes from the #158 German OCR session, all hard-coded to /tmp/ocr-verify, zero references
+  (the durable generator is e2e/fixtures/gen-ocr-de-fixture.py; same pattern #171 removed once
+  before) — and src/lib/merge.ts, a 0-byte orphan emptied (not deleted) by #111: the two
+  `from "./merge"` imports live in src/lib/sync/ and resolve to src/lib/sync/merge.ts, the real
+  engine. Deletion-only: 15 files, −240 lines. Gate on the branch: lint + tsc clean, 908/908
+  across 70 files; all 3 required checks green on the PR.
+- **Deliberately kept** (checked, not junk): 7 tracked-but-unreferenced scripts (drop-fetch.js,
+  fixture-server.py, generate-icons.js, install-readme-scenes.py, make-mht-fixture.mjs,
+  poll-checks.py, shot-check.py) are reusable tooling, not session debris; the large tracked
+  blobs are all sha256-pinned vendored engines guarded by drift tests.
+- **Sandbox observations**: the gitignored staging/ + download/ dirs were already wiped by the
+  periodic restore (as this file's hazard notes predict); /tmp/my-project is the platform's own
+  snapshot area (left alone).
+
 ## 2026-11-12 (4) — v1.14.0 RELEASED: the release train executed
 
 - **State found at session start**: develop 5 commits ahead of main with the
