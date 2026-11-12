@@ -103,6 +103,55 @@
   representative-hardware run of the committed benchmark showing a real win with identical results —
   nothing else changes; the seam, gate and benchmark ship today. Suite: 908 unit + 156 E2E.
 
+## 2026-11-12 (5) — workspace cleanup: dead-file sweep + local git hygiene (PR #201)
+
+- **Local git hygiene** (nothing published): local main was a sandbox-cron checkpoint commit
+  (scripts only) — reset to origin/main 935c6eb; develop fast-forwarded; 26 stale local branches
+  from the v1.11–v1.14 cycles deleted (all patch-equivalent to merged develop per `git cherry`;
+  remotes already gone); a superseded 2026-11-09 stash (mid-session WIP of the #159 PDF-chip work
+  — develop long carries the same changes) dropped; `git gc` shrank .git 97M→75M.
+- **Tracked-tree audit**: no junk extensions, no empty files except two —
+  mini-services/.gitkeep (wired into .zscripts/build.sh — kept) and src/lib/merge.ts.
+- **PR #201 (merged as f453f54)**: removed scripts/scratch/ — 14 one-off tesseract.js
+  probes from the #158 German OCR session, all hard-coded to /tmp/ocr-verify, zero references
+  (the durable generator is e2e/fixtures/gen-ocr-de-fixture.py; same pattern #171 removed once
+  before) — and src/lib/merge.ts, a 0-byte orphan emptied (not deleted) by #111: the two
+  `from "./merge"` imports live in src/lib/sync/ and resolve to src/lib/sync/merge.ts, the real
+  engine. Deletion-only: 15 files, −240 lines. Gate on the branch: lint + tsc clean, 908/908
+  across 70 files; all 3 required checks green on the PR.
+- **Deliberately kept** (checked, not junk): 7 tracked-but-unreferenced scripts (drop-fetch.js,
+  fixture-server.py, generate-icons.js, install-readme-scenes.py, make-mht-fixture.mjs,
+  poll-checks.py, shot-check.py) are reusable tooling, not session debris; the large tracked
+  blobs are all sha256-pinned vendored engines guarded by drift tests.
+- **Sandbox observations**: the gitignored staging/ + download/ dirs were already wiped by the
+  periodic restore (as this file's hazard notes predict); /tmp/my-project is the platform's own
+  snapshot area (left alone).
+
+## 2026-11-12 (4) — v1.14.0 RELEASED: the release train executed
+
+- **State found at session start**: develop 5 commits ahead of main with the
+  release PR #199 (develop→main) OPEN and checks still running; milestone #15
+  with #194 closed and #193 open. The cycle's complaint ("dev is still not
+  merged into main") was exactly this: the release PR had never been merged.
+- **Executed the release flow end to end**: polled the 3 required checks on
+  the head sha 6ed59df to green (lint-typecheck-test, e2e, build-smoke);
+  merged PR #199 as a merge commit (935c6eb) — main and develop share
+  ancestry again; pushed the annotated tag v1.14.0 on the merge commit;
+  published the GitHub Release with full notes; the tag-triggered Desktop
+  workflow (pinned ubuntu-22.04) builds and attaches the AppImage/deb/rpm.
+- **Milestone chain**: created the v1.15.0 milestone (#16); moved #193 OPEN
+  into it (the representative-hardware WebGPU run — one committed command:
+  `HWR_BENCH=1 HWR_BENCH_DEVICE=webgpu bunx playwright test
+  e2e/hwr-bench.spec.ts`; the `HWR_WEBGPU_EVIDENCE` gate flips only on a
+  measured win with identical results); closed milestone #15; left a
+  hand-off comment on #193.
+- **This docs PR**: PROJECT_STATUS.md (Last updated / Phase / Overall state
+  updated for the release), ROADMAP (v1.14 re-labeled shipped with the
+  measured stay-on-WASM decision; new v1.15 section for the moved #193
+  remainder), this journal entry. Docs-only — no code changes.
+- **Next cycle**: the #193 representative-hardware run; then scope further
+  v1.15.0 candidates from the ROADMAP.
+
 ## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
 
 - Phase B ink-to-text conversion shipped (#176 via PR #188): recognized
