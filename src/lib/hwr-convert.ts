@@ -222,3 +222,30 @@ export function hwrConvertSummary(out: HwrConvertOutcome): string {
     : "";
   return `${head}${tail}`;
 }
+
+/**
+ * Which of a conversion's created text elements were DROPPED by the
+ * Excalidraw store — absent from the elements map ENTIRELY, tombstone
+ * included (the measured 0.18 store/history interplay, 2026-11-11: a
+ * conversion issued right after an undo could be reconciled away ~1 s
+ * later, "no tombstone").
+ *
+ * The absence-vs-tombstone distinction is the whole point: a legitimate
+ * undo or delete TOMBSTONES the text element (isDeleted: true, still in
+ * the map — getSceneElementsIncludingDeleted keeps it), so it must never
+ * count as dropped and the conversion integrity guard stays silent. Only
+ * an element missing from the map itself is a real drop worth healing.
+ *
+ * Pure so bun unit tests can pin it (HWR-C60..C64); the runtime guard in
+ * excalidraw-client.ts feeds it the live map.
+ */
+export function detectDroppedConversion(
+  createdIds: readonly string[],
+  sceneElementsIncludingDeleted: readonly { id?: unknown }[],
+): string[] {
+  const known = new Set<string>();
+  for (const el of sceneElementsIncludingDeleted) {
+    if (el && typeof el.id === "string") known.add(el.id);
+  }
+  return createdIds.filter((id) => !known.has(id));
+}

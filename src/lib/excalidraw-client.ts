@@ -37,7 +37,12 @@ import {
   getShapeDef,
   type ShapeSkeleton,
 } from "./shape-library";
-import { conversionSkeletons, planHwrConversion, type HwrConvertOutcome } from "./hwr-convert";
+import {
+  conversionSkeletons,
+  detectDroppedConversion,
+  planHwrConversion,
+  type HwrConvertOutcome,
+} from "./hwr-convert";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
@@ -756,6 +761,16 @@ export function insertShapeById(
 /* ------------------------------------------------------------------ */
 
 /**
+ * How long after a conversion the integrity guard re-checks that the
+ * created text elements still exist in the elements map. Sized just past
+ * the measured drop window (the 0.18 store/history interplay removed an
+ * insert ~1 s after it was applied — docs/test-plans/handwriting.md
+ * "Known limitation"). The guard is a no-op on the healthy path: the
+ * elements are in the map, nothing is logged, nothing is written.
+ */
+const CONVERSION_INTEGRITY_DELAY_MS = 1_500;
+
+/**
  * Convert recognized handwriting into editable text elements (Phase B,
  * issue #176). Reads the LIVE scene and, when freedraw ink is selected,
  * converts only lines overlapping the selection (per-group — any member
@@ -774,8 +789,20 @@ export function insertShapeById(
  * inserted text and un-marks the ink) and one autosave cycle. Returns the
  * counts the toast needs; never throws for a legitimately empty scene —
  * an empty result means "nothing recognized yet".
+ *
+ * Integrity guard (HWR-U03): ~1.5 s after the insert the created ids are
+ * re-checked against the elements map INCLUDING tombstones. An element
+ * that was TOMBSTONED is a legitimate undo/delete — never touched. An
+ * element missing from the map entirely is the measured store drop —
+ * healed by re-entering this same function once (structural idempotency
+ * makes re-entry safe: lines that gained a text block meanwhile report
+ * alreadyConverted instead of inserting a duplicate). The re-entry never
+ * schedules another guard, so the loop is bounded at one heal.
  */
-export function convertHandwritingToText(api: ExcalidrawImperativeAPI): HwrConvertOutcome {
+export function convertHandwritingToText(
+  api: ExcalidrawImperativeAPI,
+  opts: { scheduleIntegrityCheck?: boolean } = {},
+): HwrConvertOutcome {
   const payload = getScenePayload(api);
   const appState = api.getAppState();
   const inkIds = new Set(
@@ -819,6 +846,32 @@ export function convertHandwritingToText(api: ExcalidrawImperativeAPI): HwrConve
     },
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
+  if (opts.scheduleIntegrityCheck !== false) {
+    const createdIds = created.map((e) => e.id);
+    setTimeout(() => {
+      let dropped: string[] = [];
+      try {
+        dropped = detectDroppedConversion(createdIds, api.getSceneElementsIncludingDeleted());
+      } catch (err) {
+        // an api whose canvas was remounted mid-window can throw on access;
+        // the new canvas is authoritative — nothing to heal here
+        console.warn("[hwr-convert] integrity check could not read the scene:", err);
+        return;
+      }
+      if (!dropped.length) return; // healthy — the only path a normal run ever takes
+      console.warn(
+        `[hwr-convert] the store dropped ${dropped.length} converted text element(s) ` +
+          `~${CONVERSION_INTEGRITY_DELAY_MS}ms after insertion — re-applying ` +
+          `(documented Excalidraw 0.18 store/history interplay, docs/test-plans/handwriting.md)`,
+      );
+      const healed = convertHandwritingToText(api, { scheduleIntegrityCheck: false });
+      if (healed.converted === 0 && healed.alreadyConverted === 0) {
+        console.error(
+          "[hwr-convert] re-apply found nothing to convert — the ink or its recognition metadata is gone",
+        );
+      }
+    }, CONVERSION_INTEGRITY_DELAY_MS);
+  }
   return { converted: plan.targets.length, alreadyConverted: plan.alreadyConverted, selected };
 }
 

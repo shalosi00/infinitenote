@@ -43,6 +43,45 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-13 — main-branch cleanup verification + conversion integrity guard (Phase B follow-up)
+
+- **State found at session start**: v1.14.0 released, main @ 2c25fec
+  (sync PR #203 merged the #201/#202 cleanup + post-release docs into
+  main), develop @ fe971af, trees identical; 0 open PRs, milestone #16
+  (v1.15.0) open with #193 only.
+- **"Continue cleaning up the main Branch on github" — verified complete**:
+  remote refs are exactly `main` + `develop` + 17 tags (all reachable
+  from main, v1.0.0…v1.14.0, 5 annotated), 17 published releases (no
+  drafts), all milestones closed except #16; local git hygiene — a stale
+  local main head (029c2c1, a UUID-message commit re-adding
+  scripts/ghapi.py that a sandbox restore resurrected) reset away,
+  /tmp scratch (incl. .ghcred) already gone, examples/staging empty, no
+  stashes, single worktree; local main↔develop tree diff empty. Nothing
+  left to delete on the GitHub side.
+- **Baseline re-verified**: lint + tsc clean, 908/908 unit across 70
+  files on a fresh origin/develop checkout.
+- **This session's dev work — the Phase B "Known limitation" closed with
+  an integrity guard**: the documented drop (conversion issued right
+  after an undo, removed by the store ~1 s later, measured 2026-11-11)
+  does NOT reproduce on the current toolchain (Chromium 156
+  headless-shell, Excalidraw 0.18): two consecutive interactive passes
+  with live-count probes to +4 s (HWR-U01). Since the drop shape stays
+  real, every conversion now schedules a 1.5 s integrity re-check:
+  `detectDroppedConversion` (pure, hwr-convert.ts, HWR-C60..C64)
+  distinguishes a TOMBSTONED element (legit undo/delete — silent) from
+  one ABSENT from the elements map (the measured drop shape — heal by
+  re-entering the structurally-idempotent conversion core once, bounded,
+  duplicate-free). E2E: e2e/handwriting-undo.spec.ts HWR-U01..U03 — U03
+  forces the exact drop shape (full-scene replace, no tombstone,
+  captureUpdate NEVER) and proves the heal persists across a reload;
+  the real-engine chain stays 7/7. Suite 913/913 across 71 files +
+  159 E2E. Measured harness findings recorded along the way: a fresh
+  import's EVENTUALLY-captured history entry merges with the next
+  IMMEDIATELY capture (one Ctrl+Z ate the import too, 6→1 — the spec
+  reloads into a fresh mount first, mirroring the real post-recognition
+  state), and the first Ctrl+Z after a conversion selection can be a
+  no-op (the guarded undo loop presses until the count moves).
+
 ## 2026-11-12 — v1.13.0 desktop artifact verification (issue #194) + v1.14 kickoff
 
 - **State found at session start**: v1.13.0 fully released — tag `v1.13.0`
