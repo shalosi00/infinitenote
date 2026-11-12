@@ -43,6 +43,95 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-12 — v1.13.0 desktop artifact verification (issue #194) + v1.14 kickoff
+
+- **State found at session start**: v1.13.0 fully released — tag `v1.13.0`
+  on merge commit 408dee9, GitHub Release published with AppImage/deb/rpm,
+  milestone #14 closed, post-release docs PR #192 merged; v1.14.0 milestone
+  #15 open with issues #193 (WebGPU acceleration, measure-first) and #194
+  (artifact verification). ROADMAP had no v1.14 section yet.
+- **This session executed #194 end to end**: fresh AppImage download from
+  the release page (152,889,848 bytes, sha256 `bc5102ade5aad106c0…`),
+  type-2 magic at offset 8 + FUSE-less `--appimage-extract` OK; objdump
+  scan of **all 174 bundled ELFs** — overall max **GLIBC_2.35** (webkit
+  stack: libcairo/libjavascriptcoregtk/libwebkit2gtk from the pinned
+  ubuntu-22.04 runner), main app binary max **GLIBC_2.34**, nothing over
+  the floor; embedded .desktop entry + hicolor icons correct; versionCode
+  230 / 1.13.0 parity across package.json, android-twa gradle + manifest,
+  src-tauri Cargo.toml + tauri.conf.json, F-Droid recipe (commit
+  `v1.13.0`); and a new verification dimension for this release: the
+  vendored handwriting model confirmed **embedded in the Tauri binary**
+  (all 10 `public/hwr/` asset paths present in `usr/bin/infinitenote` —
+  Tauri v2 embeds the whole frontendDist export; nothing downloads at
+  runtime). Evidence table: docs/desktop.md "Artifact verification log".
+- **Docs sync in this PR**: ROADMAP gained the v1.14 section and v1.13 is
+  re-labeled shipped; this journal was missing the 11-10/11-11 sessions —
+  concise backfill entries added below (the detailed records live in
+  PROJECT_STATUS.md, per the protocol).
+- **Gate**: docs-only PR — lint + typecheck + unit suite re-run green at 886/886 across 69 files (same suite size as at release, as expected for a no-code-change cycle).
+- **v1.14 next**: #193 WebGPU — executed the same session, see the next
+  entry.
+
+## 2026-11-12 (2) — issue #193 step 1: capability gate + vendored-asset audit + measured baseline
+
+- **Vendored-asset audit (the issue's own step 0)**: `public/hwr/assets.json` carries onnxruntime-web 1.31.0-dev as `ort-wasm-simd-threaded.asyncify.{mjs,wasm}` — the CPU build; NO `.jsep` (WebGPU EP) assets are vendored and the transformers.js runtime is a wasm-only closure (blob modules cannot resolve "onnxruntime-web/webgpu" — measured 2026-11-10). A WebGPU arm therefore requires vendoring the jsep pair + re-bundling BEFORE any comparison is possible.
+- **Capability gate shipped**: new pure module `src/lib/hwr-device.ts` — probeWebGPU (navigator.gpu binding + adapter probe, never throws, silent fallback) + resolveHwrDevice (returns "webgpu" only with an available adapter AND a true evidence gate; HWR_WEBGPU_EVIDENCE is false today, so behavior is byte-identical to the old unconditional wasm pin). 17 unit tests (HWR-D01–D17); hwr-client.ts now selects its device through the gate and logs the resolved device per line.
+- **Measured WASM baseline** (committed CI-neutral benchmark spec e2e/hwr-bench.spec.ts, runs only with HWR_BENCH=1; 1 cold + 3 warm single-line rounds on the real vendored engine, headless Chromium): cold 15 760 ms total / 4 452 ms per-line (incl. first-use model load); warm 1 747/1 696/1 673 ms click-to-toast with engine per-line 1 144/1 124/1 113 ms (mean 1 127 ms). The gate is observable in production: headless Chromium has no WebGPU adapter and the engine silently stayed on wasm (logged per-line suffix).
+- **Gate**: lint + typecheck + 903/903 unit across 70 files. Suite: 903 unit + 156 E2E. #193 stays
+  open: next is jsep vendoring + representative-hardware measurement before any evidence-gate flip.
+
+## 2026-11-12 (3) — issue #193 step 2: the WebGPU arm measured (and the jsep assumption falsified)
+
+- **Asset audit, answered with a measurement**: the vendored runtime closure is ALREADY webgpu-capable —
+  transformers' web build's only ORT reference is `import("onnxruntime-web/webgpu")` and bun inlines that
+  export into the shipped gzip bundle (requestDevice/GPUShaderStage/createBindGroup markers verified in the
+  vendored bytes). Decisively: forcing the device to webgpu, the request log shows the session fetches exactly
+  the SAME asyncify wasm pair as the wasm device — no jsep/plain/jspi files are ever requested. The 28 MB
+  jsep pair was staged for this cycle, measured unnecessary, and REMOVED again (the drift test's stray-file
+  check HWR-A03c caught the leftover files — the gate works).
+- **Verification seam shipped**: `pickHwrDevice`/`readDeviceOverride` in hwr-device.ts — the committed
+  benchmark forces the device via `globalThis.__HWR_DEVICE__`; production pages never set it, so the
+  evidence gate alone decides there (+5 tests HWR-D18–D22, suite 908/908 across 70 files).
+- **Measured evidence table** (committed bench, both arms, one 88 px "CAT" line): wasm cold 3 614 ms/line,
+  warm mean 1 160 ms (1 097/1 169/1 214) — webgpu (full Chromium + --enable-unsafe-webgpu +
+  --enable-unsafe-swiftshader, software adapter OBTAINED) cold 83 008 ms/line, warm 77 773 ms ≈ **67×
+  slower on SwiftShader**; recognition identity VERIFIED (both arms produce the searchable CAT hit through
+  the app's real search flow). Without the flags the adapter is null and the engine honestly reports
+  "no available backend found" per line (an earlier bench draft accepted the partial-failure toast as
+  success — fixed before shipping).
+- **Gate decision (evidence-backed now)**: HWR_WEBGPU_EVIDENCE stays false. Flipping requires a
+  representative-hardware run of the committed benchmark showing a real win with identical results —
+  nothing else changes; the seam, gate and benchmark ship today. Suite: 908 unit + 156 E2E.
+
+## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
+
+- Phase B ink-to-text conversion shipped (#176 via PR #188): recognized
+  handwriting converts to real editable text at the ink's position,
+  metadata-only, structural idempotency, one native undo step; three real
+  findings fixed and documented (stale-metadata return path in
+  applyHwrResults, Excalidraw 0.18 captureUpdate EVENTUALLY→IMMEDIATELY,
+  post-undo store quirk with workaround).
+- CI hardened: Turbopack's postcss worker IPC deadline failed 9 consecutive
+  CI builds on slower runners — production build moved to webpack
+  (`next build --webpack`, PR #190).
+- Release train: version bump 1.13.0 / versionCode 230 (PR #189), release
+  PR #191 merged as merge commit 408dee9, tag `v1.13.0` + GitHub Release
+  with AppImage/deb/rpm, post-release docs PR #192, milestone #14 closed.
+  Suite at release: 886 unit + 156 E2E.
+
+## 2026-11-10 — handwriting Phase A, test growth, hardening (backfill; details in PROJECT_STATUS.md)
+
+- Handwriting Phase A shipped (#175 via PR #178): trocr-small-handwritten
+  q8 vendored under public/hwr/ (sha256-pinned, no CDN), union-find line
+  segmentation, height-normalized rasterizer, per-line stroke metadata,
+  Ctrl+K search indexing; measured ≈3.2 s per line WASM; zero
+  cross-origin requests asserted by E2E.
+- Test-growth cycle (PR #180): +200 unit tests in 21 new files closing the
+  src/lib coverage gaps from a LOC-vs-tests survey.
+- Corrupt-input hardening: 5 real defects fixed at the sync/backup/search/
+  tag boundaries (+43 adversarial tests); v1.11.1 AppImage independently
+  re-verified (issue #164 evidence).
+
 ## 2026-11-09 — v1.11.0 release: main catches up with develop
 
 - **User question answered first**: "Is main updated / the latest version the
@@ -1310,8 +1399,11 @@ brackets — and fix whatever breaks.
   module cache can serve a stale `excalidraw-client.ts` after edits —
   restart with a `.next` wipe before trusting a run.
 
-- **PR**: to develop with `Closes #176` — completes the v1.13.0
-  milestone (release flow next).
+- **PR #188** merged (squash, `Closes #176` closed via API post-merge).
+  **Release flow**: version bump (#189, rebased onto the webpack fix) →
+  release PR #191 merged as MERGE commit 408dee9 → tag v1.13.0 + GitHub
+  Release published → milestone closed. Desktop artifacts build via the
+  tagged-release Desktop workflow.
 
 ## 2026-11-11 — README rework with a scripted screenshot pipeline; dark-canvas fix found on the way
 

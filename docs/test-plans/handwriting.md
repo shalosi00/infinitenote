@@ -137,6 +137,63 @@ will find on the page.
 | WebGPU | **not enabled in Phase A** — `hwr-client.ts` pins `device: "wasm"`; the vendored asyncify wasm is the CPU build. WebGPU stays a measured follow-up (issue #176 cycle), not a claim | design decision in hwr-client.ts |
 | Model sanity (outside CI) | trocr-small-handwritten q8 reads block-letter pen strokes "CAT" at ≈ 0.35–0.6 s/line on native CPU (Node + onnxruntime-node), 2026-11-10 pre-implementation validation | validation harness, docs/handwriting-research.md §3.1 sizes re-verified |
 
+## v1.14 — WebGPU follow-up (issue #193): asset audit answered + WebGPU arm measured (2026-11-12)
+
+Issue #193's order of operations: **verify the vendored asset set covers
+WebGPU → measure → gate → only ship a WebGPU path on a measured win.**
+Steps 1-2 landed across two cycles; the measurement below is the first
+WebGPU evidence table.
+
+1. **Asset audit — answered with a measurement, not an assumption.** The
+   runtime closure is ALREADY webgpu-capable: the raw transformers web
+   build's only ORT reference is `import("onnxruntime-web/webgpu")`, and
+   bun inlines that export (`ort.webgpu.bundle.min.mjs`) into the vendored
+   gzip bundle — `requestDevice`/`GPUShaderStage`/`createBindGroup`
+   markers verified in the shipped bytes (2026-11-12). Decisively: with
+   the device forced to webgpu, the request log shows the session fetches
+   exactly the SAME `ort-wasm-simd-threaded.asyncify.{mjs,wasm}` pair as
+   the wasm device — the jsep/plain/jspi variants are never requested, so
+   **no additional ORT wasm files are vendored** (the 28 MB jsep pair was
+   staged during this cycle, measured unnecessary, and removed again —
+   the drift-test stray-file check HWR-A03c caught the leftovers).
+2. **Capability gate (step 1, unchanged)**: `src/lib/hwr-device.ts` —
+   `probeWebGPU` (never throws, silent fallback) + `resolveHwrDevice`
+   (evidence-locked) + `pickHwrDevice`/`readDeviceOverride` (the
+   verification seam the benchmark uses to force the device; production
+   pages never set `__HWR_DEVICE__`). 22 unit tests (HWR-D01–D22); the
+   engine logs the resolved device per line.
+3. **Measured evidence table** (2026-11-12, committed CI-neutral
+   benchmark `e2e/hwr-bench.spec.ts`, `HWR_BENCH=1 [HWR_BENCH_DEVICE=webgpu]`,
+   real vendored engine, q8 trocr-small-handwritten, one 88 px "CAT"
+   line, this sandbox — CPU is shared-sandbox, so absolute numbers are
+   trend lines, not representative hardware):
+
+   | Arm | Environment | Cold per-line | Warm per-line | Recognized text | /hwr/ requests |
+   |---|---|---|---|---|---|
+   | wasm | headless Chromium (default) | 3 614 ms (click→toast 12 740 ms) | 1 097 / 1 169 / 1 214 ms — mean **1 160 ms** | searchable CAT hit | asyncify pair + model + runtime bundle |
+   | webgpu | full Chromium + `--enable-unsafe-webgpu` + `--enable-unsafe-swiftshader` (software adapter obtained) | **83 008 ms** (click→toast 93 093 ms) | **77 773 ms** (1 warm sample) | searchable CAT hit — IDENTICAL acceptance outcome | asyncify pair + model + runtime bundle — no jsep files |
+
+   Warm webgpu/wasm on software rendering: ≈ **67× slower**. The webgpu
+   path produces the same recognition result (identity verified through
+   the app's real search flow), but software WebGPU is the opposite of a
+   win for this q8 model. Without `--enable-unsafe-webgpu` the adapter is
+   null and the engine's per-line failure path reports
+   "no available backend found" honestly (partial-failure toast — the
+   app's behavior is correct; an earlier bench draft accepted that toast
+   as success, fixed before shipping).
+
+4. **Gate decision (unchanged, now evidence-backed)**:
+   `HWR_WEBGPU_EVIDENCE` stays false. Software WebGPU measured 67×
+   slower; hardware WebGPU remains untested (no GPU in any sandbox this
+   project builds in). Flipping the gate requires: a representative-
+   hardware measurement with the committed benchmark (one command:
+   `HWR_BENCH=1 HWR_BENCH_DEVICE=webgpu bunx playwright test
+   e2e/hwr-bench.spec.ts`) showing a real, reproducible win AND identical
+   results — nothing else changes; the seam, the gate and the benchmark
+   already ship.
+5. **Privacy invariant**: unchanged — both arms fetch everything from
+   same-origin /hwr/ (request-log verified), zero cross-origin requests.
+
 ## Non-goals (documented on purpose)
 
 - **CJK / multi-language handwriting** — deferred (no open on-device CJK

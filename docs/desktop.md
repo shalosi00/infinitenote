@@ -90,6 +90,34 @@ The deb/rpm declare their webkit2gtk dependency; the AppImage bundles it.
    [docs/flathub.md](flathub.md) (`node scripts/flatpak-extradata.mjs` pins the
    checksum into the flatpak manifest).
 
+## Artifact verification log (independent re-checks)
+
+Each release's desktop artifacts are re-verified by downloading them fresh
+from the GitHub Release and re-running the checks the Desktop workflow
+enforces — the same procedure introduced after the issue #164 glibc-floor
+incident (v1.11.1 AppImage re-verified 2026-11-10).
+
+### v1.13.0 (verified 2026-11-12)
+
+Fresh download of `InfiniteNote_1.13.0_amd64.AppImage` from the release page
+— 152,889,848 bytes, sha256
+`bc5102ade5aad106c0413005d4a546b2d3a1ac9e4e87107a83b9a9af1464e5f3`:
+
+| Check | Result |
+|---|---|
+| AppImage type-2 runtime | magic `41 49 02` at offset 8 — valid |
+| FUSE-less extraction | `--appimage-extract` exits 0, full tree present |
+| GLIBC floor (objdump, every bundled ELF) | 174 ELFs scanned, overall max **GLIBC_2.35** — set by the webkit stack (`libcairo.so.2`, `libjavascriptcoregtk-4.1.so.0`, `libwebkit2gtk-4.1.so.0` copied from the pinned ubuntu-22.04 runner); the main app binary requires at most **GLIBC_2.34**; nothing over the 2.35 floor |
+| Embedded .desktop entry | Name=InfiniteNote, Icon=infinitenote, Categories=Office, Exec=infinitenote, Type=Application, StartupWMClass=infinitenote; icons at 32 / 128 / 256@2 / 512 px under `usr/share/icons/hicolor/` |
+| versionCode parity | 230 / 1.13.0 consistent across `package.json`, `android-twa/app/build.gradle.kts` + `twa-manifest.json`, `src-tauri/Cargo.toml` + `tauri.conf.json`, and the F-Droid recipe (latest build block: versionName 1.13.0, versionCode 230, commit `v1.13.0`) |
+| Handwriting assets in the bundle | all 10 vendored `public/hwr/` asset paths present in `usr/bin/infinitenote` — both trocr ONNX shards, the asyncify ORT wasm, and the 7 model/tokenizer JSONs. Tauri v2 embeds the whole `frontendDist` static export into the binary (no loose resources), so the model ships inside the app and nothing downloads at runtime (14 `/hwr/` references in the binary) |
+
+Full GUI boot remains untestable in the bare verification sandbox (host
+libEGL.so.1 absent — consistent with the v1.11.1 verification evidence). The
+deb/rpm assets are present on the release (74,253,752 / 74,259,262 bytes);
+the per-release verification targets the AppImage, the artifact the glibc
+floor guards protect.
+
 ## Troubleshooting
 
 ### Building
