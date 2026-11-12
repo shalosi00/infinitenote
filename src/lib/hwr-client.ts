@@ -31,8 +31,9 @@
  */
 import { HwrError } from "./hwr";
 import {
+  pickHwrDevice,
   probeWebGPU,
-  resolveHwrDevice,
+  readDeviceOverride,
   type GpuNavigatorLike,
   type HwrDevice,
 } from "./hwr-device";
@@ -171,7 +172,8 @@ function getPipeline(): Promise<ImageToTextPipeline> {
       // measured WASM-vs-WebGPU table shows a real win. The probe resolves
       // to "wasm" silently today — behavior is byte-identical to the old
       // unconditional pin; docs/test-plans/handwriting.md carries the gate.
-      const device = await resolveHwrDevice(
+      const device = pickHwrDevice(
+        readDeviceOverride(globalThis),
         await probeWebGPU(navigator as unknown as GpuNavigatorLike | null),
       );
       activeDevice = device;

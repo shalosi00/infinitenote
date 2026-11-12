@@ -6,7 +6,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   HWR_WEBGPU_EVIDENCE,
+  pickHwrDevice,
   probeWebGPU,
+  readDeviceOverride,
   resolveHwrDevice,
   type GpuAdapterLike,
   type GpuNavigatorLike,
@@ -123,6 +125,41 @@ describe("HWR-D: evidence-locked device resolution (issue #193)", () => {
 
   test("HWR-D15: gate true cannot resurrect an unavailable adapter", () => {
     expect(resolveHwrDevice(unavailable, true)).toBe("wasm");
+  });
+});
+
+describe("HWR-D: verification seam (benchmark override, issue #193)", () => {
+  test("HWR-D18: readDeviceOverride is undefined for production-like globals", () => {
+    expect(readDeviceOverride({})).toBeUndefined();
+    expect(readDeviceOverride(undefined)).toBeUndefined();
+    expect(readDeviceOverride(null)).toBeUndefined();
+    expect(readDeviceOverride({ __HWR_DEVICE__: "cuda" })).toBeUndefined();
+    expect(readDeviceOverride({ __HWR_DEVICE__: 42 })).toBeUndefined();
+  });
+
+  test("HWR-D19: readDeviceOverride accepts only wasm/webgpu", () => {
+    expect(readDeviceOverride({ __HWR_DEVICE__: "wasm" })).toBe("wasm");
+    expect(readDeviceOverride({ __HWR_DEVICE__: "webgpu" })).toBe("webgpu");
+  });
+
+  test("HWR-D20: pickHwrDevice — a valid override wins over probe AND gate", () => {
+    expect(pickHwrDevice("webgpu", { available: false, reason: "no-adapter" })).toBe("webgpu");
+    expect(pickHwrDevice("webgpu", { available: true }, false)).toBe("webgpu");
+    expect(pickHwrDevice("wasm", { available: true }, true)).toBe("wasm");
+  });
+
+  test("HWR-D21: pickHwrDevice — no override defers to probe + evidence gate", () => {
+    expect(pickHwrDevice(undefined, { available: true }, false)).toBe("wasm");
+    expect(pickHwrDevice(undefined, { available: true }, true)).toBe("webgpu");
+    expect(pickHwrDevice(undefined, { available: false, reason: "no-adapter" }, true)).toBe("wasm");
+  });
+
+  test("HWR-D22: invalid override values are ignored (never crash the engine)", () => {
+    for (const bad of [null, "cuda", 1, true, {}]) {
+      expect(
+        pickHwrDevice(readDeviceOverride({ __HWR_DEVICE__: bad }), { available: true }),
+      ).toBe("wasm"); // gate false today
+    }
   });
 });
 

@@ -77,7 +77,31 @@
 - **Vendored-asset audit (the issue's own step 0)**: `public/hwr/assets.json` carries onnxruntime-web 1.31.0-dev as `ort-wasm-simd-threaded.asyncify.{mjs,wasm}` — the CPU build; NO `.jsep` (WebGPU EP) assets are vendored and the transformers.js runtime is a wasm-only closure (blob modules cannot resolve "onnxruntime-web/webgpu" — measured 2026-11-10). A WebGPU arm therefore requires vendoring the jsep pair + re-bundling BEFORE any comparison is possible.
 - **Capability gate shipped**: new pure module `src/lib/hwr-device.ts` — probeWebGPU (navigator.gpu binding + adapter probe, never throws, silent fallback) + resolveHwrDevice (returns "webgpu" only with an available adapter AND a true evidence gate; HWR_WEBGPU_EVIDENCE is false today, so behavior is byte-identical to the old unconditional wasm pin). 17 unit tests (HWR-D01–D17); hwr-client.ts now selects its device through the gate and logs the resolved device per line.
 - **Measured WASM baseline** (committed CI-neutral benchmark spec e2e/hwr-bench.spec.ts, runs only with HWR_BENCH=1; 1 cold + 3 warm single-line rounds on the real vendored engine, headless Chromium): cold 15 760 ms total / 4 452 ms per-line (incl. first-use model load); warm 1 747/1 696/1 673 ms click-to-toast with engine per-line 1 144/1 124/1 113 ms (mean 1 127 ms). The gate is observable in production: headless Chromium has no WebGPU adapter and the engine silently stayed on wasm (logged per-line suffix).
-- **Gate**: lint + typecheck + 903/903 unit across 70 files. Suite: 903 unit + 156 E2E. #193 stays open: next is jsep vendoring + representative-hardware measurement before any evidence-gate flip.
+- **Gate**: lint + typecheck + 903/903 unit across 70 files. Suite: 903 unit + 156 E2E. #193 stays
+  open: next is jsep vendoring + representative-hardware measurement before any evidence-gate flip.
+
+## 2026-11-12 (3) — issue #193 step 2: the WebGPU arm measured (and the jsep assumption falsified)
+
+- **Asset audit, answered with a measurement**: the vendored runtime closure is ALREADY webgpu-capable —
+  transformers' web build's only ORT reference is `import("onnxruntime-web/webgpu")` and bun inlines that
+  export into the shipped gzip bundle (requestDevice/GPUShaderStage/createBindGroup markers verified in the
+  vendored bytes). Decisively: forcing the device to webgpu, the request log shows the session fetches exactly
+  the SAME asyncify wasm pair as the wasm device — no jsep/plain/jspi files are ever requested. The 28 MB
+  jsep pair was staged for this cycle, measured unnecessary, and REMOVED again (the drift test's stray-file
+  check HWR-A03c caught the leftover files — the gate works).
+- **Verification seam shipped**: `pickHwrDevice`/`readDeviceOverride` in hwr-device.ts — the committed
+  benchmark forces the device via `globalThis.__HWR_DEVICE__`; production pages never set it, so the
+  evidence gate alone decides there (+5 tests HWR-D18–D22, suite 908/908 across 70 files).
+- **Measured evidence table** (committed bench, both arms, one 88 px "CAT" line): wasm cold 3 614 ms/line,
+  warm mean 1 160 ms (1 097/1 169/1 214) — webgpu (full Chromium + --enable-unsafe-webgpu +
+  --enable-unsafe-swiftshader, software adapter OBTAINED) cold 83 008 ms/line, warm 77 773 ms ≈ **67×
+  slower on SwiftShader**; recognition identity VERIFIED (both arms produce the searchable CAT hit through
+  the app's real search flow). Without the flags the adapter is null and the engine honestly reports
+  "no available backend found" per line (an earlier bench draft accepted the partial-failure toast as
+  success — fixed before shipping).
+- **Gate decision (evidence-backed now)**: HWR_WEBGPU_EVIDENCE stays false. Flipping requires a
+  representative-hardware run of the committed benchmark showing a real win with identical results —
+  nothing else changes; the seam, gate and benchmark ship today. Suite: 908 unit + 156 E2E.
 
 ## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
 
