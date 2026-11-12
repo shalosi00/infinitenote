@@ -103,6 +103,31 @@
   representative-hardware run of the committed benchmark showing a real win with identical results —
   nothing else changes; the seam, gate and benchmark ship today. Suite: 908 unit + 156 E2E.
 
+## 2026-11-12 (4) — v1.14.0 RELEASED: the release train executed
+
+- **State found at session start**: develop 5 commits ahead of main with the
+  release PR #199 (develop→main) OPEN and checks still running; milestone #15
+  with #194 closed and #193 open. The cycle's complaint ("dev is still not
+  merged into main") was exactly this: the release PR had never been merged.
+- **Executed the release flow end to end**: polled the 3 required checks on
+  the head sha 6ed59df to green (lint-typecheck-test, e2e, build-smoke);
+  merged PR #199 as a merge commit (935c6eb) — main and develop share
+  ancestry again; pushed the annotated tag v1.14.0 on the merge commit;
+  published the GitHub Release with full notes; the tag-triggered Desktop
+  workflow (pinned ubuntu-22.04) builds and attaches the AppImage/deb/rpm.
+- **Milestone chain**: created the v1.15.0 milestone (#16); moved #193 OPEN
+  into it (the representative-hardware WebGPU run — one committed command:
+  `HWR_BENCH=1 HWR_BENCH_DEVICE=webgpu bunx playwright test
+  e2e/hwr-bench.spec.ts`; the `HWR_WEBGPU_EVIDENCE` gate flips only on a
+  measured win with identical results); closed milestone #15; left a
+  hand-off comment on #193.
+- **This docs PR**: PROJECT_STATUS.md (Last updated / Phase / Overall state
+  updated for the release), ROADMAP (v1.14 re-labeled shipped with the
+  measured stay-on-WASM decision; new v1.15 section for the moved #193
+  remainder), this journal entry. Docs-only — no code changes.
+- **Next cycle**: the #193 representative-hardware run; then scope further
+  v1.15.0 candidates from the ROADMAP.
+
 ## 2026-11-11 — Phase B ink-to-text, webpack CI fix, v1.13.0 released (backfill; details in PROJECT_STATUS.md)
 
 - Phase B ink-to-text conversion shipped (#176 via PR #188): recognized
