@@ -9,6 +9,23 @@ import type { NextConfig } from "next";
 //   unaffected.
 const isDesktopExport = process.env.NEXT_OUTPUT_MODE === "export";
 
+// Baseline hardening headers for the web app (security audit, 2026-11-13).
+// The app is a client-only local-first PWA: it serves no user-controlled
+// HTML from other origins, embeds nothing, and needs no framing — so the
+// safe defaults are deny/no-referrer-when-downgrade. The audio note
+// recorder is the one feature that needs a device permission
+// (getUserMedia({audio:true}) in note-app.tsx), so microphone stays
+// allowed (self) while camera/geolocation stay denied. These apply to the
+// standalone server; the Tauri shell serves the static export and sets its
+// own webview context (CSP there is issue #NNN).
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "no-referrer-when-downgrade" },
+  { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+];
+
 const nextConfig: NextConfig = {
   output: isDesktopExport ? "export" : "standalone",
   // the handwriting engine is imported dynamically in the browser only —
@@ -20,6 +37,17 @@ const nextConfig: NextConfig = {
   // type errors FAIL the build (issue #104): the standalone tsc gate covers
   // PRs, but `next build` must never pass with broken types on its own
   reactStrictMode: false,
+  async headers() {
+    // Static export has no server to attach headers to; the Tauri shell
+    // governs its own webview context. Serve headers on the web build only.
+    if (isDesktopExport) return [];
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
