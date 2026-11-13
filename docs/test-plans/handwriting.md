@@ -93,6 +93,7 @@ real-engine E2E checks below.
 | HWR-C30..C32 | `conversionSkeletons`: one text skeleton per target in reading order (type/x/y/text/fontSize/fontFamily 2/INHERIT_STROKE), empty in → empty out, stable placeholder ids re-id'd at insert time |
 | HWR-C40..C45 | `hwrConvertSummary` exact toast lines: guidance (page + selection scopes), already-converted (both scopes), single/multi conversion, already-converted tail, plural forms |
 | HWR-C50..C52 | round-trip with `applyHwrResults`: recognize → convert once → re-run says already-converted (text at the position); undo (text removed) makes the line convertible again; a fresh re-recognition under an existing converted text block stays a no-op (no duplicate over the user's possibly edited text) |
+| HWR-C60..C64 | `detectDroppedConversion` (integrity guard, src/lib/__tests__/hwr-convert-dropped.test.ts): all-created-present → no drop; TOMBSTONED created ids are NOT dropped (the legit undo/delete discriminator); ids absent from the map ARE dropped, in created order; empty inputs safe; junk rows (null / non-string id) ignored, not crashes |
 
 ### E2E — Phase B additions to `e2e/handwriting.spec.ts` (same serial chain, real engine)
 
@@ -111,22 +112,68 @@ real-engine E2E checks below.
 | HWR-E03 | recognized text persists across a reload; ink untouched (5 strokes) | ✅ pass (3.2 s) |
 | HWR-E04 | a page without ink is a friendly no-op | ✅ pass (0.8 s) |
 
+### E2E — conversion integrity (e2e/handwriting-undo.spec.ts, metadata-only fixture — no engine)
+
+The fixture carries the same first-stroke metadata the real recognition
+flow stores (customData.hwrText / hwrAt), so conversion runs without the
+64 MB model and the guard logic is exercised byte-for-byte identically.
+Measured 2026-11-13, 3/3 pass + the real-engine chain 7/7.
+
+| ID | Scenario | Result (2026-11-13 local run) |
+|---|---|---|
+| HWR-U01 | fresh mount → convert → Ctrl+Z (ink-only again) → convert again IMMEDIATELY → live-count probes at +320…+4078 ms all 6 → the re-converted scene persists across a reload (the historically drop-prone state, re-measured healthy on the current toolchain) | ✅ pass ×2 |
+| HWR-U02 | the reloaded page's text is the recognized word ("cat") at the ink position (≤ 12 px), strokes kept | ✅ pass |
+| HWR-U03 | the drop shape forced for real: full-scene replace WITHOUT the created text and without a tombstone (`captureUpdate: NEVER`) → the integrity guard re-applies within ~1.5 s → exactly ONE text element (no duplicate) → the healed scene persists across a reload | ✅ pass |
+
 The fixture letters are drawn with the same constraints the segmentation
 enforces (every stroke > 0 px tall, ≥ 55 % vertical overlap with its
 neighbours) — the A crossbar and T top bar are slightly slanted so they
 segment into the line and render completely.
 
-## Known Excalidraw 0.18 limitation (documented 2026-11-11)
+## Conversion integrity guard (shipped 2026-11-13)
 
-A conversion issued IMMEDIATELY after undoing a previous conversion can
-still be dropped by the Excalidraw store ~1 s later (measured with the
-scene probes: applied at +0 ms, gone at +1200 ms, no tombstone) — an
-Excalidraw 0.18 store/history interplay, also present for other
-programmatic element inserts in that state. The reliable path is
-re-recognizing first (the recognition flow remounts the canvas, resetting
-history). Unit + E2E coverage deliberately keeps every conversion on a
-fresh-mount canvas; the toast always tells the truth about what the user
-will find on the page.
+**The measured limitation (2026-11-11):** a conversion issued IMMEDIATELY
+after undoing a previous conversion could be dropped by the Excalidraw
+store ~1 s later (measured with the scene probes: applied at +0 ms, gone
+at +1200 ms, no tombstone) — an Excalidraw 0.18 store/history interplay,
+also present for other programmatic element inserts in that state. Unit +
+E2E coverage deliberately kept every conversion on a fresh-mount canvas.
+
+**Re-measured 2026-11-13 on the current toolchain** (Chromium 156
+headless-shell, Excalidraw 0.18, `next dev` webpack): the interactive
+flow — fresh mount → convert → Ctrl+Z → convert again — does NOT drop
+anymore. Evidence: `e2e/handwriting-undo.spec.ts` HWR-U01, two
+consecutive passes, live-count probes at +320/+632/+1250/+2065/+4078 ms
+all 6, and the re-converted scene persists across a reload. The measured
+11-11 drop was a timing race the toolchain no longer hits; nothing in
+the conversion code changed between the two measurements.
+
+**The guard (defense in depth — the drop shape stays real):** every
+conversion schedules a 1.5 s integrity re-check
+(`convertHandwritingToText` in excalidraw-client.ts).
+`detectDroppedConversion` (hwr-convert.ts, pure, unit-pinned as
+HWR-C60..C64) distinguishes the only two ways a created text element can
+vanish from the scene:
+
+- **Tombstoned** (`isDeleted: true`, still in the elements map) — a
+  legitimate undo or delete by the user; the guard stays silent. Getting
+  this wrong would re-apply a conversion the user just undid.
+- **Absent from the map entirely** (the measured drop shape — "no
+  tombstone") — the guard re-enters the conversion core ONCE. Structural
+  idempotency (a text element at the ink position = converted) keeps the
+  heal duplicate-free, and the re-entry never schedules another check, so
+  the loop is bounded at one heal. The heal logs
+  `[hwr-convert] the store dropped N converted text element(s) …` to the
+  console for diagnosability.
+
+The healthy path costs one map read per conversion and writes nothing.
+The heal is proven end to end by HWR-U03, which forces the exact drop
+shape (full-scene replace without the created element, `captureUpdate:
+NEVER` — what a store reconciliation-away looks like) and asserts the
+scene returns to 6 elements with exactly ONE text block, persisting
+across a reload. HWR-U01 additionally pins the healthy post-undo flow,
+and the real-engine chain (HWR-E05..E07) passes unchanged with the guard
+in place (7/7, 2026-11-13).
 
 ## Latency (measured 2026-11-10, headless Chromium, WASM device)
 

@@ -183,6 +183,17 @@ milestones/issues. This file is the plan; the status file is the reality.
       then production stays on WASM. Privacy invariant unchanged (both arms
       same-origin, request-log verified). Further candidates come from
       upcoming cycles.
+- [x] Conversion integrity guard (2026-11-13): the Phase B known limitation
+      (a conversion issued right after an undo could be dropped by the
+      Excalidraw 0.18 store ~1 s later; measured 2026-11-11) no longer
+      reproduces on the current toolchain — re-measured with live-count
+      probes to +4 s (e2e/handwriting-undo.spec.ts HWR-U01, two passes) —
+      and every conversion now carries a 1.5 s integrity re-check that
+      heals the exact drop shape (created element absent from the elements
+      map, no tombstone) by re-entering the structurally-idempotent
+      conversion core once; a legitimate undo/delete (tombstoned element)
+      is never touched (HWR-U03 forces the drop and proves the heal;
+      unit pins HWR-C60..C64; the real-engine chain stays 7/7)
 
 ## v1.7 — Internationalization & polish (shipped in v1.7.0)
 

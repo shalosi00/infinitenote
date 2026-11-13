@@ -1,0 +1,19 @@
+# Dependabot keeps the two supply-chain surfaces current:
+# - npm: monthly in-range bumps for direct dependencies (the lockfile is the
+#   gate — PRs run the full CI suite before anything merges; critical
+#   advisories additionally flow through Dependabot security updates, which
+#   are enabled in the repo settings).
+# - github-actions: the workflows pin third-party actions by SHA; these
+#   weekly PRs move the pins to the latest upstream release so they never
+#   silently rot.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
