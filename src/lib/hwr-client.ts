@@ -24,8 +24,10 @@
  * timeouts, 2026-11-10). The gzip detour keeps the build graph untouched
  * and the drift test still pins the ORIGINAL file's sha256 (it gunzips).
  *
- * The module is imported through `new Function` so neither the bundler
- * nor static analysis touches the blob URL. The pipeline is a
+ * The module is imported through a plain dynamic import (webpackIgnore)
+ * so neither the bundler nor static analysis touches the blob URL, and no
+ * runtime code compilation happens (strict-CSP friendly, issue #207). The
+ * pipeline is a
  * lazily-created singleton reused across lines and pages; after a hard
  * failure it is torn down so the next attempt starts clean.
  */
@@ -92,13 +94,19 @@ async function importGzippedBundle(): Promise<TransformersLib> {
   const blob = new Blob([text], { type: "text/javascript" });
   const url = URL.createObjectURL(blob);
   try {
-    const dynamicImport = new Function("url", "return import(url)") as (
-      url: string,
-    ) => Promise<unknown>;
+    // Direct dynamic import — `/* webpackIgnore: true */` keeps the bundler
+    // from rewriting the runtime-computed blob URL into a context module.
+    // The previous indirection compiled code at runtime through the
+    // Function constructor, which a strict CSP only allows with
+    // script-src 'unsafe-eval'; a plain dynamic import needs script-src
+    // blob: only. Measured + shipped with the desktop CSP (issue #207).
     const timer = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("timed out")), LOAD_TIMEOUT_MS),
     );
-    const lib = (await Promise.race([dynamicImport(url), timer])) as TransformersLib;
+    const lib = (await Promise.race([
+      import(/* webpackIgnore: true */ url),
+      timer,
+    ])) as TransformersLib;
     if (typeof lib?.pipeline !== "function") {
       throw new Error("pipeline export missing from the bundle");
     }
