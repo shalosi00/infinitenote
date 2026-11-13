@@ -134,6 +134,17 @@ links are intentionally blocked — the local-first app renders audio and PDF
 attachments natively), no `upgrade-insecure-requests` (the app never talks
 HTTP to remote hosts), no remote origins anywhere.
 
+A measured note on the inventory's two browser-scheduled fetches: the web
+manifest (Chrome's installability manager) and the service-worker script
+revalidation are fetched on the browser's own schedule, and a loaded CI
+runner can defer them past the session window — the first CI run recorded a
+166-request session with no manifest fetch while local runs capture it. The
+inventory's IN-07 therefore asserts those two facts at the document level
+(the served document references the same-origin manifest, the bytes are
+served, the registered worker script is `/sw.js`), while every
+app-initiated resource class stays asserted against the recorded request
+list.
+
 The policy applies ONLY to the Tauri desktop shell (Tauri injects it into
 the pages it serves); the web/PWA build is unchanged and keeps its
 response-header hardening from the #206 audit. Unit tests pin the policy's

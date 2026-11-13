@@ -271,13 +271,42 @@ test.describe.serial("desktop CSP inventory (issue #207)", () => {
     // connect-src 'self' — tesseract traineddata + core wasm glue
     expect(has("/ocr/lang/deu.traineddata.gz"), "OCR traineddata fetched").toBe(true);
     expect(has("/ocr/core/tesseract-core"), "OCR core wasm glue fetched").toBe(true);
-    // font-src 'self' — woff2 assets requested
+    // font-src 'self' — woff2 assets requested by the app's CSS at render
     expect(urls.some((u) => u.includes(".woff2")), "webfonts requested").toBe(true);
-    // manifest-src (default-src 'self')
-    expect(has("/manifest.webmanifest"), "web manifest fetched").toBe(true);
-    // script-src 'self' — the service worker script
-    expect(has("/sw.js"), "service worker script fetched").toBe(true);
-    // img-src 'self' — at least one same-origin image (logo/icon)
+    // manifest-src (default-src 'self') and script-src 'self' (/sw.js) —
+    // the two BROWSER-scheduled fetches. Chrome downloads the manifest from
+    // its installability manager and revalidates the worker script on its
+    // own schedule, deferrable past the session window: the loaded CI
+    // runner recorded a 166-request session with NO manifest fetch
+    // (actions run 43432437110, job 131909017729) while local runs capture
+    // it — so the CSP-relevant facts are asserted at the document level
+    // instead of as a session-timing race: the document REFERENCES the
+    // same-origin manifest URL, the bytes are really served, and the
+    // registered service worker script IS the same-origin /sw.js.
+    const manifestHref = await page.evaluate(() => {
+      const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+      return link?.getAttribute("href") ?? null;
+    });
+    expect(manifestHref, "the document must reference a web manifest").toBeTruthy();
+    expect(
+      manifestHref,
+      "the manifest reference targets the same-origin manifest",
+    ).toContain("manifest.webmanifest");
+    const manifestRes = await page.request.get(manifestHref!);
+    expect(manifestRes.status(), "the manifest is served same-origin").toBe(200);
+    const swScriptUrl = await page.evaluate(async () => {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sw = reg ? reg.active ?? reg.installing ?? reg.waiting : null;
+      return sw ? sw.scriptURL : null;
+    });
+    expect(swScriptUrl, "a service worker must be registered").toBeTruthy();
+    expect(
+      new URL(swScriptUrl!, page.url()).pathname,
+      "the registered service worker script is the same-origin /sw.js",
+    ).toBe("/sw.js");
+    // img-src 'self' — the service worker precache pulls the same-origin
+    // logo at install time (public/sw.js STATIC_PREFIXES), an app-pipeline-
+    // initiated fetch that lands within the session
     expect(has("/logo.svg"), "same-origin image fetched").toBe(true);
   });
 
