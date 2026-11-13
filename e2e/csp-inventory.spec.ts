@@ -304,10 +304,27 @@ test.describe.serial("desktop CSP inventory (issue #207)", () => {
       new URL(swScriptUrl!, page.url()).pathname,
       "the registered service worker script is the same-origin /sw.js",
     ).toBe("/sw.js");
-    // img-src 'self' — the service worker precache pulls the same-origin
-    // logo at install time (public/sw.js STATIC_PREFIXES), an app-pipeline-
-    // initiated fetch that lands within the session
-    expect(has("/logo.svg"), "same-origin image fetched").toBe(true);
+    // img-src 'self' — the document's favicon/icon set is the real
+    // same-origin image consumer (scene images are data:-URLs, paste
+    // previews are blob:). The icon fetch is browser-scheduled exactly like
+    // the manifest — measured on the loaded CI runner: neither the page
+    // request list nor the SW precache produces a same-origin image fetch
+    // inside the session window — so the fact is asserted at the document
+    // level: the served HTML references same-origin icon URLs and they are
+    // really served.
+    const iconHrefs = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]')]
+        .map((l) => l.getAttribute("href") ?? "")
+        .filter(Boolean),
+    );
+    expect(iconHrefs.length, "the document must reference favicon icons").toBeGreaterThan(0);
+    const origin = new URL(page.url()).origin;
+    expect(
+      iconHrefs.filter((h) => h.startsWith("/") || h.startsWith(origin)),
+      "every icon reference must be same-origin (img-src 'self')",
+    ).toEqual(iconHrefs);
+    const iconRes = await page.request.get(iconHrefs[0]!);
+    expect(iconRes.status(), "the icon is served same-origin").toBe(200);
   });
 
   test("IN-08: the served HTML justifies the inline tokens in the policy", async () => {

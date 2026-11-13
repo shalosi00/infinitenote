@@ -122,7 +122,7 @@ PR and fails if the app ever requests anything outside this policy):
 | `script-src 'wasm-unsafe-eval'` | onnxruntime-web (HWR) and tesseract (OCR) compile WebAssembly at runtime | the two vendored engines; the ONLY eval-adjacent token in the policy — `'unsafe-eval'` is forbidden (the HWR bundle import was refactored off `new Function` in this same PR so no runtime JS compilation happens) |
 | `script-src blob:` | the HWR bundle `transformers.web.bundle.js.gz` is fetched, decompressed and imported as a `blob:` module URL | hwr-client.ts |
 | `style-src 'self' 'unsafe-inline'` | Next CSS files + React inline `style` attributes + Excalidraw's injected `<style>` | measured: inline styles are pervasive in the canvas UI |
-| `img-src 'self' data: blob:` | scene images (stored as `data:` URLs), blob previews when pasting | scene/paste handling |
+| `img-src 'self' data: blob:` | scene images (stored as `data:` URLs), blob previews when pasting; the same-origin favicon/icon set referenced by every served page (`link rel=icon`) | scene/paste handling; document-level icon assertion in IN-07 |
 | `font-src 'self' data:` | self-hosted Excalidraw fonts under `/excalidraw/`, next/font woff2 | measured in the inventory |
 | `connect-src 'self' ipc: http://ipc.localhost` | model weights + wasm + traineddata + manifest fetches are all same-origin; `ipc:` / `http://ipc.localhost` is the Tauri v2 local IPC endpoint the core always needs (per the Tauri v2 CSP docs) | hwr/ocr clients; Tauri docs |
 | `worker-src 'self' blob:` | pdf.js module worker (`/pdf.worker.min.mjs`); tesseract.js wraps its worker in a `blob:` URL (`new Worker(URL.createObjectURL(...))`, its default `workerBlobURL` behavior) | measured: both constructions occur |
@@ -141,7 +141,11 @@ runner can defer them past the session window — the first CI run recorded a
 166-request session with no manifest fetch while local runs capture it. The
 inventory's IN-07 therefore asserts those two facts at the document level
 (the served document references the same-origin manifest, the bytes are
-served, the registered worker script is `/sw.js`), while every
+served, the registered worker script is `/sw.js`). The favicon/icon fetch
+is browser-scheduled the same way (no page-context image request reliably
+lands inside the session — `/logo.svg` in the SW's runtime-fill list is
+never requested by the document at all), so the `img-src 'self'` evidence
+is the document's icon reference set plus a served check. Every
 app-initiated resource class stays asserted against the recorded request
 list.
 
