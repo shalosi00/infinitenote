@@ -43,6 +43,57 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-13 (2) — deep security scan of main: full remediation landed (#206/#208/#209)
+
+- **Task**: a deep and wide security scan of the `main` branch on GitHub.
+  Scan surface: GitHub security-feature APIs (secret scanning, code scanning,
+  Dependabot alerts), a full-history secret scan of every blob reachable from
+  `main` + `develop`, the CI workflow supply chain, branch protection, and a
+  dependency audit of the whole lockfile.
+- **Scan findings (this session)**: secret scanning 0 alerts (all states);
+  **code scanning had never run** (zero analyses — no CodeQL workflow and the
+  default-setup API rejects a classic PAT); **3 open Dependabot alerts** (all
+  `sharp`, HIGH libvips/libheif/librsvg inherited CVEs); `ci.yml` had **no
+  `permissions:` block** (jobs inherited the repo default token scope) and all
+  third-party actions were **pinned to mutable tags** (worst for
+  `softprops/action-gh-release`, which runs with `contents: write`);
+  branch protection verified solid on both branches (required checks
+  lint-typecheck-test / e2e / build-smoke, `enforce_admins`, no force-push,
+  no deletion); history scan clean — only AKIA-shaped base64 lookalikes inside
+  the vendored tesseract WASM, and the live origin-URL token appears in **zero**
+  commits/trees.
+- **Remediation round 1** (opened late in the prior session, merged this one):
+  #206 (squash `641c54a`) — dead `next-auth` removed (CRITICAL advisory, zero
+  source imports), dead zod/react-hook-form chain + `form.tsx` removed,
+  `next` 16.1.3→16.4.6 (3 CRITICAL RCEs + 12 HIGH), `sharp` 0.34.5→0.35.5,
+  baseline web security headers in `next.config.ts` + 9 pin tests
+  (`security-config.test.ts`). Follow-up issue #207 filed for the Tauri CSP.
+- **Remediation round 2** (this session): #208 (squash `aad0f40`) — explicit
+  `permissions: contents: read` in `ci.yml`; repo `default_workflow_permissions`
+  set to `read` via API; all third-party actions SHA-pinned with version
+  comments; new `.github/workflows/codeql.yml` (JS/TS analysis, paths-ignore
+  for the vendored engine assets) — **code scanning is now live**: 3 analyses,
+  87 rules, 0 open alerts on day one; new `.github/dependabot.yml` (monthly
+  npm + weekly github-actions updates so the SHA pins never rot).
+- **Main sync**: #209 (squash `5e53e5a`, precedent #203) carried #205 + the
+  remediation pair to the **default branch** so the 3 sharp alerts can close.
+  First e2e run on the sync commit flaked (3 timing-sensitive tests: sync-zip
+  export click stability, HWR-E06 undo settle, ui-surface sheet detach) while
+  the byte-identical tree was green minutes earlier — re-runs green twice;
+  suspected runner-image timing drift (annotations carry the ubuntu-latest →
+  26.04 migration notice). No code change.
+- **Measured**: dependency audit 107 findings (5 critical, 57 high, 38
+  moderate, 7 low) before the remediation pair → **60 (0 critical, 38 high,
+  19 moderate, 3 low)** after, on the merged develop tree; remaining findings
+  transitive dev/optional-paste advisories tracked by enabled Dependabot
+  security updates. Gate re-verified twice: lint + tsc clean, 922/922 unit
+  across 72 files.
+- **Settings notes**: `secret_scanning_non_provider_patterns` +
+  `secret_scanning_validity_checks` PATCHes return 200 but are silently
+  ignored for a classic PAT on this repo (re-verified twice) — known
+  limitation, only settable from the UI; the essential trio (secret scanning,
+  push protection, Dependabot security updates) is enabled.
+
 ## 2026-11-13 — main-branch cleanup verification + conversion integrity guard (Phase B follow-up)
 
 - **State found at session start**: v1.14.0 released, main @ 2c25fec
