@@ -1,0 +1,52 @@
+name: CodeQL
+
+# Static security analysis (code scanning). Before 2026-11-13 no analysis had
+# ever run on this repo — this workflow closes that gap. It analyzes the
+# JavaScript/TypeScript sources (the entire app is a client-side Next.js PWA)
+# and uploads SARIF results to the Security tab.
+#
+# Weekly schedule + every push/PR to the protected branches, mirroring the CI
+# triggers. PR runs only analyze changed files (CodeQL incrementally), so the
+# cost is small.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      # needed to upload SARIF results to the Security tab
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: github/codeql-action/init@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410 # v3
+        with:
+          languages: javascript-typescript
+          # the vendored HWR/OCR/tesseract assets under public/ are third-party
+          # upstream builds, not first-party code — excluded to keep results
+          # focused on InfiniteNote's own sources
+          paths-ignore: |
+            public/hwr
+            public/ocr
+            public/pdf.worker.min.mjs
+
+      - uses: github/codeql-action/autobuild@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410 # v3
+
+      - uses: github/codeql-action/analyze@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410 # v3
+        with:
+          category: "/language:javascript-typescript"
