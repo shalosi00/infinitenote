@@ -46,6 +46,108 @@ describe("tauri.conf.json", () => {
   });
 });
 
+describe("desktop CSP (issue #207)", () => {
+  // The exact policy shipped in tauri.conf.json, derived from the measured
+  // request inventory in e2e/csp-inventory.spec.ts and documented
+  // directive-by-directive in docs/desktop.md ("Desktop CSP"). These tests
+  // pin the SHAPE of the policy: drift in either direction (weakening or
+  // breaking the app) must fail here first.
+  const conf = readJson("src-tauri/tauri.conf.json");
+  const csp = conf.app?.security?.csp as string | undefined;
+
+  it("ships a non-null CSP string", () => {
+    expect(typeof csp).toBe("string");
+    expect(csp!.length).toBeGreaterThan(0);
+  });
+
+  /** Parse "a b c; d e" into { a: ["b","c"], d: ["e"] } (quoted tokens kept). */
+  function directives(): Map<string, string[]> {
+    const map = new Map<string, string[]>();
+    for (const part of csp!.split(";")) {
+      const tokens = part.trim().split(/\s+/).filter(Boolean);
+      if (!tokens.length) continue;
+      map.set(tokens[0], tokens.slice(1));
+    }
+    return map;
+  }
+
+  it("has exactly the expected directive set", () => {
+    expect([...directives().keys()].sort()).toEqual(
+      [
+        "base-uri",
+        "connect-src",
+        "default-src",
+        "font-src",
+        "form-action",
+        "img-src",
+        "media-src",
+        "object-src",
+        "script-src",
+        "style-src",
+        "worker-src",
+      ].sort(),
+    );
+  });
+
+  it("keeps every directive origin-restricted (no remote hosts)", () => {
+    for (const [name, values] of directives()) {
+      for (const v of values) {
+        const remote =
+          /^https?:\/\//.test(v) && v !== "http://ipc.localhost" // Tauri v2 local IPC endpoint
+          ;
+        expect(remote, `directive ${name} must not allow remote origin ${v}`).toBe(false);
+      }
+    }
+  });
+
+  it("never allows runtime code compilation (no unsafe-eval)", () => {
+    // the HWR bundle import was refactored away from `new Function`
+    // precisely so this token is unnecessary
+    for (const values of directives().values()) {
+      expect(values).not.toContain("'unsafe-eval'");
+    }
+    expect(read("src/lib/hwr-client.ts")).not.toContain("new Function");
+  });
+
+  it("allows wasm compilation only via wasm-unsafe-eval in script-src", () => {
+    const script = directives().get("script-src")!;
+    expect(script).toContain("'wasm-unsafe-eval'"); // ORT + tesseract wasm
+    expect(script).toContain("'self'");
+    expect(script).toContain("blob:"); // the HWR bundle module import
+  });
+
+  it("allows inline bootstrap payloads only where the build needs them", () => {
+    // Next's static export ships inline script payloads (the RSC flight
+    // data bootstrap) — measured in the exported HTML; Tauri hashes its
+    // own injected init scripts on top. Styles are inline everywhere
+    // (React style attributes + Excalidraw's injected <style>). Scripts
+    // outside these classes stay blocked (no remote, no eval).
+    expect(directives().get("script-src")).toContain("'unsafe-inline'");
+    expect(directives().get("style-src")).toContain("'unsafe-inline'");
+  });
+
+  it("covers the vendored engines' worker and fetch surfaces", () => {
+    expect(directives().get("worker-src")).toEqual(["'self'", "blob:"]);
+    const connect = directives().get("connect-src")!;
+    expect(connect).toContain("'self'");
+    expect(connect).toContain("ipc:");
+    expect(connect).toContain("http://ipc.localhost"); // Tauri v2 IPC
+  });
+
+  it("locks down the passive surfaces", () => {
+    expect(directives().get("object-src")).toEqual(["'none'"]);
+    expect(directives().get("base-uri")).toEqual(["'self'"]);
+    expect(directives().get("form-action")).toEqual(["'none'"]);
+    expect(directives().get("default-src")).toEqual(["'self'"]);
+    // audio clips play from data:audio payloads (audioPayloadOf), the
+    // recorder may hand the player a blob:; images come from scenes as
+    // data: URLs and previews as blob: URLs
+    expect(directives().get("media-src")).toEqual(["'self'", "data:", "blob:"]);
+    expect(directives().get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+    expect(directives().get("font-src")).toEqual(["'self'", "data:"]);
+  });
+});
+
 describe("desktop build path", () => {
   it("exposes build:desktop and the tauri CLI script", () => {
     const pkg = readJson("package.json");
