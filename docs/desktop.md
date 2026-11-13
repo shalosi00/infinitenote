@@ -90,6 +90,57 @@ The deb/rpm declare their webkit2gtk dependency; the AppImage bundles it.
    [docs/flathub.md](flathub.md) (`node scripts/flatpak-extradata.mjs` pins the
    checksum into the flatpak manifest).
 
+## Desktop CSP (issue #207)
+
+The 2026-11-13 security audit of `main` found the desktop webview running
+with `"csp": null` — Tauri v2 then serves the app with no
+Content-Security-Policy at all. The app is local-first and embeds
+everything, so the shipped policy is a strict, origin-restricted allowlist
+(`src-tauri/tauri.conf.json`, `app.security.csp`):
+
+```
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:;
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:;
+font-src 'self' data:;
+connect-src 'self' ipc: http://ipc.localhost;
+worker-src 'self' blob:;
+media-src 'self' data: blob:;
+object-src 'none'; base-uri 'self'; form-action 'none'
+```
+
+Derivation, one directive at a time — every entry below is backed by the
+measured request inventory (`e2e/csp-inventory.spec.ts`, which runs on every
+PR and fails if the app ever requests anything outside this policy):
+
+| Directive | Sources | Justified by (measured) |
+|---|---|---|
+| `default-src 'self'` | — | baseline for everything not listed; also blocks embed-iframes of pasted links (audio/PDF embeddables render natively, no iframes are used) |
+| `script-src 'self'` | Next chunks, `/ocr/tesseract.min.js` (injected UMD), `/sw.js`, the ORT glue `/hwr/ort/*.mjs` (dynamic import), worker `importScripts` of `/ocr/core/*.wasm.js` | the whole app is same-origin |
+| `script-src 'unsafe-inline'` | Next's inline RSC flight-data bootstrap (`self.__next_f.push`) in the static-export HTML; Tauri hashes its own injected init scripts on top | measured: the served HTML always carries inline `<script>` payloads and static-export HTML cannot carry nonces (asserted by IN-08 on every run) |
+| `script-src 'wasm-unsafe-eval'` | onnxruntime-web (HWR) and tesseract (OCR) compile WebAssembly at runtime | the two vendored engines; the ONLY eval-adjacent token in the policy — `'unsafe-eval'` is forbidden (the HWR bundle import was refactored off `new Function` in this same PR so no runtime JS compilation happens) |
+| `script-src blob:` | the HWR bundle `transformers.web.bundle.js.gz` is fetched, decompressed and imported as a `blob:` module URL | hwr-client.ts |
+| `style-src 'self' 'unsafe-inline'` | Next CSS files + React inline `style` attributes + Excalidraw's injected `<style>` | measured: inline styles are pervasive in the canvas UI |
+| `img-src 'self' data: blob:` | scene images (stored as `data:` URLs), blob previews when pasting | scene/paste handling |
+| `font-src 'self' data:` | self-hosted Excalidraw fonts under `/excalidraw/`, next/font woff2 | measured in the inventory |
+| `connect-src 'self' ipc: http://ipc.localhost` | model weights + wasm + traineddata + manifest fetches are all same-origin; `ipc:` / `http://ipc.localhost` is the Tauri v2 local IPC endpoint the core always needs (per the Tauri v2 CSP docs) | hwr/ocr clients; Tauri docs |
+| `worker-src 'self' blob:` | pdf.js module worker (`/pdf.worker.min.mjs`); tesseract.js wraps its worker in a `blob:` URL (`new Worker(URL.createObjectURL(...))`, its default `workerBlobURL` behavior) | measured: both constructions occur |
+| `media-src 'self' data: blob:` | audio clips play from `data:audio` payloads (`audioPayloadOf` accepts data URLs only); recorder takes may hand the player a blob | audio-notes.ts |
+| `object-src 'none'`, `base-uri 'self'`, `form-action 'none'` | nothing uses plugins, `<base>`, or forms (the auth/form stack was removed in the #206 audit remediation) | hardening floor |
+
+Notable non-inclusions (deliberate): no `frame-src` (embed iframes of pasted
+links are intentionally blocked — the local-first app renders audio and PDF
+attachments natively), no `upgrade-insecure-requests` (the app never talks
+HTTP to remote hosts), no remote origins anywhere.
+
+The policy applies ONLY to the Tauri desktop shell (Tauri injects it into
+the pages it serves); the web/PWA build is unchanged and keeps its
+response-header hardening from the #206 audit. Unit tests pin the policy's
+shape (`src/lib/__tests__/desktop-config.test.ts`, "desktop CSP" describe
+block); the AppImage evidence is collected in the artifact verification log
+below.
+
 ## Artifact verification log (independent re-checks)
 
 Each release's desktop artifacts are re-verified by downloading them fresh
