@@ -6,23 +6,39 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { lastOutsideFocus } from "@/lib/focus-return"
+import { isStaleDismissal } from "@/lib/dialog-dismiss-guard"
 
 /**
  * Controlled-open note: the app drawer passes `open` from state. On close we
  * immediately clear Radix's inline `pointer-events: none` on <body> — see
  * the Dialog wrapper for the full rationale (first click after close must
  * not die on a pointer-transparent body while the layer exits).
+ * The Sheet root carries the same stale-dismissal guard as the Dialog root
+ * (issue #223): the drawer's 300 ms exit animation keeps its DismissableLayer
+ * armed, and the first click in that window must survive radix's deferred
+ * pointerdown-outside dismissal.
  */
+const SheetOpenedAt = React.createContext<React.RefObject<number> | null>(null)
 function Sheet({
   open,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  const openedAtRef = React.useRef(0)
+  const wasOpenRef = React.useRef(false)
+  React.useLayoutEffect(() => {
+    if (open && !wasOpenRef.current) openedAtRef.current = performance.now()
+    wasOpenRef.current = !!open
+  }, [open])
   React.useEffect(() => {
     if (!open && document.body.style.pointerEvents === "none") {
       document.body.style.pointerEvents = ""
     }
   }, [open])
-  return <SheetPrimitive.Root data-slot="sheet" open={open} {...props} />
+  return (
+    <SheetOpenedAt.Provider value={openedAtRef}>
+      <SheetPrimitive.Root data-slot="sheet" open={open} {...props} />
+    </SheetOpenedAt.Provider>
+  )
 }
 
 function SheetTrigger({
@@ -64,10 +80,12 @@ function SheetContent({
   children,
   side = "right",
   onCloseAutoFocus,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
 }) {
+  const openedAtRef = React.useContext(SheetOpenedAt)
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -86,6 +104,18 @@ function SheetContent({
           className
         )}
         {...props}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (event.defaultPrevented) return
+          // Stale-dismissal guard (issue #223) — see the Dialog wrapper for
+          // the full rationale: a dismissal armed by the closing drawer's
+          // layer (pointerdown predating the open instant) must not kill a
+          // fresh open.
+          const openedAt = openedAtRef?.current ?? 0
+          if (isStaleDismissal(event.detail.originalEvent.timeStamp, openedAt)) {
+            event.preventDefault()
+          }
+        }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
           if (event.defaultPrevented) return

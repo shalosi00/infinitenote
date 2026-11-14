@@ -35,10 +35,13 @@ describe("next.config.ts security headers", () => {
 
   it("locks Permissions-Policy down to the features the app uses", () => {
     expect(cfg).toContain('"Permissions-Policy"');
-    // the audio note recorder needs the microphone — nothing else
+    // the audio note recorder needs the microphone; same-origin unload stays
+    // allowed for Excalidraw's cleanup handler (Chromium 159+ denies it by
+    // default — issue #223)
     expect(cfg).toContain("camera=()");
     expect(cfg).toContain("geolocation=()");
     expect(cfg).toContain("microphone=(self)");
+    expect(cfg).toContain("unload=(self)");
   });
 
   it("serves headers on every path", () => {
