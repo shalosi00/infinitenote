@@ -22,7 +22,11 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "no-referrer-when-downgrade" },
-  { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
+  // `unload=(self)`: the vendored Excalidraw bundle registers an `unload`
+  // cleanup handler; Chromium 159+ denies unload by default and logs a
+  // permissions-policy violation on every page load. Allowing same-origin
+  // unload keeps the intentional cleanup working (issue #223).
+  { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self), unload=(self)" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
 ];
 
