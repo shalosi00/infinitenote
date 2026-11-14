@@ -43,6 +43,68 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-14 (2) — transitive-lockfile security remediation landed on main (#221/#222/#224), bun override semantics measured
+
+- **Task**: continue the deep-and-wide security scan of `main` — the previous
+  cycles' remediation covered GitHub security features and CI; this cycle
+  audited the transitive dependency graph itself and landed the fix on the
+  default branch.
+- **The audit (fresh, tool-independent)**: Dependabot shows 0 open alerts,
+  but it cannot resolve a `bun.lock` v1 transitive graph — its clean state is
+  blind to transitive advisories. Extracted all 1,082 resolved
+  `package@version` pairs and queried the GitHub Advisory DB with
+  server-side `affects=` filtering (the DB Dependabot itself uses), then
+  re-filtered hits against each advisory's own `vulnerable_version_range`:
+  **68 in-range hits on 28 locked versions (0 critical / 43 high / 20
+  medium / 5 low)**. (An OSV.dev batch query was tried first and produced
+  grossly over-matched results — advisories whose fixed/exact versions
+  exclude the queried version — so the Advisory DB is the authoritative
+  source here.)
+- **Remediation mechanics (bun 1.3.14 semantics, all measured)**:
+  hand-edited lockfiles are rejected at `bun install --frozen-lockfile`
+  ("lockfile had changes") even when parent-range-consistent — only
+  bun-generated locks are valid; `bun update` on transitive names
+  materializes them as DIRECT dependencies and crosses majors; bun's
+  non-frozen install re-resolves the whole graph to latest-in-range after a
+  prune or manifest change. The working shape: an overrides block for the
+  15 single-major names (including lodash-es/prismjs/js-yaml, whose parents
+  pin them below their fixes — chevrotain `4.17.21` exact, refractor
+  `~1.27.0`, @mdxeditor/editor `4.1.1` exact) plus exact devDependencies
+  (`brace-expansion 1.1.22`, `minimatch 3.1.5`, `picomatch 4.0.7`,
+  `nanoid 3.3.20`) for the multi-major root copies — bun preserves every
+  parent-constrained nested copy at its own line, so nothing regresses.
+  Scoped overrides (`parent/pkg`) re-pin only EXISTING nested entries and
+  are silently ignored on root-served copies; flat overrides beat scoped
+  ones on shared paths — both measured and avoided.
+- **Collateral regressions found while validating the full-refresh variant
+  (superseded by the overrides shape, recorded in #223)**:
+  `@radix-ui/react-dialog` 1.3.1 broke sync.spec's dialog-open flow (2/2 on
+  CI, 6/6 locally — button `[active]` but dialog never rendered; bisected:
+  pinning 1.1.15 = 2/2 green) and `@playwright/test` 1.65.1 ships Chromium
+  159 which enforces the `unload` permissions policy by default (Excalidraw's
+  cleanup registration trips the console-error guard; the standalone e2e
+  server does not apply `next.config.ts` `headers()`, so a header fix cannot
+  carry CI). Both stay pinned via overrides until #223 lands deliberately.
+  The eslint toolchain bump (8.53→8.72) would have tightened
+  `react-hooks/set-state-in-effect` on three pre-existing files — moot at
+  8.53, kept un-bumped.
+- **Landed**: #222 squash-merged to develop (ed67433) after 5/5 CI checks,
+  issue #221 closed with the remediation record; sync PR #224 merged to
+  main as a merge commit (1d41130) — one CI re-run absorbed the documented
+  HWR-E06 undo-settle flake; sync branch deleted.
+- **Post-merge verification on main**: the Advisory-DB pass re-run on the
+  shipped lockfile — **37 hits remain on 12 versions (26h/9m/2l)**, every
+  one a documented residue (parent-pinned runtime copies nanoid@3.3.3 /
+  @4.0.2, nested build-tool copies brace-expansion/minimatch/picomatch,
+  zod@4.3.5 whose lift is blocked by the dead-chain guard, katex@0.16.x,
+  braces withdrawn advisory, uuid LOW fix=14) — table recorded on #221.
+- **Numbers**: 949/949 unit across 73 files (930 + 20 new bun.lock
+  resolution pins) at lint + tsc clean; 170/170 E2E across four local
+  batches on the shipped tree; 5/5 required checks on both merged heads.
+- **Next**: v1.15.0's #193 real-GPU benchmark stays hardware-blocked; the
+  residue set re-derives from the audit recipe recorded on #221; #223
+  tracks the radix-dialog/playwright upgrades.
+
 ## 2026-11-14 — desktop CSP landed (#218/#207), CodeQL alert triage, DAG-converged sync (#219), dependabot follow-through
 
 - **Task**: drive the open desktop-CSP PR (#218) to green, merge it, close
