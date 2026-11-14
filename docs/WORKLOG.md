@@ -43,6 +43,61 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-14 — desktop CSP landed (#218/#207), CodeQL alert triage, DAG-converged sync (#219), dependabot follow-through
+
+- **Task**: drive the open desktop-CSP PR (#218) to green, merge it, close
+  #207, sync to `main`, and finish the dependabot follow-through left open by
+  the 2026-11-13 security cycle.
+- **CI debugging (3 rounds, all evidence from real runs)**: round 1 failed
+  IN-07 (`web manifest fetched` — the loaded runner recorded a 166-request
+  session with NO `/manifest.webmanifest` fetch; job 131909017729); round 2
+  failed one assertion later (`same-origin image fetched` — `/logo.svg` is
+  only a `sw.js` STATIC_PREFIXES runtime-fill entry, never referenced by the
+  served document, so no page-context image fetch reliably occurs); round 3
+  green (168 passed + 2 retry-absorbed flakes). Fix design: the
+  browser-scheduled fetch families — the web manifest (Chrome's
+  installability manager), the service-worker script revalidation, the
+  favicon set — are asserted at the DOCUMENT level (reference target,
+  served-200 bytes, registered scriptURL), while every app-initiated
+  resource class stays asserted against the recorded request list.
+  `docs/desktop.md` gained the measured note. Lesson: a session-timing
+  assertion is only as strong as the browser's own scheduling of that fetch.
+- **CodeQL triage**: the first-ever open code scanning alert
+  (js/incomplete-multi-character-sanitization, HIGH,
+  src/lib/__tests__/packaging-config.test.ts:19) dismissed via the API as
+  false positive with justification — a test-only XML well-formedness helper
+  parsing the repo's own committed packaging file; no untrusted input, no
+  runtime consumer. Code scanning: 0 open alerts.
+- **Merge + sync**: #218 squash-merged to develop as 30dd95d (5/5 checks
+  green); #207 closed explicitly via API (develop merges do not auto-close).
+  Sync PR #219 hit real merge conflicts (405) — every prior develop→main
+  sync was a squash commit (verified: 5e53e5a is single-parent), so main's
+  DAG lacked develop's tip and the merge-base was stale. New construction:
+  sync branch = origin/develop + `git merge -s ours origin/main` — main's
+  tip becomes an ancestor (current merge-base restored for all future DAG
+  operations) while the TREE stays exactly develop's (asserted:
+  `git diff origin/develop HEAD` empty before push). Merged as merge commit
+  9872e90 after 5/5 checks. main and develop now share identical trees AND
+  ancestry — future syncs merge normally.
+- **Dependabot follow-through**: #210/#211/#213/#214 closed as superseded
+  (the sync landed the same versions as SHA pins), #217 (codeql-action v4
+  major bump, mutable-tag pin) closed as deliberately deferred — a v4 move
+  will be evaluated as its own SHA-pinned PR. Remote branches reduced to
+  exactly main + develop; leftover dependabot branches deleted.
+- **Hygiene**: sandbox-resurrected strays deleted —
+  `public/ocr/lang/eng.traineddata.gz` (caught by the OCR-A03b no-strays
+  guard, which worked as designed) plus one-off probe scripts;
+  `scripts/ghapi.py` added as durable tooling (the token-safe GitHub API
+  helper these cycles use).
+- **Numbers**: 930/930 unit across 72 files (local gate, lint + tsc clean);
+  CI: 170 E2E checks green on the sync head (170 passed, 0 flaky), 5/5
+  required checks on both merged heads.
+- **Next**: v1.15.0 milestone now has exactly one open item — #193's
+  real-GPU benchmark run (blocked on representative hardware; the committed
+  command makes it one run: `HWR_BENCH=1 HWR_BENCH_DEVICE=webgpu bunx
+  playwright test e2e/hwr-bench.spec.ts`). Further candidates come from
+  upcoming cycles per the ROADMAP.
+
 ## 2026-11-13 (2) — deep security scan of main: full remediation landed (#206/#208/#209)
 
 - **Task**: a deep and wide security scan of the `main` branch on GitHub.
