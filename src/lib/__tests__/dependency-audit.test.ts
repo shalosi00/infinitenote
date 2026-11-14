@@ -86,6 +86,7 @@ const FLAT_PINS: Record<string, string> = {
   lodash: "4.18.0",
   "lodash-es": "4.18.1",
   uuid: "11.1.1",
+  "@radix-ui/react-dismissable-layer": "1.2.1",
 };
 
 /** Major-aware pins: each resolved copy must meet its major line's minimum. */
@@ -139,12 +140,39 @@ describe("bun.lock security-audit resolution pins (#221)", () => {
     expect(pkg).toContain('"prismjs": "1.30.0"');
     expect(pkg).toContain('"js-yaml": "4.3.2"');
     // @playwright/test's blocker was UNPINNED by issue #223 (1.65.x shipped
-    // for real); @radix-ui/react-dialog STAYS pinned at 1.1.15 — its 1.3.1
-    // carries three measured regressions against the app (stale deferred
-    // dismissal killing re-opens, Escape swallowed while a just-closed menu's
-    // ghost layer outlives the dialog open, phone drawer content remounting
-    // under the surface sweep), tracked for a deliberate follow-up
-    expect(pkg).toContain('"@radix-ui/react-dialog": "1.1.15"');
+    // for real); @radix-ui/react-dialog's 1.1.15 override was LIFTED by
+    // issue #227 — the root resolution follows the declared range to 1.3.x,
+    // carried by the shipped stale-dismissal guard
+    // (src/lib/dialog-dismiss-guard.ts, unit-pinned in
+    // dialog-dismiss-guard.test.ts). The guard swallows exactly the proven
+    // 1.3.1 regression (deferred pointerdown-outside dismissal arming on
+    // the closing dialog's layer).
+    expect(pkg).not.toMatch(/"@radix-ui\/react-dialog":\s*"1\.1\.15"/);
+    // #227 measured consequence of the lift: react-dialog 1.3.1 pins its own
+    // @radix-ui/react-dismissable-layer@1.2.1 while every popper package
+    // (react-menu 2.1.16, react-popover, react-select, react-hover-card)
+    // keeps a parent-constrained 1.1.11 copy — TWO module instances, TWO
+    // layer stacks. Radix's highest-layer Escape semantics live inside one
+    // instance's stack, so the drawer's 1.2.1 layer (which sees no layer
+    // above it) stole the Escape meant for the page-row menu and
+    // event.preventDefault() poisoned the menu's own 1.1.11 dismissal
+    // (measured 2026-11-15: phone drawer closed under the still-open menu,
+    // multiselect-toggle detaching — live trajectory in PR #227). The
+    // override unifies every copy on 1.2.1: one instance, one stack, the
+    // upstream highest-layer logic works again for Escape, outside
+    // pointerdown AND focus. 1.2.1 exports the same surface the 1.1.11
+    // consumers import (DismissableLayer / Branch).
+    expect(pkg).toContain('"@radix-ui/react-dismissable-layer": "1.2.1"');
+  });
+
+  it("@radix-ui/react-dialog has a 1.3.x+ resolution in the lock graph (issue #227)", () => {
+    const copies = resolved.get("@radix-ui/react-dialog");
+    expect(copies).toBeDefined();
+    // the root copy follows the declared ^1.1.14 range to latest 1.x;
+    // parent-constrained copies (mdxeditor/cmdk chains) resolve per their
+    // own parents. The forced all-copies 1.1.15 override is gone, so at
+    // least one lifted resolution must exist.
+    expect((copies ?? []).some((v) => cmp(v, "1.3.0") >= 0)).toBe(true);
   });
 
   it("the exact devDependencies pin the multi-major root copies", () => {
