@@ -6,6 +6,22 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { lastOutsideFocus } from "@/lib/focus-return"
+import { isStaleDismissal } from "@/lib/dialog-dismiss-guard"
+
+/**
+ * Stale-dismissal guard plumbing (issue #223): the wrapper records the
+ * performance.now() instant of every closed->open transition and hands it to
+ * DialogContent, which swallows pointerdown-outside dismissals whose ORIGINAL
+ * pointerdown predates that instant. Radix 1.3.x (dismissable-layer 1.2.1)
+ * defers an outside dismissal to the click event while the CLOSING dialog's
+ * layer stays armed for the whole exit animation — without the guard, the
+ * Escape->immediate-reopen click arms the stale dismissal and radix's
+ * deferred onDismiss kills the fresh open before it renders (measured: open
+ * false->true, radix onOpenChange(false) 8 ms later, dialog never appears).
+ * A pointerdown that predates the open instant can never belong to this
+ * open, so swallowing it is exact, not a timing heuristic.
+ */
+const DialogOpenedAt = React.createContext<React.RefObject<number> | null>(null)
 
 /**
  * Controlled-open note: every dialog in the app passes `open` from state.
@@ -20,12 +36,25 @@ function Dialog({
   open,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  const openedAtRef = React.useRef(0)
+  const wasOpenRef = React.useRef(false)
+  // Layout effect: runs inside React's discrete-event flush, so the stamp is
+  // committed before radix's deferred dismiss handler can read it in the
+  // same click dispatch.
+  React.useLayoutEffect(() => {
+    if (open && !wasOpenRef.current) openedAtRef.current = performance.now()
+    wasOpenRef.current = !!open
+  }, [open])
   React.useEffect(() => {
     if (!open && document.body.style.pointerEvents === "none") {
       document.body.style.pointerEvents = ""
     }
   }, [open])
-  return <DialogPrimitive.Root data-slot="dialog" open={open} {...props} />
+  return (
+    <DialogOpenedAt.Provider value={openedAtRef}>
+      <DialogPrimitive.Root data-slot="dialog" open={open} {...props} />
+    </DialogOpenedAt.Provider>
+  )
 }
 
 function DialogTrigger({
@@ -67,10 +96,12 @@ function DialogContent({
   children,
   showCloseButton = true,
   onCloseAutoFocus,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const openedAtRef = React.useContext(DialogOpenedAt)
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -81,6 +112,20 @@ function DialogContent({
           className
         )}
         {...props}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (event.defaultPrevented) return
+          // Stale-dismissal guard (issue #223): a dismissal whose original
+          // pointerdown predates this dialog's current open instant was
+          // armed by the CLOSING dialog's still-armed layer and deferred to
+          // this click — swallowing it lets the fresh open survive. Real
+          // dismissals (scrim/outside clicks on an OPEN dialog) always carry
+          // a pointerdown AFTER the open instant and pass through.
+          const openedAt = openedAtRef?.current ?? 0
+          if (isStaleDismissal(event.detail.originalEvent.timeStamp, openedAt)) {
+            event.preventDefault()
+          }
+        }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
           if (event.defaultPrevented) return

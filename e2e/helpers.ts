@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { isIgnoredConsoleError } from "@/lib/e2e-console-ignore";
 
 /** The app only exposes its test hooks under ?e2e=1. */
 export const E2E_BASE = "/?e2e=1";
@@ -44,6 +45,11 @@ export function attachErrorCollector(page: Page): string[] {
   page.on("console", (message) => {
     if (message.type() !== "error") return;
     if (/Download the React DevTools/i.test(message.text())) return; // dev hint, not an app error
+    // Documented browser deprecation notices from vendored third-party code
+    // (see src/lib/e2e-console-ignore.ts for the per-rule justification) —
+    // currently the Chromium 159+ unload-permissions-policy violation for
+    // Excalidraw's own cleanup registration (issue #223).
+    if (isIgnoredConsoleError(message.text())) return;
     // Dev-only Excalidraw font-subset worker construction can hit a
     // SecurityError in the dev bundle (file:/// chunk URL); Excalidraw logs
     // it and falls back to the main thread — functionality is unaffected

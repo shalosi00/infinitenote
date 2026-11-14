@@ -35,6 +35,10 @@
  * - katex@0.16.x: fix 0.18.2 is outside the mermaid chain's ^0.16.x range
  *   (GHSA-238p-pmpm-9mq7, LOW).
  * - braces@3.0.3: the only matching advisory is withdrawn (no fixed release).
+ * - lexical@0.35.0: @mdxeditor/editor's dependency; GHSA-c2hm-mjxv-89r4 (LOW)
+ *   has NO fixed release (patched: None, range <= 6.1.1) — flagged by the
+ *   2026-11-14 #223 audit re-run, previously below the #221 pass's filter
+ *   threshold; re-check when upstream patches.
  */
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -134,9 +138,13 @@ describe("bun.lock security-audit resolution pins (#221)", () => {
     expect(pkg).toContain('"lodash-es": "4.18.1"');
     expect(pkg).toContain('"prismjs": "1.30.0"');
     expect(pkg).toContain('"js-yaml": "4.3.2"');
-    // the measured upgrade blockers stay pinned (issue #223)
+    // @playwright/test's blocker was UNPINNED by issue #223 (1.65.x shipped
+    // for real); @radix-ui/react-dialog STAYS pinned at 1.1.15 — its 1.3.1
+    // carries three measured regressions against the app (stale deferred
+    // dismissal killing re-opens, Escape swallowed while a just-closed menu's
+    // ghost layer outlives the dialog open, phone drawer content remounting
+    // under the surface sweep), tracked for a deliberate follow-up
     expect(pkg).toContain('"@radix-ui/react-dialog": "1.1.15"');
-    expect(pkg).toContain('"@playwright/test": "1.64.1"');
   });
 
   it("the exact devDependencies pin the multi-major root copies", () => {
