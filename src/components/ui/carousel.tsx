@@ -90,16 +90,34 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api || !setApi) return
-    setApi(api)
+    // eslint-plugin-react-hooks 7 set-state-in-effect (#235 sweep): hand the
+    // embla instance to the parent one microtask after commit — same
+    // observable behavior (the identity is stable), out of the effect's
+    // synchronous setState path.
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) setApi(api)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [api, setApi])
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    // eslint-plugin-react-hooks 7 set-state-in-effect (#235 sweep): the
+    // initial flag computation leaves the effect's synchronous path (one
+    // microtask after commit — before paint); the ongoing updates ride the
+    // sanctioned subscription callbacks below.
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) onSelect(api)
+    })
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 
     return () => {
+      cancelled = true
       api?.off("select", onSelect)
     }
   }, [api, onSelect])

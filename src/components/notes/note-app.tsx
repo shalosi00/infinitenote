@@ -124,6 +124,54 @@ const PAPER_STYLE_LABELS: Record<PageBackground, string> = {
   grid: "Grid",
 };
 
+/**
+ * Canvas focus guard for the page-actions menu items (issue #231, measured
+ * 2026-11-15): radix FocusScope restores focus to the menu TRIGGER when the
+ * closed menu's unmount effect flushes - and that flush rides the NEXT
+ * re-render, which can land seconds after the click (measured: the toast
+ * removal render fired it ~4 s after the menu closed). While the steal
+ * holds, every keyboard shortcut aimed at the canvas (Ctrl+Z first of all)
+ * is a no-op - HWR-E06's stuck-at-6 shape, and the same annoyance for real
+ * users. The guard hands focus back to the canvas exactly when the restore
+ * fires: while armed, a focusin on the trigger we used is countered with
+ * one canvas focus. Any user-initiated focus move elsewhere disarms it
+ * early; the window itself outlives the longest conversion/OCR toast plus
+ * the deferred restore flush.
+ */
+function armCanvasFocusGuard(trigger: HTMLElement, windowMs = 6_000): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let armed = true;
+  const disarm = () => {
+    armed = false;
+    if (timer !== undefined) clearTimeout(timer);
+    document.removeEventListener("focusin", onFocusIn, true);
+  };
+  const onFocusIn = (e: FocusEvent) => {
+    if (!armed) return;
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    // focus inside the editor (canvas or its islands) - keep guarding: the
+    // deferred radix restore can still land later and must be countered
+    if (typeof t.closest === "function" && t.closest(".excalidraw")) return;
+    if (t !== trigger) {
+      disarm(); // the user moved focus somewhere else on purpose - respect it
+      return;
+    }
+    // the radix FocusScope restore - hand keyboard focus back to the canvas
+    document.querySelector<HTMLElement>(".excalidraw")?.focus();
+    disarm();
+  };
+  timer = setTimeout(disarm, windowMs);
+  document.addEventListener("focusin", onFocusIn, true);
+  return disarm;
+}
+
+/** Arm the guard against the page-actions trigger's deferred focus restore. */
+function armPageActionsFocusGuard(): void {
+  const trigger = document.querySelector<HTMLElement>('[data-testid="page-actions"]');
+  if (trigger) armCanvasFocusGuard(trigger);
+}
+
 export default function NoteApp() {
   const formatSummary = formatSyncSummary;
   const {
@@ -578,6 +626,7 @@ export default function NoteApp() {
    */
   const handleRunOcr = useCallback(async () => {
     if (ocrRunning) return;
+    armPageActionsFocusGuard();
     const pageId = useAppStore.getState().selection?.pageId;
     if (!pageId || !canvasApi.current) {
       toast.error("Open a page first, then recognize text.");
@@ -622,6 +671,7 @@ export default function NoteApp() {
       }
     } finally {
       setOcrRunning(false);
+      useAppStore.getState().requestCanvasFocus();
     }
   }, [ocrRunning]);
 
@@ -640,6 +690,7 @@ export default function NoteApp() {
    */
   const handleRunHwr = useCallback(async () => {
     if (hwrRunning) return;
+    armPageActionsFocusGuard();
     const pageId = useAppStore.getState().selection?.pageId;
     if (!pageId || !canvasApi.current) {
       toast.error("Open a page first, then recognize handwriting.");
@@ -690,6 +741,7 @@ export default function NoteApp() {
       }
     } finally {
       setHwrRunning(false);
+      useAppStore.getState().requestCanvasFocus();
     }
   }, [hwrRunning]);
 
@@ -705,6 +757,7 @@ export default function NoteApp() {
    */
   const handleConvertHwr = useCallback(async () => {
     if (hwrConverting) return;
+    armPageActionsFocusGuard();
     if (!canvasApi.current) {
       toast.error("Open a page first, then convert handwriting to text.");
       return;
@@ -722,6 +775,11 @@ export default function NoteApp() {
       toast.error("Handwriting conversion failed.");
     } finally {
       setHwrConverting(false);
+      // keyboard determinism (issue #231): after converting from the menu,
+      // the canvas is where the user's next keystroke (undo, draw, type)
+      // belongs - request focus through the store's remount-safe path and
+      // let the focus guard counter radix's deferred trigger restore.
+      useAppStore.getState().requestCanvasFocus();
     }
   }, [hwrConverting]);
 

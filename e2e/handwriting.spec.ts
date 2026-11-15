@@ -229,18 +229,52 @@ test.describe.serial("handwriting: ink becomes searchable", () => {
     // the conversion landed as ONE native scene update — undo must take the
     // page back to ink-only (undo-safety, issue #176). The conversion toast
     // (sonner, bottom-center) lingers ~4 s and holds keyboard focus — let
-    // it detach, then focus the canvas via the hit-tested empty spot
+    // it detach, then focus the canvas via the hit-tested empty spot.
+    // Focus-deterministic (issue #227 CI evidence): a click can lose the
+    // focus race against a just-closed menu's close-focus restore — on the
+    // 2026-11-15 CI reruns activeElement stayed on the menu trigger, every
+    // Ctrl+Z was a no-op and the count stuck at 6. So after the click, WAIT
+    // for activeElement to actually sit inside the editor and re-click if a
+    // restore yanked it back.
     await page
       .locator("[data-sonner-toast]")
       .waitFor({ state: "detached", timeout: 10_000 })
       .catch(() => {});
-    await clickEmptyCanvasSpot();
+    const focusEditor = async (): Promise<void> => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await clickEmptyCanvasSpot();
+        const ok = await page
+          .waitForFunction(
+            () => {
+              const ed = document.querySelector(".excalidraw");
+              return !!ed && ed.contains(document.activeElement);
+            },
+            undefined,
+            { timeout: 1_500 },
+          )
+          .then(() => true)
+          .catch(() => false);
+        if (ok) return;
+      }
+      throw new Error("could not focus the editor — focus was stolen after every click");
+    };
+    await focusEditor();
     await page.keyboard.press("Escape");
-    // a selection-only click must not eat the undo: press Ctrl+Z until the
-    // text is gone (bounded — then the count assertion makes failures loud)
-    for (let i = 0; i < 3 && (await elementCount(page)) !== 5; i++) {
+    // a selection-only click must not eat the undo: press Ctrl+Z and WAIT for
+    // the count to settle at 5 after each press (a fixed 300 ms read raced the
+    // undo landing — a late undo then triggered an extra press that unwound
+    // past the conversion and dropped strokes). Bounded, then the count
+    // assertion makes failures loud.
+    let undone = false;
+    for (let i = 0; i < 3 && !undone; i++) {
       await page.keyboard.press("Control+z");
-      await page.waitForTimeout(300);
+      await expect
+        .poll(() => elementCount(page), { timeout: 2_000, intervals: [100, 250, 500] })
+        .toBe(5)
+        .then(() => {
+          undone = true;
+        })
+        .catch(() => {});
     }
     await expectCount(page, 5);
     expect((await sceneTypes(page))).not.toContain("text");
