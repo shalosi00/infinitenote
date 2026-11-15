@@ -6,14 +6,28 @@
 # - github-actions: the workflows pin third-party actions by SHA; these
 #   weekly PRs move the pins to the latest upstream release so they never
 #   silently rot.
+#
+# Groups (adopted from the major-repo practice of batching automated bumps):
+# npm minor+patch land as ONE monthly PR — majors stay individual because
+# they need real migration attention; all action-pin moves land as ONE
+# weekly PR so SHA rotation is reviewed as a set.
 version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      action-pins:
+        patterns:
+          - "*"
