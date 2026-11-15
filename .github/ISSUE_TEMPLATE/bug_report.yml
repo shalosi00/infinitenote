@@ -1,0 +1,85 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug. If the console shows errors (F12 → Console), paste them here.
+      placeholder: The app did X when I did Y.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-you-expected
+    attributes:
+      label: What you expected
+      placeholder: I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that triggers it. A notebook/page/action trace helps a lot.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux (browser / PWA)
+        - Android (browser / PWA / TWA)
+        - Desktop (Tauri build)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser + version
+      description: Skip if you used the Tauri desktop build.
+      placeholder: e.g. Firefox 141, Chrome 130
+
+  - type: dropdown
+    id: pwa
+    attributes:
+      label: Installed as PWA?
+      options:
+        - "Yes — installed"
+        - "No — running in a browser tab"
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: See About / release inside the app, or the release notes on GitHub.
+      placeholder: e.g. v1.14.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots / console output
+      description: Optional — devtools console errors and screenshots speed up diagnosis a lot.
+
+  - type: dropdown
+    id: parity
+    attributes:
+      label: OneNote behavior regression?
+      description: |
+        Is this something OneNote does correctly but InfiniteNote gets wrong?
+        Parity is a project goal, so this helps triage.
+      options:
+        - "No — plain bug"
+        - "Yes — OneNote handles this correctly"

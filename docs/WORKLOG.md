@@ -43,7 +43,46 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
-## 2026-11-15 (3) — audit verification cycle: every audit claim independently re-verified, `scripts/audit-lockfile.py` shipped (#238)
+## 2026-11-15 (4) — community practices adopted from the comparable majors (#241)
+
+- **Task**: "look at other major repos and learn from them" — surveyed the five
+  comparable note/whiteboard majors via the GitHub API (read-only helper, token
+  from the origin remote at runtime): Excalidraw 135.7k★, AppFlowy 78.9k★,
+  AFFiNE 74.5k★, Joplin 57.2k★, Logseq 45.6k★. Digest: what each ships for
+  SECURITY.md / CoC / issue templates / dependabot / changelogs.
+- **Measured pattern**: every comparable that has issue templates uses YAML
+  **forms** (none markdown); SECURITY.md on Joplin + AFFiNE, both anchored on
+  GitHub private vulnerability reporting; CoC on Logseq (custom) + AppFlowy
+  (Contributor Covenant 1.4); copilot-instructions.md on Excalidraw; batched
+  dependency bumps on AFFiNE (renovate groups). 3 of 5 have no root CHANGELOG
+  and rely on Releases — matches our setup (v1.12–v1.14 release bodies exist).
+- **Adopted in #241**: SECURITY.md (Joplin pattern, threat-model exclusions
+  adapted to local-first: DoS-via-imported-content, physically-local attacks,
+  plain data at rest, dependency advisories → upstream; channel = private
+  vulnerability reporting, already enabled — re-verified via API before
+  writing it); CODE_OF_CONDUCT.md (Contributor Covenant **2.1**, current
+  version); issue forms bug_report.yml + feature_request.yml + config.yml
+  (OneNote-parity question preserved as a dropdown — it is our triage edge);
+  .github/copilot-instructions.md (points Copilot at AGENTS.md's read order);
+  dependabot groups (npm minor+patch one monthly PR, action-pins one weekly PR).
+- **Bugs the research surfaced in OUR files (all fixed in #241, all measured)**:
+  CONTRIBUTING told contributors to run `bun run db:generate` — the script has
+  not existed since v1.1 removed the server DB; test counts were stale and
+  mutually contradictory (README said 858 unit / 156 e2e, PR template 34,
+  AGENTS.md "7 files, 24 checks") — re-measured: 961 unit / 75 files
+  (`bun test`), 171 e2e checks / 39 files (`playwright test --list`).
+- **Deliberate non-adoption**: CHANGELOG.md (Releases carry the notes);
+  FUNDING.yml (no funding channel set up — adding an empty one would be
+  noise); renovate (dependabot already covers both ecosystems with SHA-pin
+  rotation; a second bot is not worth the config surface for a solo
+  maintainer).
+- **Community health**: 71% before (GitHub API: `code_of_conduct: null`,
+  `issue_template: null` — markdown templates did NOT count); re-measured
+  after the sync to main lands, target ≥ 90%.
+- **State after merge #241 (squash `01ad75a`)**: develop clean, 3/3 required
+  checks green on the PR, remote branches main + develop only (auto-delete
+  handled the PR head).
+
 
 - **Task**: the standing "deep and wide security scan of main" instruction, taken one step further than the previous cycle — instead of re-running the scan from scratch, the cycle **independently re-verified every claim** in `docs/SECURITY_AUDIT_2026-11-15.md` against live sources, with fresh measurements (never the prior cycle's numbers).
 - **History re-scan (clean, fresh numbers)**: 165 commits / 2,166 unique blobs (vs the audit's 157/1,346 — main had absorbed the #232 sync) scanned with a re-implemented 14-pattern credential sweep. Live token: **absent from every blob** (byte-level search over all payloads). Hits: only the two documented false-positive classes — `AKIA…` byte noise inside the vendored Tesseract WASM payloads (9 hits, all in blobs `98e27db…`/`9dae061…`, contexts are compiled-WASM garbage) and `user:TOKEN@github.com`-shaped docstring/comment placeholders (5 hits, all in the scanner scripts and the audit report itself).
