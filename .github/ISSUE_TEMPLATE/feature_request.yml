@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an idea for InfiniteNote
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What can't you do today, or what is painful? Describe your actual use case, not just the feature.
+      placeholder: When I take lecture notes I need to …
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work? Sketches and screenshots help.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use today, or other apps that solve it.
+
+  - type: dropdown
+    id: parity
+    attributes:
+      label: OneNote parity?
+      description: |
+        Is this behavior you miss from OneNote? Parity is a project goal —
+        say so and reference how OneNote does it in the fields above.
+      options:
+        - "Yes — OneNote behavior I miss"
+        - "No — new capability beyond OneNote"
+    validations:
+      required: true

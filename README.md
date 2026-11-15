@@ -125,6 +125,16 @@ InfiniteNote is local-first by architecture, not by policy checkbox:
 - Sync is a folder you point the app at (your own disk, your own cloud drive);
   backups are plain files you can inspect.
 
+## Security
+
+Security findings are welcome and handled privately — report through
+[private vulnerability reporting](https://github.com/shalosi00/infinitenote/security/advisories/new),
+never in a public issue. The [security policy](SECURITY.md) spells out scope,
+the threat model of a local-first app and the reporting rules; the repo runs
+CodeQL, secret scanning with push protection and Dependabot on every push,
+and the measured posture is documented in the
+[security audit](docs/SECURITY_AUDIT_2026-11-15.md).
+
 ## Install
 
 ### Linux desktop (AppImage / .deb / .rpm)
@@ -213,9 +223,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server (`http://localhost:3000`) |
-| `make test` | Unit tests (858, bun test) |
+| `make test` | Unit tests (961, bun test) |
 | `make lint` / `make typecheck` | ESLint / TypeScript check |
-| `bunx playwright test` | Playwright E2E suite (156 checks; boots the app automatically) |
+| `bunx playwright test` | Playwright E2E suite (171 checks; boots the app automatically) |
 | `make build` / `make start` | Production build / boot the standalone server |
 | `make status` | Quick "where do things stand" snapshot |
 

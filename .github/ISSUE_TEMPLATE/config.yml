@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/shalosi00/infinitenote/security/advisories/new
+    about: Report privately via GitHub security advisories — never in a public issue. See SECURITY.md.
+  - name: Roadmap & planned work
+    url: https://github.com/shalosi00/infinitenote/blob/main/docs/ROADMAP.md
+    about: Check what is already planned before filing a feature request.
+  - name: Migrating from OneNote
+    url: https://github.com/shalosi00/infinitenote/blob/main/docs/onenote-migration.md
+    about: Import guide for OneNote notebooks — read this first if your import did not behave as expected.
+  - name: How the app is built
+    url: https://github.com/shalosi00/infinitenote/blob/main/docs/ARCHITECTURE.md
+    about: Architecture, module map and data flow — useful context for both bugs and proposals.

@@ -45,7 +45,7 @@ Follow this guide to work effectively without wasting context reading the whole 
 - The app exposes test hooks **only** when loaded with `?e2e=1`:
   `window.__NOTE_E2E__` (scene/element accessors) and `window.__NOTE_RESET__()`
   (hard data reset for deterministic runs).
-- `e2e/` holds the Playwright specs (7 files, 24 checks); fixtures live in
+- `e2e/` holds the Playwright specs (39 files, 171 checks); fixtures live in
   `e2e/fixtures/`. Every spec resets its own browser context (isolated
   IndexedDB) via `resetToSeed()` in `e2e/helpers.ts`, so spec files run fully
   parallel.
