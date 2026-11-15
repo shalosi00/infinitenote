@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-858%20unit%20%2B%20156%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-983%20unit%20%2B%20175%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -63,7 +63,9 @@ and sync yourself. No account, no telemetry, no lock-in.
 - **Tags** — label pages, filter the sidebar by tag, find them via search.
 - **Quick notes** — `Ctrl/Cmd+Alt+N` (or the sidebar button) drops a dated page
   into an auto-created *Quick Notes* notebook; the pinned **Today** entry opens
-  (or creates) today's daily page and reuses it all day.
+  (or creates) today's daily page and reuses it all day. Installed as a PWA,
+  InfiniteNote also appears in your OS share sheet — shared links, text and
+  files land as quick notes.
 - **Multi-select** — check off many pages in the sidebar, then move them to any
   section or delete them in one go (cross-notebook moves included).
 - **Keyboard shortcuts** — press `?` for the built-in, platform-aware cheatsheet.

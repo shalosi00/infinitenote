@@ -102,6 +102,13 @@ import {
   pickRecorderMimeType,
   recorderExtensionForMime,
 } from "@/lib/audio-notes";
+import {
+  drainSharedEntries,
+  isEmptyShare,
+  sharedEntryToFiles,
+  sharePageTitle,
+} from "@/lib/share-inbox";
+import { quickNoteTitle } from "@/lib/quick-notes";
 
 /** Result summary for an export-only round (no merge happened). */
 const NO_CHANGES_SUMMARY: SyncSummary = {
@@ -123,6 +130,13 @@ const PAPER_STYLE_LABELS: Record<PageBackground, string> = {
   ruled: "Ruled",
   grid: "Grid",
 };
+
+/**
+ * Share-target drain runs exactly once per app session (issue #247) —
+ * StrictMode double-mounts and tree refreshes must not re-drain; a reload
+ * after a fresh share starts a new session and drains again.
+ */
+let shareDrainStarted = false;
 
 /**
  * Canvas focus guard for the page-actions menu items (issue #231, measured
@@ -360,6 +374,55 @@ export default function NoteApp() {
   }, [load]);
 
   usePWA();
+
+  // Web Share Target drain (issue #247): the OS share sheet POSTs to
+  // /share-target, the service worker stashes the payload in the mailbox
+  // and redirects here; once the tree is loaded, each entry lands as a
+  // Quick Notes page through the regular import pipeline. StrictMode-safe
+  // via the module-level single-flight guard; a failed drain never blocks
+  // boot (drainSharedEntries already swallows mailbox errors to []).
+  useEffect(() => {
+    if (!loaded || shareDrainStarted) return;
+    shareDrainStarted = true;
+    void (async () => {
+      try {
+        const entries = await drainSharedEntries();
+        const capturable = entries.filter((entry) => !isEmptyShare(entry));
+        if (!capturable.length) return;
+        let captured = 0;
+        for (const entry of capturable) {
+          const apiBefore = canvasApi.current;
+          await useAppStore.getState().createQuickNote({
+            title: sharePageTitle(entry, quickNoteTitle()),
+          });
+          // createQuickNote selected a NEW page id, so CanvasEditor remounts
+          // (key = page id) and swaps the api ref — wait for the fresh canvas
+          // so the files never land on the detached scene (issue #94 lesson)
+          const deadline = Date.now() + 10_000;
+          while (Date.now() < deadline) {
+            const api = canvasApi.current;
+            if (api && api !== apiBefore) break;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          const api = canvasApi.current;
+          if (!api || api === apiBefore) {
+            toast.error("Could not open a page for the shared content.");
+            continue;
+          }
+          const files = sharedEntryToFiles(entry);
+          if (files.length) await api.importFiles(files);
+          captured += 1;
+        }
+        if (captured) {
+          toast.success(
+            `Captured ${plural(captured, "1 shared item", "# shared items")} into Quick Notes.`
+          );
+        }
+      } catch (err) {
+        console.error("share-target drain failed:", err);
+      }
+    })();
+  }, [loaded]);
 
   // Test hook — full data reset for E2E runs (?e2e=1 + development only,
   // issue #102: the destructive backdoor must never ship in prod bundles)
