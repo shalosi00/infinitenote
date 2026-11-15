@@ -98,8 +98,21 @@ Shipped remediation (same-day PR, then synced to main):
 | minimatch (10.x line) | 10.2.6 | 10.2.6 — **documented accepted risk** | upstream-blocked (typescript-eslint 8.72.2 still pins `^10.2.2`; advisory fixed in 11.0.1; forcing 11 would break eslint's CJS chain). Revisit on the next typescript-eslint bump. |
 
 Post-fix `bun audit`: **1 vulnerability (1 moderate)** — the documented
-minimatch residue above. The repo's own `scripts/audit-lockfile.py` Advisory-DB
-cross-check runs in the sweep's CI gate.
+minimatch residue above. The Advisory-DB cross-check behind the #221 recipe
+ships as `scripts/audit-lockfile.py` (extract bun.lock pairs → server-side
+`affects=` filtering → in-range re-filter); it is a local gate command
+(`python3 scripts/audit-lockfile.py`), NOT a CI step — required CI stays
+lint-typecheck-test / e2e / build-smoke, and ongoing dependency protection in
+CI comes from Dependabot alerts + Dependabot security updates. Measured
+Advisory-DB view on the swept lockfile: **3 documented residues, 0 new
+findings** — minimatch@10.2.6 (moderate, upstream-blocked), braces@3.0.3
+(advisory withdrawn, no fixed release — #221 policy), uuid@11.1.1 (LOW,
+fix=14.0.0 major bump — #221 documented residue). `bun audit` sees only the
+minimatch one because the braces advisory is withdrawn and the uuid advisory
+is marked duplicate by GitHub. Correction history: an earlier revision of
+this report said the script "runs in the sweep's CI gate"; that was wrong —
+the sweep ran it in the sandbox, the script itself was only committed later
+(verified: `git log --all` empty for the path before the commit).
 
 ## 6. Environment hygiene
 
