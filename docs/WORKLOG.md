@@ -43,7 +43,29 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
-## 2026-11-15 (4) — community practices adopted from the comparable majors (#241)
+## 2026-11-15 (5) — community-health 100% measured; first grouped dependabot PR handled (#244)
+
+- **Community health re-measured** (the (4) entry's follow-up): GitHub
+  community profile on main after the #243 sync — **100%** (was 71%);
+  `code_of_conduct` now credited. Noted quirk: the profile's `issue_template`
+  field still reads null even with valid YAML forms — GitHub's scoring no
+  longer keys on that field (the percentage is 100 with it null), so the
+  forms are simply accepted as working; issue creation on the repo now offers
+  the two forms plus the contact links.
+- **First grouped dependabot PR (#244)** — the #241 `groups` config doing
+  exactly what it was designed for: 4 action-pin moves in ONE PR (codeql
+  init/autobuild/analyze v3 -> v4.39.3 + rust-cache within v2) instead of
+  four separate PRs (the pre-groups cadence was one PR per action).
+- **v3 -> v4 major reviewed, not blind-merged**: the breaking changes in the
+  v4 release notes are CodeQL **bundle-version floors** (min bundle 2.20.7,
+  bundle ≤2.22.3 discontinued) — internal to the action, not input-surface
+  changes; our workflows use plain init/autobuild/analyze with no exotic
+  `with:` inputs. Decisive evidence: the PR's own CodeQL + Analyze checks
+  executed WITH the new pins and passed (5/5 green on head 5e9c802).
+- **Pipeline handling**: retargeted #244 from main to develop (the #216
+  precedent — dependabot defaults to the default branch, our convention is
+  develop-first), squash-merged as 4e2aa5c, then synced to main.
+
 
 - **Task**: "look at other major repos and learn from them" — surveyed the five
   comparable note/whiteboard majors via the GitHub API (read-only helper, token
