@@ -43,6 +43,75 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-16 — web share target: OS share-sheet capture into Quick Notes (#247, #248)
+
+- **Task**: continue the autonomous cycle. With #193 hardware-blocked and the
+  roadmap backlog empty, the cycle mined the majors research (#241) one level
+  deeper — repo practices were adopted there, but PRODUCT parity was never
+  systematically extracted. OneNote's "Send to OneNote" / Joplin's Android
+  share receiver are the classic capture path, and the app had nothing:
+  `public/manifest.webmanifest` had no `share_target` key and the SW fetch
+  handler returned early on every non-GET (both verified on
+  `origin/develop` @ `ecdc1e5`). Filed as issue #247.
+- **The chain**: manifest declares POST multipart `/share-target` (params
+  title/text/url + files, accept exactly the four classes `classifyFile`
+  lands: image/*, audio/*, application/pdf, text/*) → the service worker
+  intercepts the POST BEFORE the GET fast-path, stashes the payload in a
+  raw-IndexedDB mailbox (`infinitenote-share-inbox`, outside Dexie — the SW
+  must write before the app ever boots) and answers `303 -> /` (a
+  parse/stash failure still redirects — never strand the user) → on boot the
+  app drains the mailbox atomically (read + clear in ONE readwrite
+  transaction: two open tabs can never double-import) and lands each share
+  as a Quick Notes page through the regular `CanvasApi.importFiles`
+  pipeline, waiting for the page-remount canvas swap (the #94 lesson).
+- **Semantics, each a deliberate decision**: shared title -> page title
+  (trimmed, hard-capped at 80 chars so a 10k-char share title cannot blow
+  the sidebar layout); body = shared text + url composed as two paragraphs
+  (a URL-only share still captures the link); title-only shares still
+  produce a titled empty page (OneNote behavior — a share produces a page);
+  files pass through with NO mailbox-side MIME filter (unknown types hit the
+  existing "unsupported type" toast — lossless by construction);
+  `createQuickNote` gained an optional `{ title }`, the sidebar/shortcut
+  path unchanged.
+- **The SW is a standalone classic script** (no bundler), so it MIRRORS the
+  share-inbox constants and entry shape inline — drift is pinned shut by
+  unit tests that parse `public/sw.js`, `public/manifest.webmanifest` and
+  `public/share-target/index.html` and assert they agree with the app module
+  (interceptor before the GET fast-path, same DB/store/field names,
+  `Response.redirect("/", 303)`, accept list exactly the four safe classes,
+  fallback page present).
+- **Measured (all real runs)**: local gate lint + tsc clean; 983/983 unit
+  across 76 files (+22 in `share-inbox.test.ts`: composition helpers,
+  fake-indexeddb mailbox incl. malformed-row defense and File-blob integrity
+  through the structured clone, cross-file pins); 4/4 new E2E checks in
+  `e2e/share-target.spec.ts` — the page is SW-controlled exactly like an
+  installed PWA, the spec POSTs multipart through the registered service
+  worker and asserts the captured page: link+text capture with composed body,
+  shared PNG -> image element, URL-only -> dated fallback title, two stashed
+  shares -> two pages in order; suite totals now 175 checks / 40 files;
+  5/5 CI check-runs green on the PR head `14b3dbd`.
+- **Two measured E2E facts worth keeping**: (1) after a SW-synthesized
+  `Response.redirect`, the page-side `res.redirected` stays FALSE — the 303
+  happens inside the SW event, not in the page's fetch redirect chain
+  (assert on status 200 + final URL pathname instead; the interception proof
+  is the captured page itself). (2) bun's `File` constructor normalizes
+  `text/plain` to `text/plain;charset=utf-8` while browsers keep the passed
+  type verbatim — unit assertions must not pin the exact type string.
+- **Stale-count residue fixed with measured values**: README badge still
+  read 858/156 (the #241 count sweep updated the prose but missed the badge)
+  and PROJECT_STATUS's Totals line still read 564/152 — both now 983/175;
+  AGENTS.md 39/171 -> 40/175; PR template 171 -> 175.
+- **Pipeline**: PR #248 (branch `feat/share-target` off `origin/develop`,
+  squash-merged as `9948b49`); issue #247 closed by API with the full
+  summary ('Closes #N' in a squash commit on develop does not auto-close —
+  the standing hazard). Local HEAD was snapped back to stale main twice
+  mid-cycle (staging/apply.sh absorbed both); Playwright's chromium cache
+  was wiped once (`bunx playwright install chromium` per the runbook).
+- **Next**: #193 stays hardware-blocked (real-GPU HWR benchmark);
+  develop->main sync PR lands this cycle; further product-parity candidates
+  from the majors (whole-section/notebook PDF export, search scoping) for
+  upcoming cycles.
+
 ## 2026-11-15 (5) — community-health 100% measured; first grouped dependabot PR handled (#244)
 
 - **Community health re-measured** (the (4) entry's follow-up): GitHub

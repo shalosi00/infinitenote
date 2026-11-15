@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Web Share Target fallback (issue #247).
+
+  The manifest declares POST /share-target; the service worker intercepts
+  that POST before the network, so in the normal (installed-PWA) case this
+  page is never served. It only exists so an un-controlled edge (share
+  fired before the SW registered on a brand-new install) lands the user
+  back in the app instead of on a 404 — the POST body is lost in that
+  edge, which is unavoidable without an SW. Meta-refresh only: the app's
+  CSP may forbid inline scripts on this path.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InfiniteNote</title>
+    <meta http-equiv="refresh" content="0;url=/" />
+  </head>
+  <body>
+    <p><a href="/">Open InfiniteNote</a></p>
+  </body>
+</html>
