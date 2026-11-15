@@ -64,8 +64,9 @@ interface AppStore {
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
 
-  /** OneNote-style quick capture (issue #19). */
-  createQuickNote: () => Promise<void>;
+  /** OneNote-style quick capture (issue #19); opts.title names the page
+   * (Web Share Target captures, issue #247) instead of the dated default. */
+  createQuickNote: (opts?: { title?: string }) => Promise<void>;
   openTodayPage: () => Promise<void>;
   /** Monotonic counter — the canvas focuses itself whenever it changes. */
   canvasFocus: number;
@@ -283,12 +284,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
    * section (bootstrapped on first use), title stamped with today's date,
    * then select it so the user lands on a ready-to-type canvas.
    */
-  createQuickNote: async () => {
+  createQuickNote: async (opts?: { title?: string }) => {
     const home = await db.ensureQuickNotesHome(
       generatedNames().quickNotesNotebook,
       generatedNames().quickNotesSection
     );
-    const page = await db.createPage(home.section.id, quickNoteTitle());
+    const page = await db.createPage(
+      home.section.id,
+      opts?.title?.trim() || quickNoteTitle()
+    );
     await get().refresh();
     set((s) => ({
       selection: {
