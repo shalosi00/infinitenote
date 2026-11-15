@@ -841,8 +841,18 @@ export function convertHandwritingToText(
   // convertible again.
   api.updateScene({
     elements: [...api.getSceneElements(), ...created] as ExcalidrawElement[],
+    // Deselect on purpose (issue #231): selecting the freshly created text
+    // mounts Excalidraw's "Selected shape actions" panel and races the
+    // canvas for keyboard focus — on CI reruns every Ctrl+Z then landed in
+    // the panel/trigger instead of the canvas undo stack and the element
+    // count stuck at the pre-undo number (measured 2026-11-15: three
+    // presses no-op, selection shows the converted text, panel mounted).
+    // The converted scene deselects itself: the toast reports the outcome,
+    // and canvas undo becomes deterministic (HWR-E06). The selection rides
+    // the same native scene update, so the undo grouping (one IMMEDIATELY
+    // entry) is untouched.
     appState: {
-      selectedElementIds: Object.fromEntries(created.map((e) => [e.id, true])),
+      selectedElementIds: {},
     },
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   });
