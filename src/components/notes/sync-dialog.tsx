@@ -91,7 +91,12 @@ export function SyncDialog({ onRunSync }: SyncDialogProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setSummary(null);
+    // eslint-plugin-react-hooks 7 set-state-in-effect (#235 sweep): the
+    // reset leaves the effect's synchronous path; it still runs before the
+    // async handle load resolves, so no stale summary can flash.
+    queueMicrotask(() => {
+      if (!cancelled) setSummary(null);
+    });
     (async () => {
       const handle = await loadSyncFolderHandle();
       if (cancelled) return;
