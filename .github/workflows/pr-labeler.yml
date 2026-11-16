@@ -1,0 +1,38 @@
+# Path-based PR labeling — every PR gets area/docs/deps labels from the
+# files it touches.
+#
+# Adopted from the comparable majors — Logseq (`pr-labeler.yml`) and AFFiNE
+# (`auto-labeler.yml`) both run a path-based labeler. Consistent labels make
+# the release digests and future release automation mechanical instead of
+# hand-curated (today only dependabot labels its own PRs).
+#
+# Triggered on pull_request (NOT pull_request_target) — a repo-wide
+# security invariant (no pull_request_target anywhere; audited
+# 2026-11-15). Labeler only writes labels; all branches are same-repo, so
+# the fork-approval nuance of pull_request does not apply.
+#
+# All labels in .github/labeler.yml pre-exist in the repo (v7 does not
+# create them) — verified via the API on 2026-11-16.
+#
+# Non-required check; least privilege (write is scoped to pull-requests).
+name: PR labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  label:
+    name: label from changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Third-party actions are SHA-pinned (mutable tag pins are a
+      # supply-chain risk); dependabot's github-actions ecosystem keeps the
+      # pins updated. No checkout needed — the labeler reads the config
+      # and the changed files through the GitHub API.
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          configuration-path: .github/labeler.yml

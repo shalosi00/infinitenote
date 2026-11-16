@@ -1,0 +1,56 @@
+# Path → label mapping for the PR labeler workflow (actions/labeler v7
+# schema). Every label here pre-exists in the repo (labeler v7 does not
+# create labels — pre-creating them avoids granting the workflow
+# `issues: write`); existence verified via the API on 2026-11-16.
+#
+# Deliberately conservative: only map globs that are unambiguous today.
+# Ambiguous surfaces (e.g. src/lib modules that span UI and data) stay
+# unlabeled for human triage rather than risk wrong labels.
+
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: .github/**
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - '**/*.md'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - package.json
+          - bun.lock
+          - '**/Cargo.toml'
+          - '**/Cargo.lock'
+          - '**/*.gradle*'
+          - '**/tauri.conf.json'
+
+area:ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/components/**
+          - src/app/**
+          - src/hooks/**
+
+area:canvas:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/components/notes/*canvas*.tsx
+
+area:data:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/lib/notes-db.ts
+          - src/lib/sync/**
+          - src/lib/version-history.ts
+          - src/lib/share-inbox.ts
+
+area:import:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/lib/*-import.ts
+          - src/lib/import-*.ts
+          - src/lib/pdf-*.ts
+          - src/lib/export-*.ts
