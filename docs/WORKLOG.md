@@ -43,6 +43,67 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-16 (2) — PR-hygiene adoption from the majors, wave 2 (#251, #252)
+
+- **Task**: continue the standing "look at other major repos and learn
+  from them" directive. Wave 1 (#241) covered community health (SECURITY.md,
+  CoC, issue forms, dependabot groups); this cycle surveyed the **PR-hygiene
+  engineering practices** — the five comparables' `.github/workflows`
+  inventoried directly through the GitHub API (contents endpoint, 2026-11-16):
+  Excalidraw (`semantic-pr-title.yml`, `size-limit.yml`, `cancel.yml`), Joplin
+  (`check-pr-title.yml`, `close-stale-issues.yml`, `automerge.yml`),
+  Logseq (`pr-labeler.yml`, `stale-issues.yml`), AppFlowy (`commit_lint.yml`),
+  AFFiNE (`auto-labeler.yml`, `pr-title-lint.yml`).
+- **Verdict per practice**: PR-title gating (3/5 majors) → adopted;
+  path-based PR labeling (2/5) → adopted; redundant-CI cancellation
+  (Excalidraw `cancel.yml`) → **already present** (ci.yml's concurrency
+  block implements the same pattern — verified, no change); stale-issue
+  handling → skipped (one open issue — automation would be noise);
+  bundle-size enforcement (Excalidraw `size-limit.yml`) → deferred (needs
+  its own measured-budget cycle).
+- **PR-title check**: the validator lives in `src/lib/pr-title.ts` and the
+  workflow (`.github/workflows/pr-title.yml`) runs the same module its unit
+  tests pin — `bun src/lib/pr-title.ts` with the title in `PR_TITLE` (env,
+  never argv, so quotes/leading dashes cannot break the shell). 11
+  Conventional-Commit types, optional lowercase scope, breaking `!` marker,
+  single-line + 4-char-subject floors; 30 new unit tests whose positives are
+  REAL merged-PR titles queried from the repo's API (no invented data).
+  docs/PIPELINE.md already mandated conventional titles and every merged PR
+  to date conforms — this enforces the existing practice (Excalidraw/
+  Joplin/AFFiNE pattern).
+- **Path labeler**: `.github/workflows/pr-labeler.yml` + `.github/labeler.yml`
+  on actions/labeler **v7.0.0** (SHA-pinned `bf12e9b`; dependabot's weekly
+  action-pins group keeps it current). Runs on `pull_request` only (never
+  `pull_request_target` — repo-wide invariant, audited 2026-11-15); no
+  checkout (labeler reads via the API); permissions scoped to
+  `pull-requests: write` — no `issues: write` because v7 does not create
+  labels and all 7 mapped labels pre-exist (API-verified 2026-11-16):
+  `github_actions` (`.github/**`), `documentation` (`docs/**`, `**/*.md`),
+  `dependencies` (package.json/bun.lock/Cargo/gradle/tauri.conf.json),
+  `area:ui` (src/components + src/app + src/hooks), `area:canvas`
+  (src/components/notes/*canvas*), `area:data` (notes-db/sync/version-history/
+  share-inbox), `area:import` (*-import/import-*/pdf-*/export-*). Deliberately
+  conservative — ambiguous surfaces stay unlabeled for human triage.
+- **Self-verification on PR #251 itself (actual runs)**: the new
+  `conventional-commit title` check ran and succeeded against the PR's own
+  title; the labeler labeled the PR `['documentation', 'github_actions']` —
+  exactly what its globs predict for that diff. All 3 required checks + CodeQL
+  green on the head sha before the squash-merge (7edc579); sync PR #252
+  merge-commit landed 37dc531.
+- **Bonus fix**: docs/PIPELINE.md still claimed "75 unit tests" and
+  "(24 checks)" — stale numbers the #241 count sweep missed. Re-measured and
+  corrected to 1013 unit / 77 files + 175 e2e / 40 files; PIPELINE.md also
+  documents the two new checks and the auto-labeling triage note.
+- **Environment lesson re-confirmed**: the sandbox reverted the working tree
+  MID-CYCLE again (local `e2e/share-target.spec.ts` vanished between calls
+  while `origin/develop` still had it — the first `playwright --list` therefore
+  printed 171/39 from the stale tree). apply.sh's re-sync fixed it; counts
+  re-measured in the same shell call as the sync (175/40). Never measure on
+  a tree you did not re-sync in the same invocation.
+- **Totals (actual runs this cycle)**: `bun test ./src/lib/__tests__` =
+  1013 pass / 0 fail across 77 files; `bunx playwright test --list` = 175
+  tests in 40 files.
+
 ## 2026-11-16 — web share target: OS share-sheet capture into Quick Notes (#247, #248)
 
 - **Task**: continue the autonomous cycle. With #193 hardware-blocked and the
