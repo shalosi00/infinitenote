@@ -1,0 +1,12 @@
+{
+  "clientJsTotalKib": 10400,
+  "measured": {
+    "on": "2026-11-16",
+    "commit": "7b24224b738fad439413e5ea7d573404c74c1336",
+    "clientJsTotalKib": 9909.1,
+    "clientJsFiles": 173,
+    "largestChunkKib": 1776.7,
+    "largestChunk": ".next/static/chunks/120a652c.ac31f4b12d5c5200.js"
+  },
+  "policy": "Budget = the measured develop-tip build + ~5% headroom (10,400 KiB vs 9,909.1 KiB measured). The metric is every .js file under .next/static/chunks/ — the full client payload (initial + lazy) of the PWA. The budget may only move through a NEW measurement recorded here (validateBudgetConfig rejects a ceiling more than 20% above the recorded measurement, so a failing check cannot be silenced by cranking the number). The check is non-required by design: it makes regressions visible in the PR check list, it does not gate merges. Practice adopted from Excalidraw's size-limit workflow (majors-research wave 3)."
+}

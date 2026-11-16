@@ -1,0 +1,46 @@
+# Bundle-size guard — the majors-research practice adopted from Excalidraw's
+# `size-limit.yml` (wave 3 of the "learn from the majors" directive;
+# deferred from wave 2 until a real measured budget existed — this workflow
+# is that measured-budget cycle).
+#
+# Measures every .js file the production build emits under
+# .next/static/chunks/ and compares the total against the committed budget
+# in scripts/size-budget.json (measured 2026-11-16 at develop 7b24224:
+# 9,909.1 KiB across 173 files -> budget 10,400 KiB, ~5% headroom).
+#
+# NON-required check: over budget => the run goes red and the job summary
+# shows the numbers, but it cannot block a merge. Budgets move only through
+# a new measurement recorded in the budget file (the validator rejects a
+# ceiling more than 20% above the recorded measurement).
+name: Bundle size
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  size-report:
+    name: size-report
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are SHA-pinned (mutable tag pins are a
+      # supply-chain risk); dependabot's github-actions ecosystem keeps the
+      # pins updated. Same pins as ci.yml.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Production build (standalone)
+        # same retry belt-and-braces as the build-smoke check
+        run: bun run build || bun run build || bun run build
+
+      - name: Measure client JS against the committed budget
+        run: node scripts/check-bundle-size.mjs
