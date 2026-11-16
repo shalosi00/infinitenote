@@ -43,6 +43,66 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-17 — bundle-size guard: Excalidraw's size-limit practice, wave 3 (#255, #256)
+
+- **Task**: the wave-2 cycle had explicitly deferred the one remaining
+  majors practice — Excalidraw's `size-limit.yml` — "needs its own
+  measured-budget cycle". This cycle was that cycle, continued across two
+  cron invocations (the 18:51 run was interrupted mid-PR; the 02:51 run
+  resumed it from the API state — the branch, PR and checks were exactly
+  where the interrupted run left them).
+- **Measured first** (no invented budgets): built the production bundle at
+  develop `7b24224` locally — client JavaScript totals **9,909.1 KiB across
+  173 `.js` files** under `.next/static/chunks/` (initial + lazy: the full
+  PWA payload; largest chunk 1,776.7 KiB). Next 16.4.6 prints no First Load
+  JS table anymore, so the budget is derived from the artifacts themselves,
+  not from build output.
+- **The guard**: `scripts/size-budget.json` (ceiling **10,400 KiB**, ~5%
+  headroom; a `measured` block pins date/commit/total/files/largest-chunk +
+  the policy text) + `scripts/check-bundle-size.mjs` (measures every `.js`
+  under the chunks dir, compares, writes a job summary, exits 1 when over;
+  pure helpers exported — `evaluateBudget`, `validateBudgetConfig`,
+  `collectJsStats`, `formatKib`, `renderSummary` — and pinned by **25 new
+  unit tests**, the fdroid-check.mjs import pattern) +
+  `.github/workflows/size.yml` (non-required `Bundle size / size-report`
+  check on `pull_request`, same SHA-pinned actions, same build retry as
+  build-smoke).
+- **Policy in code, not prose**: `validateBudgetConfig` rejects a budget
+  BELOW its own recorded measurement (no undercounting reality) and a
+  ceiling MORE THAN 20% above the recording (a failing check can never be
+  silenced by cranking the number) — budgets move only through a new
+  measurement recorded next to the old one. Over budget = red run + summary
+  numbers, never a blocked merge (non-required by design; promotion to
+  required can come after the budget proves stable).
+- **Self-verification (actual runs)**: local gate 1038 unit / 78 files,
+  0 fail; the local CLI run of the checker against the real build printed
+  `client JS: 9.68 MiB across 173 files (largest 1.74 MiB) — budget
+  10.16 MiB` → `PASS — 95.3% of budget` (matches the python measurement
+  byte-for-byte); the new CI `size-report` check ran a full production
+  build on the PR itself and passed; PR title check + labeler ran (labels:
+  documentation + github_actions).
+- **Two new environment lessons** (both from this cycle, both real):
+  (1) The agent-side token extraction `url.split(':', 1)[1]` splits at the
+  SCHEME colon of `https://user:token@...` and yields `//user:token...` —
+  GitHub answers 401 Bad credentials and the script silently "succeeds"
+  with a None-parsed response. Use the remote-URL regex
+  (`https://[^:]+:([^@]+)@`) instead. The same silent-401 had already
+  masked a PR-body PATCH in the wave-2 cycle (PR #251's merged body shipped
+  with the inline-code names stripped by a heredoc backtick expansion; the
+  follow-up PATCH was a no-op). Both records were repaired via API once the
+  cause was found.
+  (2) A probe POST meant to inspect the API shape CREATED a PR (HTTP 201,
+  title "x") — GitHub's create-PR endpoint is not idempotent. Repair path:
+  PATCH the accidental PR into the real one instead of deleting; PR #255
+  is the probe, patched 90 seconds later with the full title/body.
+- **Bonus fix**: README's tests badge still said 983 unit — missed by both
+  the #241 and #251 sweeps. Re-measured and fixed: **1038 unit / 78 files**
+  (this PR adds 25 tests to the previous 1013/77), **175 E2E / 40 files**
+  unchanged; PROJECT_STATUS Totals + Overall-state updated in #255.
+- **Landed**: PR #255 squash-merged as `7c38919` (develop), sync PR #256
+  merge-commit into main. Totals re-measured at the merge: 1038 unit /
+  78 files, 175 e2e / 40 files.
+
 ## 2026-11-16 (2) — PR-hygiene adoption from the majors, wave 2 (#251, #252)
 
 - **Task**: continue the standing "look at other major repos and learn

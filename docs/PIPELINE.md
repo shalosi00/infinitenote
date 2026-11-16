@@ -22,14 +22,15 @@ CI: `.github/workflows/ci.yml`, runs on every push to `main`/`develop` and every
 targeting them. Concurrency group cancels superseded runs on the same ref
 (the majors' redundant-CI cancellation — Excalidraw's `cancel.yml`).
 
-Two additional non-required checks accompany every PR (adopted from the
+Three additional non-required checks accompany every PR (adopted from the
 comparable majors — Excalidraw/Joplin/AFFiNE gate PR titles, Logseq/AFFiNE
-auto-label from changed paths):
+auto-label from changed paths, Excalidraw's size-limit watches the payload):
 
 | Check | What it does |
 |---|---|
 | `PR title / conventional-commit title` | runs `src/lib/pr-title.ts` (the same module its unit tests pin) against the PR title — `type: subject` or `type(scope): subject`, Conventional Commits |
 | `PR labeler / label from changed paths` | [`actions/labeler` v7 (SHA-pinned)](https://github.com/actions/labeler) applies `.github/labeler.yml` globs → `github_actions` / `documentation` / `dependencies` / `area:ui` / `area:canvas` / `area:data` / `area:import`; runs on `pull_request` (never `pull_request_target`) and only uses labels that already exist |
+| `Bundle size / size-report` | builds the production bundle, sums every `.js` file under `.next/static/chunks/` and compares against the committed budget in `scripts/size-budget.json` (measured 2026-11-16: 9,909.1 KiB across 173 files → budget 10,400 KiB, ~5% headroom); over budget → red run + job summary, but never a blocked merge; budgets move only via a new measurement (the validator rejects a ceiling more than 20% above the recorded one) |
 
 ## Pull requests
 
