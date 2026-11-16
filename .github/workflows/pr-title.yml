@@ -1,0 +1,42 @@
+# Conventional-commit PR titles, enforced in CI.
+#
+# Adopted from the comparable majors — Excalidraw (`semantic-pr-title.yml`),
+# Joplin (`check-pr-title.yml`) and AFFiNE (`pr-title-lint.yml`) all gate
+# PR titles; docs/PIPELINE.md already mandated conventional titles by hand
+# (every merged PR to date conforms), so this only enforces the existing
+# practice. The validator is src/lib/pr-title.ts — pinned by unit tests in
+# the normal suite (src/lib/__tests__/pr-title.test.ts), so the workflow
+# and the tests cannot drift apart.
+#
+# Non-required check: it reports on its own check-run and never blocks the
+# three required checks (lint-typecheck-test / build-smoke / e2e).
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: conventional-commit title
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are SHA-pinned (mutable tag pins are a
+      # supply-chain risk); dependabot's github-actions ecosystem keeps the
+      # pins updated. Same pins as ci.yml.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Validate the PR title
+        env:
+          # Passed via the environment, never via argv interpolation, so a
+          # title containing quotes or a leading dash cannot break the shell.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bun src/lib/pr-title.ts
