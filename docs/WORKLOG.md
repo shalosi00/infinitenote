@@ -43,6 +43,53 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-17 — CI failure commentary: Joplin's comment-on-failure practice, wave 5 (#261)
+
+- **Task**: the majors-research directive's workflow space is now exhausted —
+  this wave adopted the last remaining comparables-verified practice and
+  closed out the rest with evidence. The five comparables' workflow
+  inventories were re-pulled from the API: dependency-review and
+  first-interaction greetings — none of the four reachable comparables
+  (Excalidraw, Joplin, Logseq, AppFlowy) uses either; everything else left
+  is N/A by architecture (docker builds, native-release pipelines, i18n
+  lints, monorepo dep graphs) or was skipped in waves 1-4 with recorded
+  reasons (stale-issues: one open issue; automerge: #244's manual review;
+  CODEOWNERS: no comparable has one; release automation: deliberate manual
+  flow).
+- **Adopted: Joplin's `comment-on-failure.yml`** — when the CI workflow
+  completes with failure on a same-repo PR, a follow-up workflow comments
+  on that PR naming the failed jobs and linking the run. One upgrade over
+  Joplin: they pin `quipper/comment-failure-action@v0.1.1` by mutable tag;
+  here it is plain `gh api` calls (no third-party code — the SHA-pinning
+  invariant holds) behind a least-privilege block (`actions: read` +
+  `pull-requests: write` + `contents: read`). Skips by design: push
+  failures (no PR) and fork PRs (empty `pull_requests` in `workflow_run`
+  events — GitHub's security boundary). Informational only; merge gating
+  stays with the required checks.
+- **Wave-4 cache follow-through, measured** (API log evidence, not
+  assumptions): this cycle's PR was the first cache-warm-capable run —
+  caches restore only from the run's own branch or the default branch
+  (`main`), and main's first cache-saving push (03:35) happened after every
+  wave-4 PR had already run. The PR's e2e job log shows **both caches
+  restored** (`Cache restored from key: bun-Linux-ec049d90…` ~422 MB and
+  `playwright-Linux-ec049d90…` ~293 MB); build-smoke restored the bun cache
+  too. Wall-clock: e2e 624s vs the 429-648s band across runs of identical
+  content — runner variance dominates, so **no speedup number is claimed**
+  with a single warm sample; the mechanism is verified, medians can be
+  compared once more same-lockfile PR traffic accumulates.
+- **Sandbox incident, diagnosed and fixed**: mid-gate the tree reverted and
+  resurrected ~30 stale untracked artifacts from old sessions — two of them
+  tripped filesystem-dependent tests (2 failures: the dead-dependency-chain
+  scan caught `probe-tmp.ts`, an old probe importing removed modules via
+  absolute paths; the OCR-A03b "no strays" manifest check caught
+  `lang/eng.traineddata.gz`, the pre-German language file). Cleanup (delete
+  the strays) restored 1038/78 green. Lesson: resurrected junk is now a
+  known failure signature — filesystem-dependent tests (manifest-vs-disk,
+  import scans) are the canaries; the fix is deleting the untracked
+  strays, not touching tracked code.
+- **Counts** (measured in the gate, same shell call as the reset): 1038
+  unit / 78 files, 0 fail; 175 e2e / 40 files unchanged.
+
 ## 2026-11-17 — CI acceleration + coverage report: Logseq's caching and Excalidraw's coverage-report practices, wave 4 (#258)
 
 - **Task**: the majors-research directive continued. The five comparables'
