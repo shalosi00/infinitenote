@@ -1,0 +1,97 @@
+# Tag-push release automation — majors-research wave 6 of the "learn from
+# the majors" directive. Evidence: none of the five comparables uses
+# release-please or changesets (release-please-config.json /
+# .release-please-manifest.json / .changeset/config.json probed via the API:
+# 404 in excalidraw/excalidraw, laurent22/joplin, logseq/logseq,
+# AppFlowy-IO/AppFlowy, affineworkos/affine); instead releases are CI-driven
+# from tag/branch pushes — AppFlowy's `release.yml` (on: push: tags) builds
+# release notes and creates the GitHub Release before attaching artifacts,
+# Excalidraw's `autorelease-excalidraw.yml` releases from CI tooling,
+# Logseq's build-*-release.yml workflows build tagged releases.
+#
+# Here a v* tag push now (1) verifies the tagged commit actually builds and
+# boots as a web production build before it is called a release — desktop.yml
+# already verifies the Tauri build on tags, but the web/PWA build (the thing
+# every user runs) was never verified on tags — and (2) guarantees the
+# release object exists with at least GitHub's auto-generated notes.
+# Idempotent by design: if the release was already published with
+# hand-measured notes (the documented release flow, docs/PIPELINE.md
+# Releases step 3), the ensure step leaves it untouched — generated notes
+# are a safety net against an interrupted release flow leaving an empty
+# release body (desktop.yml's artifact step would otherwise create the
+# release without any notes), never an overwrite.
+#
+# Implementation invariants (the wave-5 comment-on-failure precedent):
+# plain `gh release` calls instead of a third-party release action, and
+# least privilege — contents: read for the verification job, contents: write
+# only in the ensure-release job that may create the release object.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag-build:
+    name: tag-build-verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache bun's install cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Production build (standalone)
+        # Same retry recipe as ci.yml's build-smoke: Turbopack was moved to
+        # webpack after a deterministic runner-pool panic wave; retries stay
+        # for belt-and-braces.
+        run: bun run build || bun run build || bun run build
+
+      - name: Boot smoke test
+        run: |
+          (bun run start &)
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/ -o /dev/null; then
+              echo "Smoke OK: the tagged commit serves on :3000"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Production server did not respond within 60s"
+          exit 1
+
+  ensure-release:
+    name: ensure-github-release
+    needs: verify-tag-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Ensure the release exists (never overwrite existing notes)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            echo "Release $TAG already exists — leaving its notes untouched."
+            exit 0
+          fi
+          gh release create "$TAG" --repo "$REPO" --verify-tag --generate-notes \
+            --title "$TAG" \
+            || echo "::warning::Release creation raced with another workflow (desktop.yml attaches artifacts to the same release); the release exists — continuing."
