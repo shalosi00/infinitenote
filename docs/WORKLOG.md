@@ -43,6 +43,54 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-17 — CI acceleration + coverage report: Logseq's caching and Excalidraw's coverage-report practices, wave 4 (#258)
+
+- **Task**: the majors-research directive continued. The five comparables'
+  workflow inventories were re-pulled from the API (Excalidraw, Joplin,
+  Logseq, AppFlowy; AFFiNE's `.github/workflows` path 404s from its new org
+  layout), and two more verified practices were adopted. Candidates skipped
+  with evidence: CODEOWNERS (none of the four reachable comparables has one
+  — API-checked) and dependabot auto-merge (Joplin's `automerge.yml`; #244's
+  grouped action-pin PR included a major codeql bump that needed manual
+  review — auto-merging would have skipped that review).
+- **CI caching** (Logseq's `build.yml` practice — setup-node `cache: 'pnpm'`
+  + explicit `actions/cache@v4` steps): every CI run here re-downloaded the
+  full dependency set and Chromium from the network. setup-bun has no cache
+  input (verified against its `action.yml` — inputs are `bun-version` /
+  `bun-version-file` / `bun-download-url` / `registries`), so caching is an
+  explicit SHA-pinned `actions/cache` v6.1.0 (`55cc834`) step: bun's install
+  cache (`~/.bun/install/cache`) keyed on `bun.lock` with a prefix
+  restore-key (a lockfile change starts from the previous cache and
+  downloads only the delta) in all three required jobs, `size-report` and
+  the new coverage job; e2e additionally caches Playwright's Chromium
+  (`~/.cache/ms-playwright`) keyed exactly on the lockfile with NO
+  restore-key by design — a stale browser must never satisfy the cache; a
+  miss is the old behavior.
+- **Unit-coverage report on PRs** (Excalidraw's `test-coverage-pr.yml`
+  practice): new non-required `Coverage report / unit-coverage` check
+  (`.github/workflows/coverage.yml`) — `bun test --coverage` with the table
+  written to the job summary (the bundle-size guard's channel) instead of
+  adding a third-party PR-comment action to the supply chain; `if: always()`
+  on the summary step (Excalidraw's pattern) so the report renders even when
+  tests fail; informational by design — no thresholds, never blocks a merge.
+- **Measured** at develop `f939459` (the PR base): suite 1038 tests / 78
+  files, 0 fail; coverage aggregate **93.60% funcs / 95.69% lines**;
+  coverage overhead negligible — 4.65s vs 4.54s plain. The new check passed
+  on its own PR's first run together with all three required checks plus
+  title / labeler / size-report.
+- **Stale-count sweep**: docs/PIPELINE.md still said 1013 unit / 77 files
+  (the wave-2 measurement) — corrected to 1038/78 (measured 2026-11-17).
+  Lesson repeated: every count-bearing doc drifts each time the suite
+  grows; the sweeps keep catching new strays (README badge in #255,
+  PIPELINE here).
+- **Sandbox hazard re-confirmed**: the tree reverted to a stale snapshot
+  (old main, `c83faad`) between tool calls — the first coverage run of the
+  cycle therefore reported 961 tests / 75 files (the stale tree's suite).
+  Counts are only trusted when measured in the same shell call as the
+  `git reset --hard origin/develop`; the PR's pushed commit was verified
+  via the API (parent `f939459`, exactly the five intended files) after the
+  same hazard struck between the push and the local rev-parse.
+
 ## 2026-11-17 — bundle-size guard: Excalidraw's size-limit practice, wave 3 (#255, #256)
 
 - **Task**: the wave-2 cycle had explicitly deferred the one remaining
