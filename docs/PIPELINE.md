@@ -52,6 +52,21 @@ Excalidraw's test-coverage-pr reports unit coverage):
 | `Bundle size / size-report` | builds the production bundle, sums every `.js` file under `.next/static/chunks/` and compares against the committed budget in `scripts/size-budget.json` (measured 2026-11-16: 9,909.1 KiB across 173 files → budget 10,400 KiB, ~5% headroom); over budget → red run + job summary, but never a blocked merge; budgets move only via a new measurement (the validator rejects a ceiling more than 20% above the recorded one) |
 | `Coverage report / unit-coverage` | runs the unit suite with bun's built-in coverage and writes the table to the job summary — informational only (no thresholds, never blocks a merge), and the report renders even when tests fail (`if: always()`, Excalidraw's `test-coverage-pr.yml` pattern); measured 2026-11-17 at develop `f939459`: aggregate 93.60% funcs / 95.69% lines, coverage overhead 4.65s vs 4.54s on the 1038-test suite |
 
+Releases are CI-driven too (majors-research wave 6 — AppFlowy's `release.yml`
+creates the GitHub Release on tag push; Excalidraw's `autorelease` and
+Logseq's `build-*-release.yml` release from CI as well; none of the five
+comparables uses release-please or changesets — all probed via the API).
+Pushing a `v*` tag triggers `.github/workflows/release.yml`:
+`tag-build-verify` runs the full build-smoke recipe against the tagged
+commit (desktop.yml already verifies the Tauri build on tags — this covers
+the web/PWA build), and `ensure-github-release` creates the release with
+GitHub's auto-generated notes only if it does not exist yet, so an
+interrupted release flow can never leave an empty release body. The ensure
+step never touches an existing release: hand-measured notes published first
+stay as published. Implemented as plain `gh release` calls (the wave-5
+precedent — no third-party release action); `contents: write` lives only in
+that job.
+
 ## Pull requests
 
 1. Branch off `develop`, implement, add/adjust unit tests, run `make test make lint make typecheck` locally.
@@ -69,7 +84,12 @@ Excalidraw's test-coverage-pr reports unit coverage):
    bump (if applicable) + final `PROJECT_STATUS.md` update + notes draft.
 2. Wait for checks, **merge-commit** it (preserves the release's individual history).
 3. Tag `vX.Y.Z` on the merge commit, push the tag, publish a GitHub Release with
-   the notes (feature list, test evidence, upgrade notes).
+   the notes (feature list, test evidence, upgrade notes). The tag push itself
+   fires the `Release` workflow: the tagged commit is verified with the full
+   build-smoke recipe (`tag-build-verify`), and if the release object does not
+   exist when that finishes, `ensure-github-release` creates it with
+   auto-generated notes — a safety net, never an overwrite (see the Releases
+   are CI-driven paragraph above).
 4. Close the matching milestone; open the next one.
 
 ## Commits
