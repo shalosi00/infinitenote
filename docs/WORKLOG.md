@@ -43,6 +43,75 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-18 — Tag-push release automation: AppFlowy's release.yml practice, wave 6 (#264)
+
+- **Task**: wave 6 of the majors-research directive. This cycle first finished
+  the interrupted wave-5 tail — PR #263 (develop→main sync for wave 5) was
+  still open with all 9 checks green when the previous session ended; merged
+  as MERGE commit `aae022b`, trees byte-identical, remote branch auto-deleted.
+- **Evidence pass**: release automation was the unexplored corner of the
+  workflow space. None of the five comparables uses release-please or
+  changesets — `release-please-config.json` / `.release-please-manifest.json` /
+  `.changeset/config.json` probed via the API: 404 in all five
+  (excalidraw/excalidraw, laurent22/joplin, logseq/logseq,
+  AppFlowy-IO/AppFlowy, affineworkos/affine). Instead the majors drive
+  releases from CI: **AppFlowy `release.yml`** (`on: push: tags: ["*"]` —
+  extracts notes from CHANGELOG.md, creates the GitHub Release, then builds
+  artifacts), **Excalidraw `autorelease-excalidraw.yml`** (push to `release`
+  branch runs release tooling), **Logseq `build-*-release.yml`** (tagged
+  release builds).
+- **The gap here**: the web/PWA production build was never verified on tags —
+  desktop.yml verifies only the Tauri build — and an interrupted release flow
+  (tag pushed, hand-measured notes never published) would leave desktop.yml's
+  artifact step (softprops/action-gh-release, already SHA-pinned at v3.0.4) to
+  create the release with an **empty body**. Both hazards materialize exactly
+  when a session dies mid-release, which happened for real at the wave-5
+  boundary (the #263 sync was left open overnight).
+- **Adopted** (#264, squash `f9edb00`): `.github/workflows/release.yml` on
+  `v*` tags — job 1 `tag-build-verify` runs the full build-smoke recipe
+  against the tagged commit (frozen install + `bun run build` with the
+  webpack retry recipe + :3000 boot probe, byte-parity-checked against
+  ci.yml); job 2 `ensure-github-release` (needs: verify-tag-build,
+  `contents: write` confined to it) runs `gh release view` first and only
+  creates with `--verify-tag --generate-notes` when the release is missing —
+  idempotent by design: hand-measured notes published first are never
+  overwritten, and a race with desktop.yml's artifact step degrades to a
+  warning. Invariants kept: plain `gh release` calls (no third-party release
+  action — the wave-5 precedent), SHA-pinned actions only, `contents: read`
+  workflow-wide, never a PR check.
+- **Gate evidence**: 1038 unit tests / 78 files, 0 fail; lint + tsc clean;
+  all 9 workflow YAMLs parse; the ensure-release decision logic rehearsed
+  against a mock `gh` binary (missing release → `create --verify-tag
+  --generate-notes`; existing release → untouched, no create call; create
+  race → warning, exit 0); pin audit (exactly 3 SHA-pinned uses) and
+  trigger/permission structure asserted programmatically.
+- **Live validation bonus**: PR #264's first e2e attempt flaked ("text editor
+  never opened after 3 canvas clicks" — a 30s canvas-click timeout on a diff
+  containing zero app code; green on rerun), and the wave-5
+  `comment-on-failure.yml` workflow **fired live for the first time** — the
+  github-actions bot commented on the PR naming the failed job and linking
+  the run, exactly as designed. First real-world exercise of wave 5, on wave
+  6's own PR.
+- **Skipped with evidence**: coverage thresholds/trends (no comparable sets
+  any — re-verified from the workflow inventories); size-report promotion to
+  required (budget recorded 2026-11-16 is 2 days / a handful of green runs
+  old — the aged criterion not met; also a branch-protection settings change,
+  not PR-able code — re-evaluate next cycle); i18n locale-coverage lint
+  (Excalidraw `locales-coverage.yml`, AppFlowy `ninja_i18n.yml` +
+  `translation_notify.yml` — N/A, UI English-only since v1.9); CLA (Joplin
+  `cla.yml` — external third-party app, repo invariant is no external bots);
+  nightly web deploys (Logseq `deploy-web-*` — product/infra decision, not on
+  the roadmap).
+- **Sandbox note**: `apply.sh` originally resolved its relative rsync/cp
+  targets from inside the staging dir (staging lives inside the repo tree) —
+  `cp` failed with "same file" and no repo files were touched; fixed by
+  `cd "$(git rev-parse --show-toplevel)"` after branch setup.
+- **Next cycle**: size-report promotion once the budget has aged further; the
+  next release tag live-exercises the Release workflow end-to-end; workflow
+  space from the five comparables is now fully inventoried — future waves
+  must either go beyond workflows (release notes content, CONTRIBUTING
+  depth) or deepen existing adoptions.
+
 ## 2026-11-17 — CI failure commentary: Joplin's comment-on-failure practice, wave 5 (#261)
 
 - **Task**: the majors-research directive's workflow space is now exhausted —
