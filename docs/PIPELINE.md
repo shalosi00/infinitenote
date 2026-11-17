@@ -28,7 +28,17 @@ CI-caching practice (Logseq's `build.yml` combines setup-node's `cache:`
 input with explicit `actions/cache@v4` steps; setup-bun has no cache input,
 verified against its `action.yml`, so the cache is an explicit step here).
 e2e additionally caches Playwright's Chromium, keyed exactly on the lockfile
-with no restore-key — a stale browser must never satisfy the cache.
+with no restore-key — a stale browser must never satisfy the cache. Caches
+restore only from the run's own branch or the default branch (`main`), so a
+fresh PR branch is warm only after a `main` push has saved the cache.
+
+When the CI workflow completes with failure on a same-repo PR, a follow-up
+workflow comments on that PR naming the failed jobs and linking the run —
+Joplin's `comment-on-failure.yml` practice (majors-research wave 5),
+implemented here as plain `gh api` calls instead of the mutable-tag-pinned
+third-party action Joplin uses, keeping the SHA-pinning and least-privilege
+invariants. Push failures and fork PRs are skipped by design; the comment is
+informational only — merge gating stays with the required checks.
 
 Four additional non-required checks accompany every PR (adopted from the
 comparable majors — Excalidraw/Joplin/AFFiNE gate PR titles, Logseq/AFFiNE
