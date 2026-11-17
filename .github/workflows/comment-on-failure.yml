@@ -1,0 +1,60 @@
+# CI failure commentary — the majors-research practice adopted from Joplin's
+# `comment-on-failure.yml` (wave 5 of the "learn from the majors" directive;
+# the last remaining comparables-verified workflow practice that maps to this
+# repo — dependency-review and first-interaction greetings were checked and
+# none of the four reachable comparables uses either). Joplin posts a PR
+# comment whenever its CI workflow completes with failure, naming what broke
+# and pointing contributors straight at the run. Joplin does it with
+# quipper/comment-failure-action@v0.1.1 pinned by mutable tag — here the same
+# behavior is a few `gh api` calls, so the repo's invariants stay intact:
+# no third-party code at all, and a least-privilege token (actions: read +
+# pull-requests: write; contents: read).
+#
+# Skips by design: failures on push runs (develop/main) have no PR to
+# comment on and the if-guard drops them; fork PRs expose an empty
+# pull_requests list in workflow_run events (GitHub's security boundary), so
+# they are skipped too — same-repo PRs, this repo's only kind today, are
+# covered. The comment is informational only: merge gating stays with the
+# required checks.
+name: Comment on CI failure
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment-on-failure:
+    name: comment-on-failure
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.pull_requests[0] != null }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on the PR whose CI failed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          FAILED_JOBS=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")')
+          if [ -z "$FAILED_JOBS" ]; then
+            FAILED_JOBS="see the run log"
+          fi
+          BODY=$(mktemp)
+          {
+            echo "CI failed on commit \`${SHORT_SHA}\` — failed job(s): **${FAILED_JOBS}**."
+            echo
+            echo "Logs and re-run: ${RUN_URL}"
+            echo
+            echo "This comment is informational only (Joplin's comment-on-failure practice, majors-research wave 5); merge gating stays with the required checks."
+          } > "$BODY"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$BODY"
