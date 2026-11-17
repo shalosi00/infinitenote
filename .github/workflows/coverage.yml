@@ -1,0 +1,73 @@
+# Unit-coverage report — the majors-research practice adopted from Excalidraw's
+# `test-coverage-pr.yml` (wave 4 of the "learn from the majors" directive):
+# run the unit suite with bun's built-in coverage on every PR and surface the
+# table. Excalidraw posts a vitest-report comment; here the table goes to the
+# job summary — the same channel the bundle-size guard already uses — instead
+# of adding a third-party PR-comment action to the supply chain.
+#
+# NON-required and informational: no thresholds, it cannot block a merge.
+# The summary step uses `if: always()` (Excalidraw's pattern) so the report
+# renders even when tests fail. Measured at develop f939459 (2026-11-17):
+# aggregate 93.60% funcs / 95.69% lines; coverage overhead negligible
+# (4.65s vs 4.54s on the 1038-test suite).
+name: Coverage report
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: unit-coverage
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are SHA-pinned (mutable tag pins are a supply-chain
+      # risk); dependabot's github-actions ecosystem keeps the pins updated.
+      # Same pins as ci.yml.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache bun's install cache
+        # same cache as ci.yml's jobs (majors-research wave 4, Logseq's
+        # CI-caching practice)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Unit suite with coverage
+        run: |
+          set -o pipefail
+          bun test --coverage --coverage-reporter=text --coverage-dir /tmp/coverage \
+            src/lib/__tests__ 2>&1 | tee /tmp/coverage.txt
+
+      - name: Write the coverage table to the job summary
+        # Excalidraw's test-coverage-pr.yml generates the report even when
+        # the tests fail (its `if: always()`) — same behavior here.
+        if: always()
+        run: |
+          {
+            echo "## Unit-test coverage"
+            echo
+            echo "Informational only — no thresholds, never blocks a merge."
+            echo
+            echo '```'
+            awk '/^File +\|/,/^--*\|/' /tmp/coverage.txt 2>/dev/null | head -120
+            echo '```'
+            grep -E '^Ran [0-9]+ tests' /tmp/coverage.txt || true
+          } >> "$GITHUB_STEP_SUMMARY"
