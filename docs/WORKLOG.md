@@ -43,6 +43,55 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-18 (3) — v1.15.0 release train: the release flow executed live, wave 8 (#270/#271)
+
+- **Task**: cut v1.15.0 per docs/PIPELINE.md's release flow — and use the tag
+  push as the first live exercise of the wave-6 Release workflow, the
+  explicitly flagged follow-up from last cycle.
+- **Release-prep PR #270** (squash `7da4046`, 9/9 checks green): version files
+  bumped to 1.15.0 / versionCode 250 across package.json, tauri.conf.json,
+  Cargo.toml, the TWA gradle + bubblewrap manifest, and a new fdroid Builds
+  entry; PROJECT_STATUS.md refreshed (In flight was stale at v1.11.1-era
+  content, Next up was stale at v1.10, Recent history was stale at
+  2026-11-09 — the v1.11.0-v1.14.0 release entries live in their GitHub
+  Release notes + this worklog). Local gate: 1038 unit / 78 files, 0 fail;
+  175 e2e / 40 files; version parity asserted across all six files.
+- **Release PR #271** (develop→main, **MERGE commit** `f34a4365` per the
+  documented flow, 13/13 check-runs green on the head sha): carries the whole
+  v1.15.0 content — OS share capture (#247), the HWR fix family
+  (#205/#231/#234), the hardening era (#206/#208/#218/#222/#224/#230/#235/
+  #238), community practices (#241), majors waves 2-7 (#251/#255/#258/#261/
+  #264/#267) — with the notes draft in the PR body.
+- **Tag + Release, live**: tag `v1.15.0` pushed on the merge commit; the
+  hand-measured notes were published FIRST (release created 11:26:15Z, before
+  the workflow's ensure step ran) and stayed intact. The Release workflow's
+  first real run: `tag-build-verify` **success** (frozen install + webpack
+  retry recipe + :3000 boot probe on the tagged commit) and
+  `ensure-github-release` **success** taking the idempotent path — log line:
+  "Release v1.15.0 already exists — leaving its notes untouched." The safety
+  net behaved exactly as designed in wave 6. Desktop workflow green on the
+  tag: three artifacts attached (AppImage 152,926,712 bytes, deb, rpm).
+- **Milestones rotated via API**: v1.16.0 milestone #17 created, #193 moved
+  into it, v1.15.0 closed (final: 0 open / 1 closed — #204 shipped long ago,
+  #193 hardware-blocked).
+- **Flatpak per-release step caught up** — a documented step skipped since
+  v1.7.0: docs/flathub.md Step 2 ("re-run scripts/flatpak-extradata.mjs
+  --tag vX.Y.Z") and Step 5 ("every minor release: bump the metainfo
+  <releases> block"). Executed for v1.15.0: the extra-data source is pinned
+  to the real AppImage asset (downloaded, sha256 computed, size verified
+  against the release API by the shipped tool), and the metainfo <releases>
+  block is backfilled for 1.7.0-1.15.0 from the published release notes
+  (XML re-validated).
+- **Sandbox residue note**: the restore resurrected three untracked strays —
+  `public/ocr/lang/eng.traineddata.gz` (pre-v1.9 English OCR model),
+  `src/components/ui/form.tsx` (imports the removed react-hook-form chain)
+  and `src/lib/merge.ts` (deleted in #201) — which tripped OCR-A03b and the
+  dead-chain scan locally. Untracked, so CI was never affected; deleted and
+  the gate re-run green.
+- **Next cycle**: beyond-workflows candidates from the majors — Joplin's
+  structured PR-review docs and release-notes content conventions; #193
+  parked in v1.16.0 (hardware-blocked).
+
 ## 2026-11-18 (2) — CONTRIBUTING gateway + stale-count sweep + size-report promoted to required, wave 7 (#267)
 
 - **Task**: wave 7, the first "beyond workflows" wave of the majors-research
