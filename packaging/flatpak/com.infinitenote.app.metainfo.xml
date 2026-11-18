@@ -51,6 +51,61 @@
   </screenshots>
 
   <releases>
+    <release version="1.15.0" date="2026-11-18">
+      <description>
+        <p>Hardening and community release: OS share capture into Quick Notes (Web Share Target), security hardening (strict desktop CSP, web security headers, least-privilege CI, audited lockfiles), community health docs, and CI/release automation practices adopted from major open-source repos.</p>
+      </description>
+    </release>
+    <release version="1.14.0" date="2026-11-12">
+      <description>
+        <p>Hardening and measurement release: independent desktop-artifact verification, and the WebGPU handwriting investigation concluded with the measured decision to stay on the WASM engine.</p>
+      </description>
+    </release>
+    <release version="1.13.0" date="2026-11-11">
+      <description>
+        <p>Handwriting made fully usable end to end — written, found (handwriting search), and converted to text — entirely on-device.</p>
+      </description>
+    </release>
+    <release version="1.12.0" date="2026-11-10">
+      <description>
+        <p>Handwriting-recognition research write-up: the decision basis for on-device HTR work (docs/handwriting-research.md).</p>
+      </description>
+    </release>
+    <release version="1.11.1" date="2026-11-10">
+      <description>
+        <p>Desktop fix: the AppImage is rebuilt against the ubuntu-22.04 glibc 2.35 floor so it launches on Ubuntu 24.04, Debian 13 and Mint 22; README and troubleshooting rework.</p>
+      </description>
+    </release>
+    <release version="1.11.0" date="2026-11-09">
+      <description>
+        <p>Page version history, on-device OCR for images (English and German), and OneNote-style PDF file chips that keep the original file.</p>
+      </description>
+    </release>
+    <release version="1.10.1" date="2026-11-07">
+      <description>
+        <p>Patch release: fresh element ids on every shape insert (#65 follow-up).</p>
+      </description>
+    </release>
+    <release version="1.10.0" date="2026-11-07">
+      <description>
+        <p>OneNote-style shape library (toolbar with blocks, arrow variants, elbow connectors and sticky notes) and a bundled-asset Android TWA that renders offline on first run (F-Droid compliance).</p>
+      </description>
+    </release>
+    <release version="1.9.0" date="2026-11-07">
+      <description>
+        <p>Focused English-only interface: the v1.7 i18n layer (next-intl, catalogs, language toggle) removed; CJK note content remains fully supported.</p>
+      </description>
+    </release>
+    <release version="1.8.0" date="2026-11-07">
+      <description>
+        <p>Audio blocks: import audio files or record straight into the page — clips play as on-canvas players and persist locally; import-test hardening wave.</p>
+      </description>
+    </release>
+    <release version="1.7.0" date="2026-11-07">
+      <description>
+        <p>Internationalization (English + 简体中文) and polish: a six-accent themes gallery over light/dark, and the F-Droid build recipe with validation tooling.</p>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-11-07">
       <description>
         <p>Distribution release: the desktop app is packaged for Linux
