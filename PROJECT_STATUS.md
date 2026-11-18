@@ -6,6 +6,7 @@
 
 | | |
 |---|---|
+| **Last updated** | 2026-11-18 (3) (v1.15.0 release train — version files bumped to 1.15.0 / versionCode 250 across package.json, tauri.conf.json, Cargo.toml, the TWA gradle + bubblewrap manifest, and a new fdroid Builds entry; PROJECT_STATUS refreshed: Current version, Phase, In flight (was stale at v1.11.1-era content), Next up (was stale at v1.10), Recent history (was stale at 2026-11-09 — the v1.11.0-v1.14.0 release entries live in their GitHub Release notes + the worklog); the release is the first live exercise of the wave-6 Release workflow on a real tag; counts re-measured on the release-prep branch: 1038 unit / 78 files, 175 e2e / 40 files) |
 | **Last updated** | 2026-11-18 (2) (CONTRIBUTING gateway + repo-wide stale-count sweep + size-report promoted to required, wave 7 of the majors-research directive — (1) **size-report promotion**: the wave-3 bundle-size guard's budget (recorded 2026-11-16 at develop `7b24224`: 9,909.1 KiB measured → 10,400 KiB ceiling) is now aged — green on every PR since it landed (#258 through #266: nine green size-report runs on nine PR heads, zero non-green — API-counted, the e2e rerun on #264 re-ran only that job) — so `size-report` was added to the required status checks on both protected branches via the branch-protection API (contexts now `lint-typecheck-test`, `build-smoke`, `e2e`, `size-report`; strict-up-to-date retained; enforce-admins/no-reviews/no-force-push/no-deletions unchanged; PUT + GET verified); the check keeps its policy in code — a budget below its own measurement is invalid, a ceiling >20% above the recording is rejected — so a failing check can never be silenced by cranking the number; (2) **CONTRIBUTING.md rewritten as a contributor-journey gateway** — evidence: the five comparables' contributing docs pulled from the API — only Logseq has a deep root CONTRIBUTING.md (10 KB: conduct → ways to help → question → bug → feature → submit issue → PR guidelines), Excalidraw's is a 100-byte stub pointing at its docs site, Joplin/AFFiNE/AppFlowy keep theirs off-repo (probed paths 404) — so the adoption is Logseq's structure with ours' accuracy: ways to contribute (code/tests/docs/triage, with #193's real-GPU benchmark named as a concrete open task), question flow (Discussions disabled — API-verified — so issues + the existing `question` label), bug/feature flows via the existing YAML forms, PR guidelines with the four-required-checks table, Thank-you closer; the Excalidraw-stub pattern rejected deliberately — a stub pointing at docs would lose the repo's self-containment (no external docs site exists); (3) **stale-count sweep** — the recurring drift bit again: CONTRIBUTING.md said 961 unit/75 files + 171 e2e/39 files (last touched wave 1) and .github/copilot-instructions.md the same, PROJECT_STATUS.md's module map said "34 checks" for the E2E suite and "564 unit tests"/"152 E2E tests" in the commands cheat-sheet, and the ci.yml module-map row omitted e2e; all fixed from a fresh same-call measurement at develop `5c2b00d`: 1038 unit / 78 files, 175 e2e / 40 files; counts unchanged |
 | **Last updated** | 2026-11-18 (tag-push release automation, wave 6 of the majors-research directive — releases are CI-driven in every comparable: none of the five uses release-please or changesets (`release-please-config.json` / `.release-please-manifest.json` / `.changeset/config.json` probed via the API: 404 in all five), instead AppFlowy's `release.yml` triggers on tag push and creates the GitHub Release before attaching artifacts, Excalidraw's `autorelease-excalidraw.yml` releases from CI tooling, Logseq's `build-*-release.yml` builds tagged releases; the gap here: the web/PWA production build was never verified on tags (desktop.yml verifies only the Tauri build), and desktop.yml's artifact step (`softprops/action-gh-release`, already SHA-pinned) would create the release with an empty body if the hand-written notes were not published first — an interrupted release flow hazard; adopted: `.github/workflows/release.yml` fires on `v*` tags — `tag-build-verify` runs the full build-smoke recipe (frozen install + `bun run build` with the webpack retry recipe + :3000 boot probe) against the tagged commit, then `ensure-github-release` creates the release with GitHub's auto-generated notes only if it does not exist (`gh release view` first, `gh release create --verify-tag --generate-notes` behind it) — idempotent by design, hand-measured notes published first are never overwritten, and a race with desktop.yml's artifact step degrades to a warning; invariants kept: plain `gh release` calls (no third-party release action, the wave-5 precedent), SHA-pinned actions only, `contents: read` workflow-wide with `contents: write` confined to the ensure job; skipped with evidence this cycle: coverage thresholds/trends (no comparable sets any — re-verified from the workflow inventories, Excalidraw's coverage stays threshold-free), size-report promotion to required (budget recorded 2026-11-16 is 2 days / a handful of green runs old — the aged criterion not met; also a branch-protection settings change, not PR-able code — re-evaluate next cycle), i18n locale-coverage lint (Excalidraw `locales-coverage.yml`, AppFlowy `ninja_i18n.yml`/`translation_notify.yml` — N/A, UI English-only since v1.9), CLA (Joplin `cla.yml` — external third-party app, repo invariant is no external bots), nightly web deploys (Logseq `deploy-web-*` — a product/infra decision, not on the roadmap); first live exercise is the next release tag; counts unchanged: 1038 unit / 78 files, 175 e2e / 40 files) |
 | **Last updated** | 2026-11-17 (2) (CI failure commentary, wave 5 of the majors-research directive — the last remaining comparables-verified workflow practice: Joplin's `comment-on-failure.yml` posts a PR comment when the CI workflow completes with failure on a same-repo PR, naming the failed jobs and linking the run; adopted with one upgrade — Joplin pins quipper/comment-failure-action@v0.1.1 by mutable tag, here it is plain `gh api` calls (no third-party code, keeping the SHA-pinning invariant) behind a least-privilege block (actions: read + pull-requests: write + contents: read); skips by design: push failures (no PR to comment on) and fork PRs (empty `pull_requests` list in workflow_run events — GitHub's security boundary); the comment is informational only, merge gating stays with the required checks; also evaluated and skipped with evidence: dependency-review and first-interaction greetings (none of the four reachable comparables uses either — workflow inventories re-pulled from the API); cache-effect measurement (wave 4 follow-through): CI run durations pulled from the API show runner variance dominating (e2e job 429-648s for identical content), and no PR run has been cache-warm yet — caches restore only from the run's own branch or the default branch (`main`), whose first cache-saving push happened after every wave-4 PR had already run; the first warm-capable PR is this cycle's own, log-verified hit/miss + durations recorded in the worklog; counts unchanged: 1038 unit / 78 files, 175 e2e / 40 files) |
@@ -15,8 +16,8 @@
 | **Last updated** | 2026-11-16 (web share target capture — issue #247: the installed PWA now registers a `share_target` (POST multipart to `/share-target`), the service worker intercepts the OS share-sheet POST before the network, stashes it in a raw-IndexedDB mailbox (`infinitenote-share-inbox`) and redirects to /, and the boot drain lands each share as a Quick Notes page via the regular import pipeline — shared title becomes the page title (capped 80), body = text + url composed, files pass through to the existing importers (image/audio/pdf/text), URL-only shares fall back to the dated quick-note title, a share always produces a page; atomic read+clear drain so two tabs can never double-import; standalone fallback page for the pre-SW edge; sw.js mirrors the share-inbox constants — pinned in sync by unit tests; counts re-measured: 983 unit / 76 files, 175 e2e checks / 40 files; also fixed the stale README badge (858/156 — missed by the #241 count sweep) and the stale PROJECT_STATUS Totals line (564/152)) |
 | **Last updated** | 2026-11-15 (community-practices adoption, researched from the comparable majors — Excalidraw, Logseq, Joplin, AppFlowy, AFFiNE: SECURITY.md added on the Joplin pattern — supported versions, private-vulnerability-reporting channel (already enabled, re-verified), reporting rules, and an explicit out-of-threat-model section adapted to local-first (DoS via imported content, physically-local attacks, plain data at rest, dependency advisories -> upstream); CODE_OF_CONDUCT.md added (Contributor Covenant 2.1); markdown issue templates converted to YAML issue forms (bug_report.yml + feature_request.yml + config.yml — every comparable with templates uses forms, none markdown); .github/copilot-instructions.md added (Excalidraw pattern) pointing Copilot at AGENTS.md's read order; CONTRIBUTING.md refreshed — dead `bun run db:generate` removed (script gone since v1.1 removed the server DB), stale counts fixed; stale counts fixed across README (858→961 unit, 156→171 e2e), PR template (34→171), AGENTS.md (7 files/24 checks→39/171), all re-measured (bun test: 961/75 files; playwright --list: 171/39 files); dependabot groups added — npm minor+patch one monthly PR, action-pin moves one weekly PR; CHANGELOG.md deliberately skipped: GitHub Releases carry the notes (v1.12-v1.14 bodies measured) and 3 of 5 comparables also rely on Releases alone; community health was 71% pre-change, re-measured post-merge) |
 | **Last updated** | 2026-11-15 (2) (community health measured at **100%** after the #243 sync — was 71%; code_of_conduct credited, `issue_template` field still null by GitHub quirk though the forms work; first grouped dependabot PR #244 handled: 4 action-pin moves in one PR — codeql-action v3->v4.39.3 (breaking changes reviewed: bundle-version floors, not input-surface; validated by the PR's own CodeQL run on the new pins) + rust-cache within v2; retargeted to develop per #216 precedent, squash-merged 4e2aa5c, synced to main) |
-| **Current version** | v1.14.0 (version files bumped via the release flow; tag + GitHub Release published at the end of the flow) |
-| **Phase** | v1.15.0 milestone open — issue #193 (real-GPU HWR benchmark, hardware-blocked); #231 fixed (#234); dependency security sweep landed (#235); audit re-verified + scripts/audit-lockfile.py committed (#238); community-practices adoption #241 + worklog (4); community health 100% + grouped dependabot follow-through #244 + worklog (5); web share target capture #247; PR-hygiene adoption (PR-title check + path labeler, majors wave 2); bundle-size guard (size-report check + committed budget, majors wave 3); CI acceleration (bun + Playwright caching) + unit-coverage report on PRs (majors wave 4); CI failure commentary (Joplin practice, majors wave 5); tag-push release automation (AppFlowy practice, majors wave 6); CONTRIBUTING gateway + stale-count sweep + size-report promotion to required (majors wave 7)
+| **Current version** | v1.15.0 (version files bumped via the release flow; tag + GitHub Release published at the end of the flow) |
+| **Phase** | v1.15.0 releasing (release train this cycle); v1.16.0 milestone open with #193 (real-GPU HWR benchmark — hardware-blocked); majors-research waves 1-7 landed (community practices, PR hygiene, bundle-size guard, CI caching + coverage, failure commentary, tag-push release automation, CONTRIBUTING gateway + size-report promotion) |
 | **Overall state** | 2026-11-18: 1038 unit (78 files) + the 175-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
 
 ## TL;DR
@@ -59,6 +60,11 @@ styles (plain/ruled/grid). v1.3 adds page tags, OneNote-style quick capture
 ("Quick note" button + Ctrl/Cmd+Alt+N, a pinned **Today** daily page that is
 created on first open and reused all day), and print-friendly paginated PDF
 export (A4 portrait/landscape, vector text, sliced images).
+v1.15 hardens the platform (strict desktop CSP, web security headers,
+least-privilege CI with CodeQL, Advisory-DB-audited lockfiles) and adds
+OS share capture: the installed PWA registers a Web Share Target, so
+shares from the Android share sheet or desktop share UIs land as Quick
+Notes pages.
 
 ## What works today (verified by tests)
 
@@ -99,22 +105,31 @@ export (A4 portrait/landscape, vector text, sliced images).
 
 ## In flight
 
-- **v1.11.1 patch — desktop artifact glibc fix (#164) + README rework (#165)**:
-  the v1.11.0 AppImage bundled libraries from the ubuntu-latest runner
-  (glibc 2.43) and failed to launch on Ubuntu 24.04 / Debian 13 / Mint 22
-  (silent dynamic-linker abort — "double-click does nothing"). Fix: Desktop
-  workflow pinned to ubuntu-22.04 (glibc 2.35 floor), a post-build guard that
-  extracts the AppImage and fails on any GLIBC requirement above the floor,
-  the trigger/test pins (the trigger was correct on disk all along — the suspected corruption was an output-display artifact; see the worklog addendum), a full README rework (real test counts, AppImage install +
-  troubleshooting) and an end-user troubleshooting section in docs/desktop.md.
-  Verified by a dispatched Desktop workflow run on the fix branch before
-  merge; shipped as v1.11.1 with rebuilt artifacts.
-  Next per the roadmap: the v1.12 handwriting-recognition research (#133).
+- **v1.15.0 release train** (this cycle): version bump + release PR
+  develop-to-main (merge commit) + tag + GitHub Release — the first
+  live exercise of the wave-6 Release workflow (`tag-build-verify` +
+  `ensure-github-release`) on a real tag. Shipped since v1.14.0: OS
+  share capture into Quick Notes (Web Share Target, #247), the HWR
+  conversion integrity guard + focus fixes (#205/#231/#234), the stale
+  Radix dialog dismissal guard (#226), desktop CSP (#218) + web
+  security headers (#206), least-privilege CI + CodeQL + Dependabot
+  (#208/#212/#216), the Advisory-DB transitive-lockfile remediation
+  sweep (#222/#224/#230/#235) + scripts/audit-lockfile.py (#238), the
+  community-practices adoption (SECURITY.md, CoC, YAML issue forms,
+  copilot guide, #241), and majors waves 2-7 (#251/#255/#258/#261/
+  #264/#267).
+- **#193** (real-GPU HWR benchmark) parked in the v1.16.0 milestone —
+  hardware-blocked: the measurement needs a real-GPU machine; the
+  capability gate + measured WASM baseline already shipped (v1.14.0).
 
-## Next up — v1.10 (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.16 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. Bundled-asset TWA (WebViewAssetLoader) for full F-Droid offline compliance (#64)
-2. Drawing shape library beyond Excalidraw defaults (#65)
+1. Real-GPU HWR benchmark to re-evaluate the WebGPU arm (#193 —
+   hardware-blocked: needs a real-GPU run; the capability gate and
+   the measured WASM baseline shipped in v1.14.0)
+2. Majors-research continuation beyond workflows: structured PR-review
+   docs and release-notes content conventions are the next candidate
+   surfaces (evidence-first, wave by wave)
 
 ## Repo map (30 seconds)
 
@@ -157,6 +172,23 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-18 — v1.15.0 released**: release train executed per
+  docs/PIPELINE.md — version-bump PR, release PR develop-to-main (merge
+  commit), tag v1.15.0 + GitHub Release with hand-measured notes,
+  milestones rotated (v1.15.0 closed, v1.16.0 opened with #193 moved
+  over); the tag push is the first live exercise of the wave-6 Release
+  workflow. Ships vs v1.14.0: OS share capture into Quick Notes (Web
+  Share Target, #247), HWR conversion integrity + focus fixes
+  (#205/#231/#234), stale-dialog dismissal guard (#226), desktop CSP
+  (#218) + web security headers (#206), least-privilege CI + CodeQL +
+  Dependabot (#208/#212/#216), transitive-lockfile audit remediation
+  (#222/#224/#230/#235) + scripts/audit-lockfile.py (#238), community
+  practices (SECURITY.md, CoC, YAML issue forms, copilot guide, #241),
+  and majors waves 2-7 (#251/#255/#258/#261/#264/#267). Note: Recent
+  history entries for the v1.11.0-v1.14.0 releases live in their GitHub
+  Release notes + the worklog (this section had drifted to 2026-11-09);
+  re-measured at the release-prep branch: 1038 unit / 78 files, 175 e2e /
+  40 files, 0 known bugs.
 - **2026-11-09 — verification pass on the top-2 features + E2E click
   hardening**: full gate re-run on the merge state of #154/#155 —
   lint/typecheck clean, 531/531 unit, E2E in CI mode (production build,
