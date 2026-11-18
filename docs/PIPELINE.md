@@ -14,9 +14,10 @@ How work moves from idea to release. Applies to humans and AI agents alike.
 
 | Check | What it does |
 |---|---|
-| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 1038 unit tests (78 files, measured 2026-11-17), plus a secret-leak grep |
+| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 1038 unit tests (78 files, measured 2026-11-18 at develop `5c2b00d`), plus a secret-leak grep |
 | `build-smoke` | `next build` production build + boots standalone server + HTTP 200 probe |
-| `e2e` | Playwright browser E2E against the production build (175 checks in 40 files, measured 2026-11-16) |
+| `e2e` | Playwright browser E2E against the production build (175 checks in 40 files, measured 2026-11-18 at develop `5c2b00d`) |
+| `size-report` | builds the production bundle and **enforces** the committed budget in `scripts/size-budget.json` (measured 2026-11-16 at develop `7b24224`: 9,909.1 KiB across 173 `.js` files → 10,400 KiB ceiling, ~5% headroom; budgets move only via a new measurement — the validator rejects a ceiling more than 20% above the recorded one); promoted from non-required to required on both protected branches on 2026-11-18 once the budget had aged — green on every PR since it landed (#258 → #266); over budget → red run and a blocked merge |
 
 CI: `.github/workflows/ci.yml`, runs on every push to `main`/`develop` and every PR
 targeting them. Concurrency group cancels superseded runs on the same ref
@@ -40,16 +41,15 @@ third-party action Joplin uses, keeping the SHA-pinning and least-privilege
 invariants. Push failures and fork PRs are skipped by design; the comment is
 informational only — merge gating stays with the required checks.
 
-Four additional non-required checks accompany every PR (adopted from the
+Three additional non-required checks accompany every PR (adopted from the
 comparable majors — Excalidraw/Joplin/AFFiNE gate PR titles, Logseq/AFFiNE
-auto-label from changed paths, Excalidraw's size-limit watches the payload,
-Excalidraw's test-coverage-pr reports unit coverage):
+auto-label from changed paths, Excalidraw's test-coverage-pr reports unit
+coverage):
 
 | Check | What it does |
 |---|---|
 | `PR title / conventional-commit title` | runs `src/lib/pr-title.ts` (the same module its unit tests pin) against the PR title — `type: subject` or `type(scope): subject`, Conventional Commits |
 | `PR labeler / label from changed paths` | [`actions/labeler` v7 (SHA-pinned)](https://github.com/actions/labeler) applies `.github/labeler.yml` globs → `github_actions` / `documentation` / `dependencies` / `area:ui` / `area:canvas` / `area:data` / `area:import`; runs on `pull_request` (never `pull_request_target`) and only uses labels that already exist |
-| `Bundle size / size-report` | builds the production bundle, sums every `.js` file under `.next/static/chunks/` and compares against the committed budget in `scripts/size-budget.json` (measured 2026-11-16: 9,909.1 KiB across 173 files → budget 10,400 KiB, ~5% headroom); over budget → red run + job summary, but never a blocked merge; budgets move only via a new measurement (the validator rejects a ceiling more than 20% above the recorded one) |
 | `Coverage report / unit-coverage` | runs the unit suite with bun's built-in coverage and writes the table to the job summary — informational only (no thresholds, never blocks a merge), and the report renders even when tests fail (`if: always()`, Excalidraw's `test-coverage-pr.yml` pattern); measured 2026-11-17 at develop `f939459`: aggregate 93.60% funcs / 95.69% lines, coverage overhead 4.65s vs 4.54s on the 1038-test suite |
 
 Releases are CI-driven too (majors-research wave 6 — AppFlowy's `release.yml`
