@@ -43,6 +43,60 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-18 (2) — CONTRIBUTING gateway + stale-count sweep + size-report promoted to required, wave 7 (#267)
+
+- **Task**: wave 7, the first "beyond workflows" wave of the majors-research
+  directive — the workflow inventory from the five comparables is exhausted
+  (wave 6 closed it), so this wave (1) deepened wave 3's adoption and (2)
+  moved to contributing docs, the next surface the majors influence.
+- **Size-report promoted to required** (settings change via the
+  branch-protection API — no diff can carry it): the wave-3 budget (recorded
+  2026-11-16 at develop `7b24224`: 9,909.1 KiB measured → 10,400 KiB ceiling)
+  is now aged — **API-counted this cycle: 9 green `size-report` runs on the
+  9 PR heads #258-#266, zero non-green** (the #264 rerun re-ran only e2e) —
+  so `size-report` joined `lint-typecheck-test` / `build-smoke` / `e2e` as a
+  required check on **both** protected branches. Everything else carried
+  through byte-identical (strict-up-to-date, enforce-admins, no reviews, no
+  force-push/deletions); PUT + GET verified. Two API wrinkles recorded: the
+  PUT rejects the older `{"enabled": bool}` object form for the newer flags
+  (block_creations/lock_branch/allow_fork_syncing/required_conversation_
+  resolution want plain booleans — 422 "is not a boolean" until fixed), and
+  `e2e`'s existing context carries an app_id binding while the other contexts
+  are unbound — size-report was added unbound to match the majority. The
+  wave-7 PR (#267) was the first to merge under the promoted protection.
+- **CONTRIBUTING.md rewritten as a contributor-journey gateway**: evidence
+  pulled from the API — only **Logseq** has a deep root CONTRIBUTING.md
+  (10 KB: conduct → ways to help → question → bug → feature → submit issue →
+  PR guidelines); **Excalidraw's is a 100-byte stub** to its docs site;
+  **Joplin/AFFiNE/AppFlowy keep theirs off-repo** (probed paths 404). Adopted
+  Logseq's structure with ours' accuracy: ways to contribute (code/tests/
+  docs/triage, with #193's real-GPU benchmark named as a concrete open task —
+  measurement, not code, is the blocker), question flow (Discussions
+  disabled, API-verified → issues + the existing `question` label), bug/
+  feature flows via the existing YAML forms, PR guidelines with the
+  four-required-checks table, thank-you closer. Excalidraw's stub pattern
+  rejected deliberately: a stub pointing at docs would lose self-containment
+  (no external docs site exists here).
+- **Repo-wide stale-count sweep** — the recurring drift bit again
+  (CONTRIBUTING.md was last touched in wave 1): CONTRIBUTING.md said 961
+  unit/75 files + 171 e2e/39 files, `.github/copilot-instructions.md` the
+  same, PROJECT_STATUS.md's module map said "34 checks" for the E2E suite
+  (pre-2026-11-08!), "564 unit tests"/"152 E2E tests" in the commands
+  cheat-sheet, and the ci.yml module-map row omitted e2e entirely. All fixed
+  from a fresh same-call measurement at develop `5c2b00d`: 1038 unit / 78
+  files, 175 e2e / 40 files — the gate asserts the measured numbers equal
+  every claim in the touched docs.
+- **Gate evidence**: 1038 pass / 0 fail, lint + tsc clean, stale-count and
+  PIPELINE-reflow assertions green, promotion live-verified via the API on
+  both branches, title validator green; PR 9/9 checks green under the
+  promoted protection (squash `f5303f2`).
+- **Next cycle**: the Release workflow (wave 6) is still awaiting its first
+  live exercise on a release tag; the majors' release-notes *content*
+  (AppFlowy derives notes from CHANGELOG.md — we deliberately rely on
+  GitHub Releases, re-verified) and Joplin's structured PR-review docs are
+  candidate beyond-workflows surfaces; #193 remains the only open issue
+  (hardware-blocked).
+
 ## 2026-11-18 — Tag-push release automation: AppFlowy's release.yml practice, wave 6 (#264)
 
 - **Task**: wave 6 of the majors-research directive. This cycle first finished
