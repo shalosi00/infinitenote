@@ -2,6 +2,10 @@
 
 <!-- What does this PR do and why? 1-3 sentences. -->
 
+## Feature preview
+
+<!-- For new user-facing features: attach a screenshot or recording (drag & drop into this section) so reviewers see the change before reading the code. Delete this section for non-feature PRs. (AppFlowy's PR-template practice, majors-research wave 9.) -->
+
 ## Changes
 
 <!-- Bullet list of the meaningful changes. -->
