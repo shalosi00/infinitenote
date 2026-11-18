@@ -92,6 +92,69 @@ that job.
    are CI-driven paragraph above).
 4. Close the matching milestone; open the next one.
 
+### Release notes convention (majors-research wave 9)
+
+Release notes follow one written structure — author-agnostic, so every
+release reads the same regardless of who writes it. Evidence (release
+bodies pulled from the API, 2026-11-19): each of the four reachable
+comparables ships a recognizable convention — **Joplin** publishes flat
+type-prefixed bullets with no headings (`- New: … (#123)`,
+`- Improved: … (#456 by @user)`, `- Fixed: …`), crediting external
+contributors inline per bullet; **Logseq** uses category headings
+(`## Features`, `## Enhancements`, `## Fixed issues`, `## Thanks`) with
+user-facing sentences; **AppFlowy** publishes `### vX.Y.Z` under which
+`#### New Features` / `#### Improvements` / `#### Bug Fixes` appear plus a
+`#### ⚠️ Action Required` section whenever the user must do something after
+upgrading; **Excalidraw** publishes `### Highlights` / `### Breaking
+changes` with one PR link per bullet. AFFiNE is the counter-example: all 29
+of its most recent release bodies are machine-generated channel blobs
+(checked via the API) — not a convention to adopt. The gap here: our notes
+have been strong but ad hoc — three different shapes measured across
+v1.13.0, v1.14.0 and v1.15.0, and step 3 above said only "feature list,
+test evidence, upgrade notes". The convention below codifies what those
+three releases already do in practice, plus the two majors' practices worth
+adding (AppFlowy's Action Required, Joplin's inline contributor credit):
+
+1. **Opening line** — `vX.Y.Z — **theme**.` plus one sentence naming what
+   ships and why it matters.
+2. **`## Highlights`** — one bullet per shipped issue/PR, bold
+   `#issue / PR #N —`, each bullet carrying a measured number or an
+   evidence pointer (bytes, milliseconds, check counts, doc links), written
+   user-facing ("you can now …", not "refactor of …"). Sub-sections under
+   Highlights when one feature dominates the release (v1.13.0:
+   Phase A / Phase B / Hardening + quality).
+3. **`## Upgrade notes`** — only when users must act: data migration,
+   changed shortcuts, packaging catch-up steps (AppFlowy's Action Required
+   practice). Omit the section entirely when there is nothing to act on —
+   an empty upgrade section is noise.
+4. **Contributor credit** — when a merged PR is authored outside the
+   maintainer team, credit it inline in its bullet, Joplin-style
+   (`… (PR #N by @user)`).
+5. **Measured close** — the unit/E2E counts as measured on the merged tip
+   for this release, never carried over from a previous release's notes.
+
+Template — fill per release in the release PR body:
+
+```markdown
+vX.Y.Z — **<theme>**. <One sentence: what ships and why it matters.>
+
+## Highlights
+
+- **#<issue> / PR #<N> — <user-facing what>**: <measured evidence>
+- …
+
+## Upgrade notes
+
+<only if users must act; delete the whole section otherwise>
+
+Unit suite: <N tests across M files, measured on the merged tip>; E2E:
+<K checks across J files>.
+```
+
+Every number in the notes comes from a run on the merged tip and every
+evidence claim names the doc or log that backs it — the same rule
+PROJECT_STATUS.md lives by.
+
 ## Commits
 
 Conventional Commits on feature branches (they are squashed anyway):
