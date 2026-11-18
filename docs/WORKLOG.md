@@ -43,6 +43,60 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-19 — Release-notes convention + PR feature preview, wave 9 (#274)
+
+- **Task**: wave 9 of the majors-research directive — the beyond-workflows
+  direction the wave-8 entry named ("Joplin's structured PR-review docs and
+  release-notes content conventions"). Two surfaces probed from the API.
+- **Release-notes convention adopted** (docs/PIPELINE.md, new "Release notes
+  convention (majors-research wave 9)" subsection): the four reachable
+  comparables each publish a recognizable notes convention — **Joplin**:
+  flat type-prefixed bullets, no headings even for large releases
+  (`- New: … (#16845)`, `- Improved: … (#16838 by @user)`, `- Fixed: …`),
+  external contributors credited inline per bullet; **Logseq**: category
+  headings (`## Features`, `## Enhancements`, `## Fixed issues`,
+  `## Thanks`) with user-facing sentences; **AppFlowy**: `### vX.Y.Z`
+  heading with `#### New Features` / `#### Improvements` /
+  `#### Bug Fixes` plus `#### ⚠️ Action Required` whenever post-upgrade
+  user steps exist; **Excalidraw**: `### Highlights` / `### Breaking
+  changes` with one PR link per bullet (39 KB body on v0.18.0).
+  **AFFiNE is the counter-example** — all 29 of its most recent release
+  bodies are machine-generated channel blobs (API-checked), nothing to
+  adopt. The gap here: our notes were strong but ad hoc — three different
+  shapes measured across the v1.13.0 / v1.14.0 / v1.15.0 bodies (v1.15.0's
+  hand-measured body: 4,438 bytes), and PIPELINE.md step 3 said only
+  "feature list, test evidence, upgrade notes". The adoption codifies the
+  de-facto structure (opening theme line → Highlights with issue/PR-linked
+  measured bullets → Upgrade notes only when users must act (AppFlowy's
+  practice) → Joplin-style inline credit for external PRs → counts measured
+  on the merged tip) plus a fill-in template.
+- **PR feature preview adopted** (.github/pull_request_template.md):
+  AppFlowy's template asks for a video/screenshot of new user-facing
+  features ("drag and drop … to showcase"); AFFiNE's checklist adds the
+  conventional-title + tests items. Ours already had the CI-enforced
+  conventional title (wave 2) and a Testing section, but no preview ask —
+  a `## Feature preview` section added for feature PRs (non-feature PRs
+  delete it).
+- **Probed and skipped with evidence**: a reviewer-facing "how we review"
+  doc — no comparable ships one on-repo. Joplin's CONTRIBUTING.md (7,000
+  bytes, on master; wave 7's probe had found no on-repo Joplin contributing
+  doc) is a contributor journey (support → bugs → features → code → style →
+  tests), and its readme/dev on the dev branch lists build/style/
+  accessibility/localisation docs only (no reviewing doc); Excalidraw's
+  CONTRIBUTING.md stays a 100-byte stub; Logseq's is a contributor journey
+  with PR guidelines; AppFlowy/AFFiNE carry PR-template checklists only.
+  The honest adoption surface for review structure is the template, not an
+  invented review doc.
+- **PR #274** (squash `1e36b9a`, 9/9 check-runs green): docs-only diff
+  (+70/−2 across PIPELINE.md, pull_request_template.md, PROJECT_STATUS.md);
+  gate re-measured on the branch: lint 0 fail, tsc clean, 1038 unit / 78
+  files 0 fail, 175 e2e / 40 files.
+- **Next cycle**: the v1.16.0 milestone still holds only #193
+  (hardware-blocked); the roadmap says further candidates come from
+  upcoming cycles — the natural next wave is product-parity research from
+  the comparables (which OneNote-style behaviors the majors expose that we
+  lack) rather than more process surface.
+
 ## 2026-11-18 (3) — v1.15.0 release train: the release flow executed live, wave 8 (#270/#271)
 
 - **Task**: cut v1.15.0 per docs/PIPELINE.md's release flow — and use the tag
