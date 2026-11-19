@@ -43,6 +43,69 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-20 — Custom page templates: OneNote Page Templates parity, wave 12 (#286)
+
+- **Task**: wave 12 — the third product-parity wave. The v1.16.0
+  milestone's last implementable issue (#279) — the wave-10/11 entries
+  had already shipped its siblings (#277 tables, #278 file attachments).
+  The issue's evidence pass was done at filing time (OneNote page
+  templates are per-machine by design; Joplin ships a Templates plugin;
+  Logseq/AppFlowy solve the adjacent need with page duplication; ours
+  offered only paper styles + same-section duplication).
+- **Design**: the version-history.ts pure-policy pattern end to end —
+  `src/lib/page-templates.ts` (typed `TemplateError` + toast-ready
+  messages, the 10 MiB payload cap REUSED from
+  `MAX_FILE_ATTACHMENT_BYTES` because a template's payload duplicates on
+  every created page, corrupt-scene parsing restores nothing,
+  case-insensitive picker order), an ADDITIVE Dexie v4 `templates`
+  store (the v2/v3 bumps are the precedent — no migration),
+  `createPageFromTemplate` in the store (the proven `addPage`
+  selection/focus path + paper-style carry-over), two dialogs
+  (save with the page title pre-filled at OPEN time; picker with
+  measured meta rows, confirm-guarded delete, explicit empty state),
+  and templates INCLUDED in notebook backups under the pages'
+  field-tolerance contract (corrupt/oversize/blank-name entries skip
+  silently; fresh ids on restore; old archives restore untouched — the
+  backup `version` stays 1).
+- **Product decision measured live**: a fresh page's first autosave
+  writes an EMPTY scene (`Saved` indicator on a never-edited page), so
+  the "refuse empty pages" guard first planned for save-as-template is
+  WRONG — it would block OneNote's stationery case. Empty pages save as
+  paper-style-only templates (0 elements); PT-E04 pins it.
+- **Lessons (all measured this cycle)**:
+  - The updated react-hooks plugin forbids setState directly inside an
+    effect (`react-hooks/set-state-in-effect`) — prefill-on-open must
+    happen in the OPENING event via a store action
+    (`openSaveTemplate`), the app's rename-draft pattern, not in an
+    effect.
+  - Sonner pauses auto-dismiss while the mouse hovers a toast, and a
+    click's cursor parks exactly where the toast appears (bottom-center)
+    — identical-text toasts from consecutive tests then collide under
+    Playwright strict mode. Fix: `.first()` on toast filters + move the
+    mouse away after asserting.
+  - Escape right after a nested Radix AlertDialog closed can be
+    swallowed (#226 family) — close dialogs via their own Close button
+    in specs that follow the confirm flow.
+  - The sandbox reverted the tree MID-E2E-RUN (not just between calls):
+    the dev server compiles whatever the tree is at boot, a mid-run
+    revert hot-reloads it to the stale code, and the app silently loses
+    the feature under test. Verify HEAD immediately before interactive
+    runs; checkout + run in ONE shell call.
+  - `POST /issues/:n/assets` (PR image upload) answers 404 for this
+    token even though GETs and merges work — the wave-9 Feature-preview
+    section ships textually for now.
+- **Gate**: 1142 unit / 84 files, 0 fail (base 8f3f091: 1113/82 — +29:
+  16 PT-P pure + 13 PT-D db); 206 e2e / 43 files; new spec PT-E01..E05
+  5/5; neighbors version-history + crud + background + ui-overlap 20/20.
+  PR #286: 9/9 checks green (4 required), squash `7ee086b`; #279 closed
+  explicitly via API after merge (the body's `Closes #279` line did NOT
+  fire this time — the belt-and-suspenders close is not optional).
+- **Next cycle**: the v1.16.0 release train — version bump, release PR
+  develop→main (MERGE), tag, hand-written release notes under the
+  wave-9 convention (theme: OneNote everyday parity), milestone rotate
+  (v1.16.0 closed, hardware-blocked #193 moved forward per the v1.15.0
+  precedent, v1.17.0 opened), then the next product-parity candidate.
+
 ## 2026-11-19 (3) — General file attachments: OneNote Insert > File Attachment parity, wave 11 (#283)
 
 - **Task**: wave 11 — the second PRODUCT-PARITY wave, per the wave-10
