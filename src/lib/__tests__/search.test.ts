@@ -215,3 +215,43 @@ describe("search — PDF attachment names (docs/test-plans/pdf-attachment.md, AT
     expect(hits[0].snippet).toContain("quarterly-report.pdf");
   });
 });
+
+describe("search — general file attachment names (issue #278, ATT-SF*)", () => {
+  const fileChipScene = (name: unknown) =>
+    JSON.stringify({
+      elements: [
+        { type: "embeddable", id: "chip1", link: "infinitenote:file", customData: { fileName: name } },
+      ],
+      files: {},
+    });
+
+  it("ATT-SF01: emits the chip's fileName as searchable content", () => {
+    expect(extractSearchableText(fileChipScene("archive.zip"))).toEqual([
+      "archive.zip",
+    ]);
+  });
+
+  it("ATT-SF02: blank names are not emitted", () => {
+    expect(extractSearchableText(fileChipScene("   "))).toEqual([]);
+    expect(extractSearchableText(fileChipScene(""))).toEqual([]);
+  });
+
+  it("ATT-SF03: non-embeddable elements carrying fileName stay out of search", () => {
+    const otherScene = JSON.stringify({
+      elements: [{ type: "image", id: "i1", customData: { fileName: "x.zip" } }],
+      files: {},
+    });
+    expect(extractSearchableText(otherScene)).toEqual([]);
+  });
+
+  it("ATT-SF04: a page whose only content is a chip is found by the file name", () => {
+    const idx = buildSearchIndex([nb], [sec], [
+      page("p1", "Meeting", fileChipScene("archive.zip")),
+      page("p2", "Other", scene("unrelated body text")),
+    ]);
+    const hits = searchIndex(idx, "archive");
+    expect(hits).toHaveLength(1);
+    expect(hits[0].pageId).toBe("p1");
+    expect(hits[0].snippet).toContain("archive.zip");
+  });
+});

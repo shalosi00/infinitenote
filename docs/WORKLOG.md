@@ -43,6 +43,67 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-19 (3) — General file attachments: OneNote Insert > File Attachment parity, wave 11 (#283)
+
+- **Task**: wave 11 — the second PRODUCT-PARITY wave, per the wave-10
+  entry's pointer ("general file attachments (#278 …) is the next
+  product-parity candidate"). The issue's evidence pass was already done
+  at filing time: OneNote's Insert > File Attachment embeds ANY file that
+  stays downloadable from the page; Joplin/Logseq treat attachments as
+  core; ours shipped only two special-cased embeddables (audio #67, PDF
+  #204) and a generic file died on "unsupported type". #278 shipped this
+  cycle and the issue closed explicitly via API (the PR body's plain
+  `Closes #278` line did fire, but the explicit close is the proven belt).
+- **Design**: a generalization, NOT new machinery — the PDF-chip pattern
+  end to end. New pure `src/lib/file-attachment.ts` (no Excalidraw
+  imports): `infinitenote:file` marker scheme, the 10 MiB cap
+  (`MAX_FILE_ATTACHMENT_BYTES`, the PDF/audio data-size policy), MIME
+  honesty (`withFileMime` rebuilds the octet-stream default to the
+  recorded MIME and preserves `;`-params; empty payloads are legal 0-byte
+  files), validated `fileAttachmentOf` (all four customData fields or
+  null), generic `fileDataUrlToBlob`, `formatFileSize` (1024-based, one
+  decimal below 10 of a unit), `fileBadgeLabel` (extension uppercased,
+  4-char cap, "FILE" fallback), and a combined rotation-exact hit-test
+  across BOTH chip kinds (`hitTestAttachment` returns pdf|file). Client:
+  `makeFileAttachmentElement` (neutral-slate embeddable, customData
+  `{ fileName, fileData, fileSize, fileMime }`) + `attachFiles` (cap
+  check BEFORE scene mutation, ONE updateScene per batch, no programmatic
+  selection — the HWR-E05/E06 focus-race lesson re-applied). UI: the
+  Import menu's "File attachment (any file)…" picker with NO accept
+  restriction (that is the feature), wired through the REAL file chooser;
+  drag-drop/import of any `classifyFile` "unknown" file now attaches
+  instead of dying; the shared three-item context menu; `fileName`
+  search-indexed like `audioName`/`pdfName` (zero structural change).
+- **Two measured design facts** (both written into the test plan):
+  1. A PDF through the explicit attach path embeds WITHOUT printout pages
+     (FA-E11: chip only, zero images) — OneNote's own split: drop may
+     convert, Insert > File Attachment never does.
+  2. Excalidraw's history COALESCES consecutive snapshots, so several
+     rapid attach batches share one undo entry — the honest contract is
+     "undo removes the attach" (FA-E15 asserts mobile.zip gone while the
+     pre-reload archive.zip survives), not "one press per batch". The
+     handwriting-undo lessons re-proven: sonner toasts steal keyboard
+     focus, and the first Ctrl+Z after an interaction can be a no-op.
+- **PR #283** (squash `46f45b9`, 9/9 check-runs green on head
+  `c9d707a` — lint-typecheck-test, e2e, build-smoke, size-report + CodeQL,
+  title, labeler, coverage, unit-coverage): 48 new unit tests
+  (file-attachment 32 + edges 12, search ATT-SF01–04), 15 new E2E
+  checks (e2e/file-attachment.spec.ts FA-E01..E15). Two e2e flake-sources
+  caught locally and pinned: repeated identical toasts need a
+  newest-toast assertion (sonner keeps past toasts in the DOM — strict
+  mode), and undo needs the toasts-detached + hit-tested-focus recipe.
+  Neighbors spot-run clean: pdf-attachment 11/11, ui-overlap 5/5,
+  table+canvas 14/14, search-trash+imports 13/13. Counts re-measured on
+  the branch (base `2bd2b7c`): 1113 unit / 82 files, 0 fail; 201 e2e /
+  42 files. The recurring stale-count drift swept (README badge,
+  CONTRIBUTING, AGENTS.md — which had drifted to 185 again —
+  copilot-instructions, PR template, PIPELINE required-checks rows).
+- **Next cycle**: custom page templates (#279 — save a page as a
+  reusable template, the OneNote "page templates" parity) is the next
+  product-parity candidate; #193 stays hardware-blocked in v1.16.0. If
+  v1.16.0 completes, run the release train per docs/PIPELINE.md (the
+  wave-9 release-notes convention now governs the notes).
+
 ## 2026-11-19 (2) — Tables on pages: OneNote Insert > Table parity, wave 10 (#280)
 
 - **Task**: wave 10 — the first PRODUCT-PARITY wave, the direction the wave-9

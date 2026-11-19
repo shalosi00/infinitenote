@@ -32,6 +32,13 @@ export interface CanvasApi {
    */
   insertTable: (rows: number, cols: number) => boolean;
   /**
+   * Attach one or more files as OneNote-style file chips (issue #278,
+   * OneNote "Insert > File Attachment" parity): byte-exact embedded
+   * originals, downloadable offline. Files past the 10 MiB cap are
+   * skipped with an explicit toast; toasting lives in the canvas.
+   */
+  attachFiles: (files: File[]) => Promise<void>;
+  /**
    * Convert recognized handwriting to editable text (issue #176 Phase B):
    * per-group when ink is selected, whole page otherwise; returns the
    * counts the completion toast needs.

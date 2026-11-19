@@ -39,10 +39,14 @@ import {
   exportSceneFile,
   appendScene,
 } from "@/lib/excalidraw-client";
-import { exportPagePdf } from "@/lib/pdf-export";
+import {
+  exportPagePdf,
+} from "@/lib/pdf-export";
+import {
+  attachFiles as attachFilesImpl,
+} from "@/lib/excalidraw-client";
 import { audioPayloadOf, isAudioBlockLink } from "@/lib/audio-notes";
 import {
-  hitTestPdfAttachment,
   isPdfAttachmentLink,
   pdfAttachmentOf,
   pdfAttachmentSkippedToast,
@@ -51,6 +55,19 @@ import {
   type PdfAttachment,
   type PdfAttachmentElementLike,
 } from "@/lib/pdf-attachment";
+import {
+  fileAttachmentSkippedToast,
+  fileAttachedToast,
+  fileBadgeLabel,
+  fileDataUrlToBlob,
+  fileAttachmentOf,
+  formatFileSize,
+  hitTestAttachment,
+  isFileAttachmentLink,
+  type AttachmentHit,
+  type FileAttachment,
+  type FileAttachmentElementLike,
+} from "@/lib/file-attachment";
 import {
   hitTableCell,
   MAX_COLS,
@@ -228,11 +245,60 @@ function PdfAttachmentChip({
   );
 }
 
+/**
+ * Renderer for generic file attachment chips (issue #278): neutral slate
+ * badge with the file's extension, the name, and the human-readable size.
+ */
+function FileAttachmentChip({
+  element,
+  theme,
+}: {
+  element: ExcalidrawEmbeddableElement;
+  theme: "light" | "dark";
+}) {
+  const attachment = fileAttachmentOf(element);
+  if (!attachment) return null; // corrupted block — let Excalidraw render its default
+  const dark = theme === "dark";
+  return (
+    <div
+      data-testid="file-attachment-chip"
+      className="flex h-full w-full items-center gap-2 px-2"
+      style={{
+        background: dark ? "#2a2a33" : "#f3f3f7",
+        color: dark ? "#d8d8e2" : "#3f3f4a",
+        fontFamily: "system-ui, sans-serif",
+      }}
+      title={attachment.name}
+    >
+      <span
+        data-testid="file-attachment-badge"
+        className="flex h-6 w-9 shrink-0 items-center justify-center rounded text-[9px] font-bold text-white"
+        style={{ background: "#475569" }}
+        aria-hidden="true"
+      >
+        {fileBadgeLabel(attachment.name)}
+      </span>
+      <span
+        data-testid="file-attachment-name"
+        className="truncate text-[11px] leading-tight"
+      >
+        {attachment.name}
+      </span>
+      <span
+        data-testid="file-attachment-size"
+        className="ml-auto shrink-0 text-[10px] opacity-70"
+      >
+        {formatFileSize(attachment.size)}
+      </span>
+    </div>
+  );
+}
+
 /** The attachment context menu open state: cursor position + target file. */
 interface PdfMenuState {
   x: number;
   y: number;
-  attachment: PdfAttachment;
+  attachment: PdfAttachment | FileAttachment;
 }
 
 /** The table context menu open state: cursor position + the hit cell. */
@@ -325,10 +391,11 @@ function TableMenu({
 }
 
 /**
- * Right-click menu for PDF attachment chips (docs/test-plans/
- * pdf-attachment.md): View file (blob URL in a new tab), Download file
- * (byte-exact original), Copy file name. Fixed to the cursor, clamped
- * into the viewport; closes on Escape, any outside pointerdown, wheel/pan
+ * Right-click menu for attachment chips — BOTH kinds since issue #278
+ * (PDF chips, docs/test-plans/pdf-attachment.md, and generic file chips):
+ * View file (blob URL in a new tab), Download file (byte-exact original),
+ * Copy file name. Fixed to the cursor, clamped into the viewport; closes
+ * on Escape, any outside pointerdown, wheel/pan
  * or a contextmenu that misses the chip.
  */
 function PdfAttachmentMenu({
@@ -633,6 +700,24 @@ export default function ExcalidrawCanvas({
               onToast(`Imported scene \"${sceneFile.name}\"`);
             }
           }
+          // everything else becomes a OneNote-style file attachment chip
+          // (issue #278): a generic file (zip, spreadsheet, source file,
+          // …) used to die on "unsupported type" — now it embeds as a
+          // byte-exact, downloadable chip, so a drop is never a dead end
+          const others = files.filter((f) => classifyFile(f) === "unknown");
+          if (others.length) {
+            const outcome = await attachFilesImpl(api, others);
+            if (outcome.attached.length) {
+              touched = true;
+              onToast(fileAttachedToast(outcome.attached.length));
+            }
+            for (const name of outcome.skippedLarge) {
+              onToast(fileAttachmentSkippedToast(name));
+            }
+            for (const name of outcome.skippedInvalid) {
+              onToast(`Skipped the file attachment for "${name}" — its contents could not be read.`);
+            }
+          }
           const known =
             images.length +
             texts.length +
@@ -641,7 +726,8 @@ export default function ExcalidrawCanvas({
             docxFiles.length +
             htmlFiles.length +
             mhtFiles.length +
-            audioFiles.length;
+            audioFiles.length +
+            others.length;
           if (files.length > known) {
             onToast("Some files were skipped (unsupported type)");
           }
@@ -672,6 +758,22 @@ export default function ExcalidrawCanvas({
             return false;
           }
           return true;
+        },
+        // issue #278: OneNote "Insert > File Attachment" — per-file skip
+        // toasts, one batch toast on success
+        attachFiles: async (files) => {
+          const outcome = await attachFilesImpl(api, files);
+          if (outcome.attached.length) {
+            onToast(fileAttachedToast(outcome.attached.length));
+            latestScene.current = getScenePayload(api);
+            scheduleSave();
+          }
+          for (const name of outcome.skippedLarge) {
+            onToast(fileAttachmentSkippedToast(name));
+          }
+          for (const name of outcome.skippedInvalid) {
+            onToast(`Skipped the file attachment for "${name}" — its contents could not be read.`);
+          }
         },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
@@ -795,14 +897,16 @@ export default function ExcalidrawCanvas({
     }
   }, []);
 
-  /* ----------------- PDF attachment chip context menu ----------------- */
+  /* --------------- attachment chip context menu (both kinds) --------------- */
 
   /**
    * Capture-phase contextmenu interception (docs/test-plans/
    * pdf-attachment.md): client coords → scene coords via Excalidraw's
    * own transform, then a rotation-exact hit-test against the live chip
-   * elements. A hit opens OUR menu (and suppresses the native + Excalidraw
-   * menus); a miss closes ours and lets the event flow untouched.
+   * elements — BOTH kinds since issue #278 (generic file chips and PDF
+   * chips share the menu layer). A hit opens OUR menu (and suppresses the
+   * native + Excalidraw menus); a miss closes ours and lets the event
+   * flow untouched.
    */
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -829,10 +933,10 @@ export default function ExcalidrawCanvas({
         return;
       }
       setTableMenu(null);
-      const hit = hitTestPdfAttachment(
+      const hit = hitTestAttachment(
         scene.x,
         scene.y,
-        api.getSceneElements() as unknown as readonly PdfAttachmentElementLike[],
+        api.getSceneElements() as unknown as readonly (PdfAttachmentElementLike | FileAttachmentElementLike)[],
       );
       if (!hit) {
         setPdfMenu(null);
@@ -840,7 +944,7 @@ export default function ExcalidrawCanvas({
       }
       e.preventDefault();
       e.stopPropagation();
-      setPdfMenu({ x: e.clientX, y: e.clientY, attachment: hit });
+      setPdfMenu({ x: e.clientX, y: e.clientY, attachment: hit.attachment });
     };
     wrapper.addEventListener("contextmenu", onContextMenu, true);
     return () => wrapper.removeEventListener("contextmenu", onContextMenu, true);
@@ -860,7 +964,10 @@ export default function ExcalidrawCanvas({
         return;
       }
       try {
-        const blob = pdfDataUrlToBlob(menu.attachment.dataUrl);
+        const blob =
+          "mime" in menu.attachment
+            ? fileDataUrlToBlob(menu.attachment.dataUrl)
+            : pdfDataUrlToBlob(menu.attachment.dataUrl);
         if (action === "download") {
           downloadBlob(blob, menu.attachment.name);
           return;
@@ -873,7 +980,7 @@ export default function ExcalidrawCanvas({
         window.open(url, "_blank");
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch {
-        onToast("Could not read the attached PDF.");
+        onToast("Could not read the attached file.");
       }
     },
     [onToast],
@@ -907,14 +1014,20 @@ export default function ExcalidrawCanvas({
 
   /**
    * Custom renderer for embeddable elements (issue #67): audio clips get a
-   * native `<audio controls>` player and PDF printouts get the OneNote-style
-   * file chip (docs/test-plans/pdf-attachment.md); everything else falls
-   * back to Excalidraw's default iframe (returning null/undefined does that).
+   * native `<audio controls>` player, PDF printouts get the OneNote-style
+   * file chip (docs/test-plans/pdf-attachment.md) and generic file
+   * attachments get the issue-#278 chip; everything else falls back to
+   * Excalidraw's default iframe (returning null/undefined does that).
    */
   const renderEmbeddable = useCallback(
     (element: ExcalidrawEmbeddableElement, _appState: AppState) => {
       if (isPdfAttachmentLink(element.link)) {
         return <PdfAttachmentChip element={element} theme={theme} />;
+      }
+      // generic file chips (issue #278) — the same embeddable pattern as
+      // the PDF chip above, for any file OneNote would attach
+      if (isFileAttachmentLink(element.link)) {
+        return <FileAttachmentChip element={element} theme={theme} />;
       }
       if (!isAudioBlockLink(element.link)) return null;
       return <AudioEmbeddablePlayer element={element} theme={theme} />;
@@ -975,10 +1088,13 @@ export default function ExcalidrawCanvas({
           },
         }}
         libraryReturnUrl={typeof window !== "undefined" ? window.location.origin : undefined}
-        // only our audio blocks (AUDIO_LINK_SCHEME marker) and PDF
-        // attachment chips (infinitenote:pdf) may mount interactive embeds;
-        // every other embeddable stays rejected, exactly as before
-        validateEmbeddable={(url) => isAudioBlockLink(url) || isPdfAttachmentLink(url)}
+        // only our audio blocks (AUDIO_LINK_SCHEME marker), PDF attachment
+        // chips (infinitenote:pdf) and generic file chips (infinitenote:file,
+        // issue #278) may mount interactive embeds; every other embeddable
+        // stays rejected, exactly as before
+        validateEmbeddable={(url) =>
+          isAudioBlockLink(url) || isPdfAttachmentLink(url) || isFileAttachmentLink(url)
+        }
       />
       {pdfMenu && (
         <PdfAttachmentMenu
