@@ -43,6 +43,85 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-19 (2) — Tables on pages: OneNote Insert > Table parity, wave 10 (#280)
+
+- **Task**: wave 10 — the first PRODUCT-PARITY wave, the direction the wave-9
+  entry named ("which OneNote-style behaviors the majors expose that we
+  lack, rather than more process surface"). Evidence pulled from the API and
+  the web: OneNote's "Insert > Table" is a first-class everyday action
+  (support.microsoft.com); the comparables are table-first (Joplin ships an
+  interactive markdown table editor plus the `markdown-it-multimd-table`
+  dependency — release notes v3.7.12/v3.7.13/v3.7.21 all touch it; AppFlowy's
+  0.14.8 ships "Simple table conversion"; Logseq's 2.0.2 calls out table
+  scrolling; AFFiNE's blocksuite tree is organized around data-view/database
+  blocks); Excalidraw has NO table element (source-verified against
+  packages/element/src/types.ts — arrow/document/embeddable/freedraw/iframe/
+  image/line/stickynote/text/video); our src/ had only the shadcn UI-kit
+  table. v1.16.0 gained three product-parity issues (#277 tables —
+  implemented this cycle, #278 general file attachments, #279 custom page
+  templates) and tables SHIPPED.
+- **Design**: pure `src/lib/table-insert.ts` (uniform-grid geometry, per-cell
+  bound-text extraction, skeleton building, structural-op planning, cell
+  hit-test — no @excalidraw imports, bun-testable) + `insertTable` /
+  `applyTableOp` in excalidraw-client (the shape-library insertion path,
+  rebuild in ONE updateScene = one undo step) + the header toolbar popover
+  (defaults 3×3, OneNote's starter grid) + the cell context menu (the
+  PDF-chip pattern). Cells are white-filled containers with bound labels;
+  double-click types into a cell (the non-transparent-container flow;
+  transform.ts skips empty labels so untapped cells ship no text child).
+- **Two design evolutions from live e2e measurement** (both written back
+  into issue #277's body):
+  1. The planned `groupIds: [tableId]` shared group was DROPPED —
+     Excalidraw's double-click turns an ALREADY-SELECTED GROUP into
+     group-leaf selection and returns (handleCanvasDoubleClick's
+     selectedGroupIds branch, identical in 0.18.1 and master), so a grouped
+     cell can never reach the double-click-to-type flow. The OneNote
+     behavior — click into a cell, type — wins; cells stay ungrouped,
+     whole-table moves work by rubber-band selection, ops key off
+     customData markers not selection.
+  2. Table INSERT deselects on purpose — the HWR-E05/E06 lesson re-proven:
+     the programmatic auto-select mounts the Selected-shape-actions panel
+     which races the canvas for keyboard focus and killed the editor before
+     the first keystroke (measured: editing:false at t+30ms with
+     textareas:0).
+- **Ghost-label hazard caught by e2e TB-E03**: the rebuild tombstoned the
+  marked cells/borders but NOT their unmarked bound labels — the old
+  "revenue Q1" survived a row insert as a floating text. Fix: one doomed-id
+  set serves the whole-table delete and the rebuild alike (labels die with
+  their cells).
+- **Responsive header + mobile parity**: the toolbar trigger hides below
+  640px — the header was already at capacity at 320px and the ui-overlap
+  audit pinned it ("Export@300,8 extends past the viewport edge"; caught in
+  CI, fixed in the same PR). Phones insert via the ⋯ page-actions menu's
+  "Insert table 3×3" (TB-E11 pins the handler; the overlap audit pins the
+  hiding).
+- **Structural ops**: Add row below / Add column right / Delete row /
+  Delete column / Delete table from the cell's right-click menu; 1×1
+  deletion floor + 20×12 growth ceiling refuse with explicit toasts;
+  uniform-grid rule normalizes dragged cells on the next op (the (0,0) cell
+  anchors the grid). Cell text is indexed by the existing full-text search
+  with ZERO search changes; every export path needs no changes (borders
+  export as vectors, labels as text).
+- **PR #280** (squash `358aa0f`, 9/9 check-runs green on the head sha —
+  lint-typecheck-test, e2e, build-smoke, size-report + CodeQL, title,
+  labeler, coverage): 27 new unit tests (table-insert + table-insert-edges),
+  11 new E2E checks (e2e/table.spec.ts TB-E01..E11); neighbors spot-run
+  clean (shape-library + canvas + pdf-attachment: 23, ui-overlap: 5/5).
+  Counts re-measured on the wave-10 branch (base 460d0ff): 1065 unit / 80
+  files, 0 fail; 186 e2e / 41 files. The recurring stale-count drift swept
+  (README badge, CONTRIBUTING, AGENTS.md, copilot-instructions, PR template,
+  PIPELINE required-checks rows). Issue #277 closed explicitly via API —
+  the PR body's "Closes #277" sat inside a checklist item's backticks and
+  GitHub ignored it (hazard 2 again).
+- **Sandbox residue note**: the restore struck between the force-push and
+  the PR-body update — HEAD snapped back to stale main with cron-era
+  commits (5e1c65d) while the pushed branch ref (5f3bc3c) survived; the
+  remote tracking data told the truth. No work lost: push early holds.
+- **Next cycle**: general file attachments (#278 — the OneNote "Insert >
+  File Attachment" parity, a generalization of the shipped PDF-chip
+  pattern) is the next product-parity candidate; custom page templates
+  (#279) after it; #193 stays hardware-blocked in v1.16.0.
+
 ## 2026-11-19 — Release-notes convention + PR feature preview, wave 9 (#274)
 
 - **Task**: wave 9 of the majors-research directive — the beyond-workflows
