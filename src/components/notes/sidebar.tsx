@@ -23,6 +23,7 @@ import {
   FolderOpen,
   FolderSync,
   Keyboard,
+  LayoutTemplate,
   ListChecks,
   MoreHorizontal,
   Palette,
@@ -559,6 +560,7 @@ function SectionNode({
   const expanded = useAppStore((s) => s.expanded.has(section.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addPage = useAppStore((s) => s.addPage);
+  const openTemplatesPicker = useAppStore((s) => s.openTemplatesPicker);
   const rename = useAppStore((s) => s.renameSection);
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
@@ -617,6 +619,9 @@ function SectionNode({
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuItem onClick={() => void addPage(section.id)}>
               <Plus /> {"New page"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openTemplatesPicker(section.id)}>
+              <LayoutTemplate /> {"New page from template…"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(section.id)}>
               <Pencil /> {"Rename"}

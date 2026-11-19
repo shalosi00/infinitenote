@@ -13,6 +13,9 @@
  *   manifest. Both are additive stores — no data migration needed.
  * - v3 (version history): `pageVersions` holds per-page scene snapshots
  *   (auto / manual / pre-restore) with a FIFO budget — additive again.
+ * - v4 (page templates, issue #279): `templates` stores reusable page
+ *   scenes under user-chosen names — additive once more; templates are
+ *   local-only by design (OneNote semantics) and ride in notebook backups.
  */
 import Dexie, { type Table } from "dexie";
 import { generatedNames } from "./generated-names";
@@ -29,6 +32,16 @@ import {
   type PageVersionSummary,
 } from "./version-history";
 import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
+import {
+  MAX_TEMPLATE_BYTES,
+  TemplateError,
+  buildTemplateRow,
+  parseTemplateContent,
+  sortTemplatesForPicker,
+  validateTemplateName,
+  type TemplateRow,
+  type TemplateSummary,
+} from "./page-templates";
 
 /** Purge tombstone — `purged: true` entries of the sync trash log. */
 export interface TombstoneRow {
@@ -52,6 +65,7 @@ export class InfiniteNoteDB extends Dexie {
   tombstones!: Table<TombstoneRow, string>;
   syncMeta!: Table<SyncMetaRow, string>;
   pageVersions!: Table<PageVersionRow, string>;
+  templates!: Table<TemplateRow, string>;
 
   constructor() {
     super("infinitenote");
@@ -75,6 +89,15 @@ export class InfiniteNoteDB extends Dexie {
       syncMeta: "key",
       pageVersions: "id, pageId, createdAt",
     });
+    this.version(4).stores({
+      notebooks: "id, order, deletedAt",
+      sections: "id, notebookId, order, deletedAt",
+      pages: "id, sectionId, order, deletedAt, [sectionId+deletedAt]",
+      tombstones: "id",
+      syncMeta: "key",
+      pageVersions: "id, pageId, createdAt",
+      templates: "id, name, createdAt",
+    });
   }
 }
 
@@ -90,6 +113,9 @@ export function newId(): string {
 }
 
 const now = () => Date.now();
+
+/** Fallback name for backup templates whose name field is blank/missing. */
+const RESTORED_TEMPLATE_NAME = "Restored template";
 
 /** All alive rows sorted by order (nulls/deleted filtered). */
 function alive<T extends { order: number; createdAt: number; id: string; deletedAt: number | null }>(
@@ -626,6 +652,59 @@ export async function getPageVersionContent(
 }
 
 /* ------------------------------------------------------------------ */
+/* page templates (v4, issue #279 — OneNote page templates parity)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Save a scene payload as a reusable template. Validates the name and
+ * enforces the attachment-size cap (a template's payload duplicates on
+ * every page created from it — the same rationale as the attachment cap).
+ * Throws TemplateError (typed) so the UI maps the code to an explicit toast.
+ */
+export async function saveTemplate(
+  rawName: string,
+  payload: ScenePayload,
+  background?: PageRow["background"],
+): Promise<TemplateSummary> {
+  const name = validateTemplateName(rawName);
+  const row = buildTemplateRow(name, payload, background, now());
+  if (row.byteSize > MAX_TEMPLATE_BYTES) throw new TemplateError("too-large");
+  await db.templates.add(row);
+  const { content: _content, ...summary } = row;
+  return summary;
+}
+
+/** All templates in picker order — summaries only (content stays in the DB). */
+export async function listTemplates(): Promise<TemplateSummary[]> {
+  const rows = await db.templates.toArray();
+  return sortTemplatesForPicker(rows).map(({ content: _content, ...summary }) => summary);
+}
+
+/** Full row of one template (content included), or null. */
+export async function getTemplateRow(id: string): Promise<TemplateRow | null> {
+  const row = await db.templates.get(id);
+  return row ?? null;
+}
+
+/**
+ * The scene a stored template holds. Corrupt rows (bad JSON, wrong shape)
+ * restore nothing rather than garbage — null means "skip", never "crash".
+ */
+export async function getTemplateContent(id: string): Promise<ScenePayload | null> {
+  const row = await db.templates.get(id);
+  if (!row) return null;
+  return parseTemplateContent(row.content);
+}
+
+/**
+ * Hard-delete a template. Templates have no trash: they are labels plus
+ * scenes, not pages — pages already created from a template are untouched.
+ */
+export async function deleteTemplate(id: string): Promise<void> {
+  await db.templates.delete(id);
+}
+
+/* ------------------------------------------------------------------ */
 /* trash listing                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -661,13 +740,14 @@ export async function listTrash(): Promise<TrashSnapshot> {
  * instead of being blocked by tombstones for rows the user just erased.
  */
 export async function eraseAllData(): Promise<void> {
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.syncMeta, db.pageVersions], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.tombstones, db.syncMeta, db.pageVersions, db.templates], async () => {
     await db.notebooks.clear();
     await db.sections.clear();
     await db.pages.clear();
     await db.tombstones.clear();
     await db.syncMeta.clear();
     await db.pageVersions.clear();
+    await db.templates.clear();
   });
 }
 
@@ -676,10 +756,11 @@ export async function eraseAllData(): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 export async function buildBackup(): Promise<string> {
-  const [notebooks, sections, pages] = await Promise.all([
+  const [notebooks, sections, pages, templates] = await Promise.all([
     db.notebooks.toArray(),
     db.sections.toArray(),
     db.pages.toArray(),
+    db.templates.toArray(),
   ]);
   const sorted = <T extends { order: number; createdAt: number; id: string }>(arr: T[]) =>
     [...arr].sort(byOrder);
@@ -700,6 +781,16 @@ export async function buildBackup(): Promise<string> {
               .map((p) => ({ ...p })),
           })),
       })),
+    // templates ride in backups (issue #279) — they are the user's
+    // reusable content, unlike pageVersions (page-scoped machinery)
+    templates: sortTemplatesForPicker(templates).map((t) => ({
+      name: t.name,
+      createdAt: t.createdAt,
+      elementCount: t.elementCount,
+      byteSize: t.byteSize,
+      background: t.background,
+      content: t.content,
+    })),
   };
   return JSON.stringify(backup, null, 2);
 }
@@ -749,13 +840,18 @@ export async function restoreBackup(json: string): Promise<number> {
       }>;
       }>;
     }>;
+    templates?: Array<{
+      name?: string;
+      content?: string | null;
+      background?: PageRow["background"];
+    }>;
   };
   if (parsed?.app !== "infinitenote" || !Array.isArray(parsed.notebooks)) {
     throw new RestoreError("Not an InfiniteNote backup file");
   }
   let pageCount = 0;
   const ts = now();
-  await db.transaction("rw", [db.notebooks, db.sections, db.pages], async () => {
+  await db.transaction("rw", [db.notebooks, db.sections, db.pages, db.templates], async () => {
     const notebooks = await db.notebooks.toArray();
     let maxOrder = Math.max(0, ...notebooks.map((n) => n.order));
     for (const nb of parsed.notebooks!) {
@@ -806,6 +902,24 @@ export async function restoreBackup(json: string): Promise<number> {
           });
         }
       }
+    }
+    // templates ride in backups (issue #279). Same tolerance contract as
+    // pages: corrupt scenes, missing names and oversize payloads skip
+    // silently rather than crash the restore — a backup restores as much
+    // as it honestly can.
+    for (const tpl of parsed.templates ?? []) {
+      if (typeof tpl !== "object" || tpl === null) continue;
+      if (typeof tpl.content !== "string") continue;
+      const payload = parseTemplateContent(tpl.content);
+      if (!payload) continue;
+      const row = buildTemplateRow(
+        typeof tpl.name === "string" && tpl.name.trim() ? tpl.name.trim() : RESTORED_TEMPLATE_NAME,
+        payload,
+        tpl.background,
+        ts,
+      );
+      if (row.byteSize > MAX_TEMPLATE_BYTES) continue;
+      await db.templates.add(row);
     }
   });
   return pageCount;
