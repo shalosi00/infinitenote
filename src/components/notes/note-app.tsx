@@ -21,6 +21,7 @@ import {
   MoreHorizontal,
   NotebookPen,
   PackageOpen,
+  Paperclip,
   PenLine,
   Printer,
   ScanText,
@@ -584,8 +585,20 @@ export default function NoteApp() {
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const backupInputRef = useRef<HTMLInputElement>(null);
+  // issue #278: the file-attachment picker accepts ANY file — no accept
+  // restriction — because whatever the user picks is embedded byte-exactly
+  const attachInputRef = useRef<HTMLInputElement>(null);
 
   const openFilePicker = () => importInputRef.current?.click();
+
+  const handleAttachFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (!canvasApi.current) {
+      toast.error("Open a page first, then attach files.");
+      return;
+    }
+    await canvasApi.current.attachFiles(Array.from(files));
+  };
 
   const handleImportFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -1004,6 +1017,21 @@ export default function NoteApp() {
             e.target.value = "";
           }}
         />
+        {/* issue #278: OneNote "Insert > File Attachment" — any file embeds
+            as a byte-exact, downloadable chip; no accept restriction on
+            purpose (that is the whole feature) */}
+        <input
+          ref={attachInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          aria-label={"Attach file"}
+          data-testid="attach-file-input"
+          onChange={(e) => {
+            void handleAttachFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
         {/* curated shape library (issue #65) — header toolbar, desktop + mobile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1120,8 +1148,14 @@ export default function NoteApp() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>{"Insert into current page"}</DropdownMenuLabel>
-            <DropdownMenuItem onClick={openFilePicker}>
+            <DropdownMenuItem onClick={openFilePicker} data-testid="import-content">
               <ImageIcon /> {"Images, PDF, Word, HTML, text, audio…"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => attachInputRef.current?.click()}
+              data-testid="import-attach-file"
+            >
+              <Paperclip /> {"File attachment (any file)…"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{"Library"}</DropdownMenuLabel>
