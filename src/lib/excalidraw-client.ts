@@ -81,6 +81,15 @@ import {
   withPdfMime,
   type PdfAttachmentOutcome,
 } from "./pdf-attachment";
+import {
+  FILE_ATTACHMENT_HEIGHT,
+  FILE_ATTACHMENT_LINK_SCHEME,
+  FILE_ATTACHMENT_WIDTH,
+  fileAttachmentSkippedToast,
+  fileAttachedToast,
+  isFileAttachmentTooLarge,
+  withFileMime,
+} from "./file-attachment";
 
 const now = () => Date.now();
 
@@ -652,6 +661,118 @@ export async function importPdfAsPrintout(
   }
   applySkeletons(api, skeletons, newFiles, chip ? [chip] : []);
   return { rendered: skeletons.length, total, attachment: attachment.kind };
+}
+
+/* ------------------------------------------------------------------ */
+/* general file attachments (issue #278)                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The OneNote "Insert > File Attachment" chip for ANY file (issue #278,
+ * generalizing the PDF chip above): an Excalidraw embeddable whose `link`
+ * carries the `infinitenote:file` marker scheme and whose `customData`
+ * carries the ORIGINAL bytes as a data: URL plus the recorded name, MIME
+ * and byte size. Neutral slate styling distinguishes it from the red PDF
+ * chip; the badge shows the file's extension (formatFileSize /
+ * fileBadgeLabel in lib/file-attachment.ts are unit-tested).
+ */
+export function makeFileAttachmentElement(
+  name: string,
+  mime: string,
+  dataUrl: string,
+  size: number,
+  x: number,
+  y: number
+): ExcalidrawElement {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  return {
+    id: crypto.randomUUID(),
+    type: "embeddable",
+    x,
+    y,
+    width: FILE_ATTACHMENT_WIDTH,
+    height: FILE_ATTACHMENT_HEIGHT,
+    angle: 0,
+    strokeColor: "#475569",
+    backgroundColor: "#f1f5f9",
+    fillStyle: "solid",
+    strokeWidth: 1,
+    strokeStyle: "solid",
+    roughness: 0,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed,
+    version: 1,
+    versionNonce: seed,
+    isDeleted: false,
+    boundElements: null,
+    updated: now(),
+    link: FILE_ATTACHMENT_LINK_SCHEME,
+    locked: false,
+    customData: { fileName: name, fileData: dataUrl, fileSize: size, fileMime: mime },
+  } as unknown as ExcalidrawElement;
+}
+
+/**
+ * Attach one or more files to the current page (issue #278). Each file is
+ * size-capped BEFORE any scene mutation (10 MiB, the PDF/audio stance —
+ * the payload rides every autosave, snapshot and sync copy) and lands as
+ * a chip at the next insert position, each row offset so a batch stays
+ * readable. ONE updateScene per batch = one undo step removes them all.
+ *
+ * Returns the per-file outcomes the caller turns into toasts: attached
+ * names, oversized names (explicitly skipped), and names whose data URL
+ * could not be normalized (defensive — never a corrupt chip).
+ */
+export async function attachFiles(
+  api: ExcalidrawImperativeAPI,
+  files: readonly File[],
+): Promise<{ attached: string[]; skippedLarge: string[]; skippedInvalid: string[] }> {
+  const attached: string[] = [];
+  const skippedLarge: string[] = [];
+  const skippedInvalid: string[] = [];
+  const created: ExcalidrawElement[] = [];
+  const base = nextInsertPosition(api.getSceneElements());
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (isFileAttachmentTooLarge(file.size)) {
+      skippedLarge.push(file.name);
+      continue;
+    }
+    try {
+      const raw = await fileToDataUrl(file);
+      const dataUrl = withFileMime(raw, file.type);
+      if (!dataUrl) {
+        skippedInvalid.push(file.name);
+        continue;
+      }
+      created.push(
+        makeFileAttachmentElement(
+          file.name,
+          file.type || "application/octet-stream",
+          dataUrl,
+          file.size,
+          base.x,
+          base.y + i * (FILE_ATTACHMENT_HEIGHT + 16),
+        ),
+      );
+      attached.push(file.name);
+    } catch {
+      skippedInvalid.push(file.name);
+    }
+  }
+  if (created.length) {
+    // one updateScene = one undo step (the tables precedent); INSERT
+    // deselects on purpose — the HWR-E05/E06 lesson: programmatic
+    // auto-selection mounts the Selected-shape-actions panel and races
+    // the canvas for keyboard focus
+    api.updateScene({
+      elements: [...api.getSceneElements(), ...created],
+    });
+  }
+  return { attached, skippedLarge, skippedInvalid };
 }
 
 /* ------------------------------------------------------------------ */
