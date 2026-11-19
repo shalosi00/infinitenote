@@ -11,6 +11,7 @@ import {
   Download,
   FileDown,
   FileJson,
+  FilePlus2,
   FileUp,
   History,
   Image as ImageIcon,
@@ -60,6 +61,7 @@ import type { PageBackground, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
 import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
+import { TemplateError, TEMPLATE_ERROR_MESSAGES } from "@/lib/page-templates";
 import { SHAPE_CATEGORIES, shapesByCategory } from "@/lib/shape-library";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -90,6 +92,8 @@ import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
 import { HistoryDialog } from "./history-dialog";
+import { SaveTemplateDialog } from "./save-template-dialog";
+import { TemplatesDialog } from "./templates-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
@@ -921,6 +925,38 @@ export default function NoteApp() {
     }
   }, []);
 
+  /* ------------------------------ page templates ---------------------- */
+
+  /**
+   * "Save as template" (issue #279): snapshot exactly what is persisted —
+   * flush pending edits first, then store the scene under the chosen name
+   * with the page's paper style. An EMPTY page saves too (OneNote's
+   * stationery case: the template carries just the paper style) — a fresh
+   * page's first autosave writes an empty scene, which normalizes to a
+   * zero-element payload. Resolves true when saved (the dialog closes);
+   * false after an explicit failure toast (the dialog stays).
+   */
+  const handleSaveAsTemplate = useCallback(async (rawName: string): Promise<boolean> => {
+    const pageId = useAppStore.getState().selection?.pageId;
+    if (!pageId) return false;
+    try {
+      await canvasApi.current?.flushSave();
+      const content = (await db.getPageContent(pageId)) ?? { elements: [], files: {} };
+      const page = useAppStore.getState().pages.find((p) => p.id === pageId);
+      await db.saveTemplate(rawName, content, page?.background);
+      toast.success("Template saved.");
+      return true;
+    } catch (err) {
+      if (err instanceof TemplateError) {
+        toast.error(TEMPLATE_ERROR_MESSAGES[err.code]);
+      } else {
+        console.error(err);
+        toast.error("Could not save the template.");
+      }
+      return false;
+    }
+  }, []);
+
   /* ------------------------------- render ------------------------------ */
 
   if (!loaded) {
@@ -1434,6 +1470,30 @@ export default function NoteApp() {
                       <Type />
                       {hwrConverting ? "Converting handwriting…" : "Convert handwriting to text"}
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      data-testid="save-as-template"
+                      onClick={() => useAppStore.getState().openSaveTemplate()}
+                    >
+                      <LayoutTemplate />
+                      {"Save as template…"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="new-page-from-template"
+                      onClick={() => {
+                        // target: the open page's own section — the natural
+                        // "next page goes here" context (the sidebar's section
+                        // menu targets that section explicitly)
+                        const state = useAppStore.getState();
+                        const sectionId = state.selection?.pageId
+                          ? state.pages.find((p) => p.id === state.selection!.pageId)?.sectionId
+                          : null;
+                        if (sectionId) state.openTemplatesPicker(sectionId);
+                      }}
+                    >
+                      <FilePlus2 />
+                      {"New page from template…"}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -1526,6 +1586,8 @@ export default function NoteApp() {
         onSaveNow={handleSaveVersionNow}
         onRestore={handleRestoreVersion}
       />
+      <SaveTemplateDialog onSave={handleSaveAsTemplate} />
+      <TemplatesDialog />
       <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>

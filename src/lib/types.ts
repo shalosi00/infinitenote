@@ -91,6 +91,16 @@ export interface ScenePayload {
   files: Record<string, { id: string; dataURL: string; mimeType: string; created: number }>;
 }
 
+/** One template inside a backup archive (issue #279) — content included. */
+export interface BackupTemplate {
+  name: string;
+  createdAt: number;
+  elementCount: number;
+  byteSize: number;
+  background?: PageBackground;
+  content: string;
+}
+
 export interface BackupFile {
   app: "infinitenote";
   version: 1;
@@ -100,6 +110,8 @@ export interface BackupFile {
       sections: Array<Section & { pages: Array<PageMeta & { content: string | null }> }>;
     }
   >;
+  /** added with schema v4 — absent in archives exported before templates */
+  templates?: BackupTemplate[];
 }
 
 export const isNotebookColor = (v: unknown): v is NotebookColor =>
