@@ -14,9 +14,9 @@ How work moves from idea to release. Applies to humans and AI agents alike.
 
 | Check | What it does |
 |---|---|
-| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 1038 unit tests (78 files, measured 2026-11-18 at develop `5c2b00d`), plus a secret-leak grep |
+| `lint-typecheck-test` | ESLint, `tsc --noEmit`, 1065 unit tests (80 files, measured 2026-11-19 on the wave-10 branch, base `460d0ff`), plus a secret-leak grep |
 | `build-smoke` | `next build` production build + boots standalone server + HTTP 200 probe |
-| `e2e` | Playwright browser E2E against the production build (175 checks in 40 files, measured 2026-11-18 at develop `5c2b00d`) |
+| `e2e` | Playwright browser E2E against the production build (186 checks in 41 files, measured 2026-11-19 on the wave-10 branch, base `460d0ff`) |
 | `size-report` | builds the production bundle and **enforces** the committed budget in `scripts/size-budget.json` (measured 2026-11-16 at develop `7b24224`: 9,909.1 KiB across 173 `.js` files → 10,400 KiB ceiling, ~5% headroom; budgets move only via a new measurement — the validator rejects a ceiling more than 20% above the recorded one); promoted from non-required to required on both protected branches on 2026-11-18 once the budget had aged — green on every PR since it landed (#258 → #266); over budget → red run and a blocked merge |
 
 CI: `.github/workflows/ci.yml`, runs on every push to `main`/`develop` and every PR

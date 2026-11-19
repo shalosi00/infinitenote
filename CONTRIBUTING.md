@@ -83,8 +83,8 @@ also trigger an automatic PR comment naming the failed jobs).
 bun install
 bun run lint         # must be clean
 bunx tsc --noEmit    # must be clean
-bun test src/lib/__tests__    # 1038 unit tests across 78 files (measured 2026-11-18 at develop 5c2b00d)
-bunx playwright test # 175 checks across 40 files (boots the app automatically if :3000 is free)
+bun test src/lib/__tests__    # 1065 unit tests across 80 files (measured 2026-11-19 on the wave-10 branch, base 460d0ff)
+bunx playwright test # 186 checks across 41 files (boots the app automatically if :3000 is free)
 ```
 
 Add unit tests for new `src/lib` logic in `src/lib/__tests__/`. `make help`

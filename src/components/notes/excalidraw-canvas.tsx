@@ -51,6 +51,12 @@ import {
   type PdfAttachment,
   type PdfAttachmentElementLike,
 } from "@/lib/pdf-attachment";
+import {
+  hitTableCell,
+  MAX_COLS,
+  MAX_ROWS,
+} from "@/lib/table-insert";
+import { applyTableOp, insertTable } from "@/lib/excalidraw-client";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
@@ -229,6 +235,95 @@ interface PdfMenuState {
   attachment: PdfAttachment;
 }
 
+/** The table context menu open state: cursor position + the hit cell. */
+interface TableMenuState {
+  x: number;
+  y: number;
+  tableId: string;
+  row: number;
+  col: number;
+}
+
+/**
+ * Right-click menu for table cells (issue #277): the OneNote-style
+ * structural ops — Add row below / Add column right / Delete row /
+ * Delete column / Delete table. Fixed to the cursor, clamped into the
+ * viewport; closes on Escape, any outside pointerdown, wheel/pan or a
+ * contextmenu that misses the table (the PdfAttachmentMenu behavior).
+ */
+function TableMenu({
+  menu,
+  onClose,
+  onAction,
+}: {
+  menu: TableMenuState;
+  onClose: () => void;
+  onAction: (action: "add-row-below" | "add-col-right" | "delete-row" | "delete-col" | "delete-table") => void;
+}) {
+  const MENU_WIDTH = 208;
+  const ITEM_HEIGHT = 36;
+  const MENU_HEIGHT = ITEM_HEIGHT * 5 + 16;
+  const left = Math.max(8, Math.min(menu.x, window.innerWidth - MENU_WIDTH - 8));
+  const top = Math.max(8, Math.min(menu.y, window.innerHeight - MENU_HEIGHT - 8));
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-table-context-menu]")) return;
+      onClose();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    const onWheel = () => onClose();
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("wheel", onWheel, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("wheel", onWheel);
+    };
+  }, [onClose]);
+
+  const items: Array<{ id: "add-row-below" | "add-col-right" | "delete-row" | "delete-col" | "delete-table"; label: string; testid: string }> = [
+    { id: "add-row-below", label: "Add row below", testid: "table-menu-add-row-below" },
+    { id: "add-col-right", label: "Add column right", testid: "table-menu-add-col-right" },
+    { id: "delete-row", label: "Delete row", testid: "table-menu-delete-row" },
+    { id: "delete-col", label: "Delete column", testid: "table-menu-delete-col" },
+    { id: "delete-table", label: "Delete table", testid: "table-menu-delete-table" },
+  ];
+  return (
+    <div
+      data-table-context-menu=""
+      data-testid="table-context-menu"
+      role="menu"
+      aria-label="Table actions"
+      className="fixed z-50 overflow-hidden rounded-md border bg-popover py-1 text-popover-foreground shadow-md"
+      style={{ left, top, width: MENU_WIDTH }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.id}
+          role="menuitem"
+          data-testid={item.testid}
+          className={
+            item.id === "delete-table"
+              ? "flex w-full cursor-pointer items-center border-t px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+              : "flex w-full cursor-pointer items-center px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+          }
+          onClick={() => onAction(item.id)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Right-click menu for PDF attachment chips (docs/test-plans/
  * pdf-attachment.md): View file (blob URL in a new tab), Download file
@@ -367,6 +462,13 @@ export default function ExcalidrawCanvas({
    * right-click lands on a chip; null while closed.
    */
   const [pdfMenu, setPdfMenu] = useState<PdfMenuState | null>(null);
+
+  /**
+   * Table context menu state (issue #277). Opened by the same capture-phase
+   * contextmenu listener when the right-click lands inside a table cell;
+   * null while closed.
+   */
+  const [tableMenu, setTableMenu] = useState<TableMenuState | null>(null);
 
   /** Write the latest stashed scene into IndexedDB. */
   const doSave = useCallback(async (): Promise<void> => {
@@ -563,6 +665,14 @@ export default function ExcalidrawCanvas({
         },
         // issue #176 Phase B: recognized handwriting → editable text
         convertHandwriting: () => convertHandwritingToText(api),
+        // issue #277: OneNote "Insert > Table" — out-of-bounds sizes toast
+        insertTable: (rows, cols) => {
+          if (!insertTable(api, rows, cols)) {
+            onToast(`Tables support 1-${MAX_ROWS} rows and 1-${MAX_COLS} columns.`);
+            return false;
+          }
+          return true;
+        },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),
@@ -704,6 +814,21 @@ export default function ExcalidrawCanvas({
         { clientX: e.clientX, clientY: e.clientY },
         api.getAppState(),
       );
+      // tables first (issue #277): a cell hit opens the table menu and
+      // suppresses the native + Excalidraw menus exactly like a chip hit
+      const cell = hitTableCell(
+        api.getSceneElements() as unknown as Parameters<typeof hitTableCell>[0],
+        scene.x,
+        scene.y,
+      );
+      if (cell) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPdfMenu(null);
+        setTableMenu({ x: e.clientX, y: e.clientY, ...cell });
+        return;
+      }
+      setTableMenu(null);
       const hit = hitTestPdfAttachment(
         scene.x,
         scene.y,
@@ -750,6 +875,32 @@ export default function ExcalidrawCanvas({
       } catch {
         onToast("Could not read the attached PDF.");
       }
+    },
+    [onToast],
+  );
+
+  /** The five table actions (issue #277): add/delete row/column, delete table. */
+  const handleTableMenuAction = useCallback(
+    (menu: TableMenuState, action: "add-row-below" | "add-col-right" | "delete-row" | "delete-col" | "delete-table") => {
+      setTableMenu(null);
+      const api = apiRef.current;
+      if (!api) return;
+      const op =
+        action === "add-row-below"
+          ? ({ type: "insert-row", at: menu.row } as const)
+          : action === "add-col-right"
+            ? ({ type: "insert-col", at: menu.col } as const)
+            : action === "delete-row"
+              ? ({ type: "delete-row", at: menu.row } as const)
+              : action === "delete-col"
+                ? ({ type: "delete-col", at: menu.col } as const)
+                : ({ type: "delete-table" } as const);
+      const result = applyTableOp(api, menu.tableId, op);
+      if (!result.ok) {
+        onToast(result.error ?? "The table op could not be applied.");
+        return;
+      }
+      if (result.message) onToast(result.message);
     },
     [onToast],
   );
@@ -834,6 +985,13 @@ export default function ExcalidrawCanvas({
           menu={pdfMenu}
           onClose={() => setPdfMenu(null)}
           onAction={(action) => handlePdfMenuAction(pdfMenu, action)}
+        />
+      )}
+      {tableMenu && (
+        <TableMenu
+          menu={tableMenu}
+          onClose={() => setTableMenu(null)}
+          onAction={(action) => handleTableMenuAction(tableMenu, action)}
         />
       )}
       {background === "ruled" && (

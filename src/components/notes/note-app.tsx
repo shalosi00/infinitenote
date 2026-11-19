@@ -29,6 +29,7 @@ import {
   Signature,
   Square,
   Sun,
+  Table2,
   Tags,
   Type,
   Upload,
@@ -204,6 +205,11 @@ export default function NoteApp() {
   const theme = resolvedTheme === "dark" ? "dark" : "light";
 
   const canvasApi = useRef<CanvasApi | null>(null);
+  // OneNote "Insert > Table" popover state (issue #277): defaults 3×3 like
+  // OneNote's starter grid; insert clamps/validates and toasts out-of-bounds
+  const [tableOpen, setTableOpen] = useState(false);
+  const [tableRows, setTableRows] = useState("3");
+  const [tableCols, setTableCols] = useState("3");
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Compact screens cannot fit a flyout submenu beside the export menu (the
   // menu hugs the right edge; the flyout flips left off-screen — the PDF
@@ -1032,6 +1038,70 @@ export default function NoteApp() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* OneNote "Insert > Table" (issue #277) — header toolbar, desktop +
+            mobile; a compact rows×cols popover, defaults 3×3 like OneNote's
+            starter grid */}
+        <Popover open={tableOpen} onOpenChange={setTableOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 hidden sm:inline-flex"
+              data-testid="table-button"
+              aria-label={"Insert table"}
+              title={"Insert table"}
+            >
+              <Table2 className="h-4 w-4" />
+              <span className="hidden sm:inline">{"Table"}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56" data-testid="table-menu">
+            {/* the popover trigger hides below sm (640px) — the header was
+                already at capacity at 320px and the overlap audit pinned it
+                ("Export@300,8 extends past the viewport edge"); phones insert
+                via the ⋯ page-actions menu below (OneNote's starter grid) */}
+            <div className="flex flex-col gap-3">
+              <div className="text-sm font-medium">{"Insert table"}</div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="table-rows" className="w-14 text-sm">{"Rows"}</label>
+                <Input
+                  id="table-rows"
+                  data-testid="table-rows-input"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={tableRows}
+                  onChange={(e) => setTableRows(e.target.value)}
+                  className="h-8"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="table-cols" className="w-14 text-sm">{"Columns"}</label>
+                <Input
+                  id="table-cols"
+                  data-testid="table-cols-input"
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={tableCols}
+                  onChange={(e) => setTableCols(e.target.value)}
+                  className="h-8"
+                />
+              </div>
+              <Button
+                size="sm"
+                data-testid="table-insert-button"
+                onClick={() => {
+                  canvasApi.current?.insertTable(Number(tableRows), Number(tableCols));
+                  setTableOpen(false);
+                }}
+              >
+                {"Insert"}
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {/* aria-label keeps the button named below sm, where the text
@@ -1294,6 +1364,12 @@ export default function NoteApp() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" data-testid="page-actions-menu">
+                    <DropdownMenuItem
+                      data-testid="page-actions-insert-table"
+                      onClick={() => canvasApi.current?.insertTable(3, 3)}
+                    >
+                      <Table2 /> {"Insert table 3×3"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       data-testid="open-version-history"
                       onClick={() => useAppStore.getState().setHistoryOpen(true)}

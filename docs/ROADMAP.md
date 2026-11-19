@@ -173,7 +173,28 @@ milestones/issues. This file is the plan; the status file is the reality.
       v1.15.0 milestone (non-goals unchanged: CJK deferred, vendored model
       unchanged)
 
-## v1.15 — Representative-hardware WebGPU measurement (current)
+## v1.16 — Canvas structure & OneNote everyday parity (current)
+
+- [x] Tables on pages (issue #277): OneNote "Insert > Table" parity — a table
+      inserts from the header toolbar (defaults 3×3) as NATIVE Excalidraw
+      elements: (rows+1)+(cols+1) border lines + white cell containers with
+      bound, editable labels; one click selects the whole table (shared
+      group), double-click types into a cell (OneNote behavior), structural
+      ops (Add row below / Add column right / Delete row / Delete column /
+      Delete table) run from the cell's right-click menu and rebuild the
+      grid in one undo step; 1×1 deletion floor, 20×12 growth ceiling;
+      cell text is indexed by the existing full-text search with no search
+      changes; every export path needs no changes
+      (docs/test-plans/table.md)
+- [ ] General file attachments (issue #278): OneNote "Insert > File
+      Attachment" parity — any file lands a chip generalized from the
+      PDF-chip pattern, byte-exact download, names searchable
+- [ ] Custom page templates (issue #279): save a page as a reusable
+      template, create pages from a template picker (additive Dexie v3
+      table; local-only by design, included in backups)
+
+## v1.15 — Representative-hardware WebGPU measurement (shipped in v1.15.0;
+the hardware-blocked benchmark remainder lives in v1.16.0 as issue #193)
 
 - [ ] #193 remainder: run the committed benchmark (`HWR_BENCH=1
       HWR_BENCH_DEVICE=webgpu bunx playwright test e2e/hwr-bench.spec.ts`)
