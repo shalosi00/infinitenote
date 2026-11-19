@@ -11,6 +11,7 @@ import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete,
 import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./last-page";
 import { quickNoteTitle, todayKey } from "./quick-notes";
 import { generatedNames } from "./generated-names";
+import { parseTemplateContent } from "./page-templates";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
 
@@ -30,6 +31,13 @@ interface AppStore {
   trashOpen: boolean;
   shortcutsOpen: boolean;
   historyOpen: boolean;
+  /** Template picker dialog (issue #279) + the section it creates pages into. */
+  templatesOpen: boolean;
+  templatesTargetSectionId: string | null;
+  /** "Save as template" name dialog (issue #279) — the draft name is
+   *  pre-filled by openSaveTemplate (the app's rename-draft pattern). */
+  saveTemplateOpen: boolean;
+  saveTemplateName: string;
 
   load: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -51,6 +59,13 @@ interface AppStore {
   deleteSection: (id: string) => Promise<void>;
 
   addPage: (sectionId: string, title?: string) => Promise<void>;
+  /**
+   * Create a page from a saved template (issue #279): the template's scene
+   * payload lands on a fresh page and its paper style carries over. Returns
+   * false when the target section is gone or the template is unreadable —
+   * the caller toasts; the picker stays open.
+   */
+  createPageFromTemplate: (sectionId: string, templateId: string) => Promise<boolean>;
   renamePage: (id: string, title: string) => Promise<void>;
   movePage: (id: string, dir: -1 | 1) => Promise<void>;
   duplicatePage: (id: string) => Promise<void>;
@@ -77,6 +92,13 @@ interface AppStore {
   setTrashOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
   setHistoryOpen: (open: boolean) => void;
+  setTemplatesOpen: (open: boolean) => void;
+  setSaveTemplateOpen: (open: boolean) => void;
+  /** Open "Save as template" pre-filled with the open page's title. */
+  openSaveTemplate: () => void;
+  setSaveTemplateName: (name: string) => void;
+  /** Open the template picker for a concrete target section. */
+  openTemplatesPicker: (sectionId: string) => void;
 
   // trash actions (result in refresh)
   restoreFromTrash: (kind: "notebook" | "section" | "page", id: string) => Promise<void>;
@@ -121,6 +143,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   trashOpen: false,
   shortcutsOpen: false,
   historyOpen: false,
+  templatesOpen: false,
+  templatesTargetSectionId: null,
+  saveTemplateOpen: false,
+  saveTemplateName: "",
   tagFilter: null,
   canvasFocus: 0,
 
@@ -268,6 +294,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
   renamePage: async (id, title) => {
     await db.renamePage(id, title);
     await get().refresh();
+  },
+
+  /**
+   * Page from template (issue #279): the proven addPage path plus a
+   * template payload write — fresh page row → scene payload as content →
+   * paper style carried over → refresh → select → canvas focus.
+   */
+  createPageFromTemplate: async (sectionId, templateId) => {
+    const sec = get().sections.find((s) => s.id === sectionId);
+    if (!sec) return false; // section vanished (trashed/purged) — nothing to create into
+    const row = await db.getTemplateRow(templateId);
+    if (!row) return false;
+    const payload = parseTemplateContent(row.content);
+    if (!payload) return false; // corrupt template — the picker stays, the UI toasts
+    const count = get().pages.filter((p) => p.sectionId === sectionId).length;
+    const page = await db.createPage(
+      sectionId,
+      generatedNames().page(count + 1),
+      JSON.stringify(payload),
+    );
+    if (row.background) await db.setPageBackground(page.id, row.background);
+    await get().refresh();
+    set((s) => ({
+      selection: {
+        notebookId: sec.notebookId,
+        sectionId,
+        pageId: page.id,
+      },
+      expanded: new Set([...s.expanded, sectionId]),
+      // a freshly created page must grab keyboard focus (issue #81) —
+      // same mechanism as addPage
+      canvasFocus: s.canvasFocus + 1,
+    }));
+    return true;
   },
   setPageBackground: async (id, background) => {
     await db.setPageBackground(id, background);
@@ -428,6 +488,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setTrashOpen: (open) => set({ trashOpen: open }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
   setHistoryOpen: (open) => set({ historyOpen: open }),
+  setTemplatesOpen: (open) => set({ templatesOpen: open }),
+  setSaveTemplateOpen: (open) => set({ saveTemplateOpen: open }),
+  openSaveTemplate: () => {
+    // OneNote's own default: pre-fill the dialog with the page's title —
+    // done in the OPENING event (the rename-draft pattern), not in an effect
+    const state = get();
+    const title = state.selection?.pageId
+      ? state.pages.find((p) => p.id === state.selection!.pageId)?.title ?? ""
+      : "";
+    set({ saveTemplateOpen: true, saveTemplateName: title });
+  },
+  setSaveTemplateName: (name) => set({ saveTemplateName: name }),
+  openTemplatesPicker: (sectionId) =>
+    set({ templatesOpen: true, templatesTargetSectionId: sectionId }),
 
   restoreFromTrash: async (kind, id) => {
     if (kind === "notebook") await db.restoreNotebook(id);

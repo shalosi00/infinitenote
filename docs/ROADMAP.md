@@ -186,12 +186,13 @@ milestones/issues. This file is the plan; the status file is the reality.
       cell text is indexed by the existing full-text search with no search
       changes; every export path needs no changes
       (docs/test-plans/table.md)
-- [ ] General file attachments (issue #278): OneNote "Insert > File
+- [x] General file attachments (issue #278): OneNote "Insert > File
       Attachment" parity — any file lands a chip generalized from the
       PDF-chip pattern, byte-exact download, names searchable
-- [ ] Custom page templates (issue #279): save a page as a reusable
-      template, create pages from a template picker (additive Dexie v3
+- [x] Custom page templates (issue #279): save a page as a reusable
+      template, create pages from a template picker (additive Dexie v4
       table; local-only by design, included in backups)
+      (docs/test-plans/page-templates.md)
 
 ## v1.15 — Representative-hardware WebGPU measurement (shipped in v1.15.0;
 the hardware-blocked benchmark remainder lives in v1.16.0 as issue #193)

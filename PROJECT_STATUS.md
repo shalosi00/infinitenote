@@ -6,6 +6,8 @@
 
 | | |
 |---|---|
+| **Last updated** | 2026-11-20 (v1.16.0 release train — version files bumped to 1.16.0 / versionCode 260 across package.json, tauri.conf.json, Cargo.toml, the TWA gradle + bubblewrap manifest, and a new fdroid Builds entry; the flatpak metainfo <releases> block gains the 1.16.0 entry (the AppImage extra-data checksum re-pin follows the release once the tag's artifacts exist — scripts/flatpak-extradata.mjs); PROJECT_STATUS Current version row refreshed; the wave-12 counts are already measured on this tree: 1142 unit / 84 files, 206 e2e / 43 files) |
+| **Last updated** | 2026-11-20 (custom page templates — OneNote "Page Templates" parity, issue #279, wave 12 of the product-parity direction: save any page as a reusable template from its page-actions menu; create pages from a template picker reachable from BOTH the sidebar's section menu and the page-actions menu. Evidence was already in the issue (probed 2026-11-19): OneNote ships page templates saved per-machine, Joplin ships a Templates plugin, Logseq/AppFlowy solve the adjacent need with page duplication, and ours offered only paper styles (no content) plus same-section page duplication. Design: the version-history.ts pure-policy pattern — new `src/lib/page-templates.ts` (name validation with the typed TemplateError + toast-ready messages, the 10 MiB payload cap REUSED from the attachment policy because a template's payload duplicates on every page created from it, scene parsing that restores nothing from corrupt rows, case-insensitive picker order), an ADDITIVE Dexie v4 `templates` store (no existing-store migration — the v2/v3 bumps are the precedent), `createPageFromTemplate` in the store (the proven addPage selection/focus path + paper-style carry-over), two dialogs (save with the page title pre-filled at OPEN time via the rename-draft pattern — the new react-hooks set-state-in-effect lint rule forbids prefill-in-effect; picker with measured meta lines, confirm-guarded delete, explicit empty state), and templates INCLUDED in notebook backups under the pages' field-tolerance contract (corrupt/oversize/blank-name entries skip silently, fresh ids on restore, old archives restore untouched — the backup version stays 1). One product decision MEASURED live: a fresh page's first autosave writes an EMPTY scene, so saving it is OneNote's STATIONERY case — allowed (paper style without content), not refused; the E2E spec pins it (PT-E04). Gate: 1142 unit / 84 files, 0 fail; 206 e2e / 43 files; new spec page-templates 5/5; neighbors version-history + crud + background + ui-overlap 20/20) |
 | **Last updated** | 2026-11-19 (2) (general file attachments — OneNote "Insert > File Attachment" parity, issue #278, wave 11 of the product-parity direction the wave-10 entry carried forward: ANY file — zip, spreadsheet, source file — now attaches to a page. Evidence was already in the issue (probed 2026-11-19): OneNote's Insert > File Attachment embeds any file that stays downloadable from the page, Joplin/Logseq treat attachments as core, and ours shipped only two special-cased embeddables (audio #67, PDF #204) — a generic file died on "unsupported type". Design: a generalization, not new machinery — the shipped PDF-chip pattern end to end: a new pure `src/lib/file-attachment.ts` (marker scheme `infinitenote:file`, 10 MiB cap, MIME-honest data-URL normalization, validated extraction, generic base64→Blob decode, human size + extension-badge formatters, and a combined rotation-exact hit-test across BOTH chip kinds), `makeFileAttachmentElement`/`attachFiles` in excalidraw-client (one updateScene per batch, no programmatic selection — the HWR focus-race lesson), the neutral-slate chip (extension badge capped at 4 chars + name + human size), the Import menu's new "File attachment (any file)…" picker with NO accept restriction, drag-drop/import of any `classifyFile` "unknown" file now attaches instead of dying ("a drop is never a dead end"), the shared three-item context menu, and `fileName` search indexing. Two design facts measured live: a PDF through the explicit attach path embeds WITHOUT printout pages (OneNote's own split — drop may convert, Insert > File Attachment never does), and Excalidraw coalesces consecutive history snapshots so undo is honest as "removes the attach" rather than "one press per batch" (FA-E15, the handwriting-undo lesson). Gate: 1113 unit / 82 files, 0 fail; 201 e2e / 42 files measured on this branch; neighbors pdf-attachment 11/11, ui-overlap 5/5, table+canvas 14/14) |
 | **Last updated** | 2026-11-19 (release-notes convention + PR feature preview, wave 9 of the majors-research directive — the beyond-workflows direction the wave-8 worklog named: (1) **release-notes convention written down** in docs/PIPELINE.md — evidence pulled from the API (2026-11-19): the four reachable comparables each ship a recognizable release-notes convention (Joplin: flat type-prefixed bullets with no headings and inline external credits `- New: … (#123)` / `- Improved: … (#456 by @user)`; Logseq: category headings Features/Enhancements/Fixed issues/Thanks with user-facing sentences; AppFlowy: version heading + New Features/Improvements/Bug Fixes plus a ⚠️ Action Required section for post-upgrade user steps; Excalidraw: Highlights/Breaking changes with one PR link per bullet), while AFFiNE is the counter-example — all 29 of its most recent release bodies are machine-generated channel blobs; the gap here: our notes have been strong but ad hoc — three different shapes measured across the v1.13.0/v1.14.0/v1.15.0 bodies (v1.15.0's hand-measured body: 4,438 bytes) and PIPELINE.md step 3 said only "feature list, test evidence, upgrade notes"; adopted: a written convention + template codifying what v1.13.0-v1.15.0 already do in practice (opening line with theme → Highlights with issue/PR-linked measured bullets → Upgrade notes only when users must act (AppFlowy's practice) → Joplin-style inline credit for external PRs → unit/E2E counts measured on the merged tip); (2) **PR feature preview** — AppFlowy's PR template asks for a video/screenshot of new user-facing features; our template already had the conventional title (CI-enforced since wave 2) and tests but no preview ask — a Feature preview section added for feature PRs; also probed for a reviewer-facing "how we review" doc and found nothing to adopt: no comparable ships one on-repo (Joplin's CONTRIBUTING.md now exists on master — 7,000 bytes, contributor-journey, not reviewer-facing — and its readme/dev on the dev branch lists build/style/accessibility docs only; Excalidraw's stays a 100-byte stub; Logseq's is a contributor journey; AppFlowy/AFFiNE carry PR-template checklists only — AFFiNE's template 404s by branch name and lives on the default branch); counts re-measured in this cycle's gate: 1038 unit / 78 files, 175 e2e / 40 files) |
 | **Last updated** | 2026-11-18 (4) (v1.15.0 released — the release train executed live and the wave-6 Release workflow exercised for real: release-prep PR #270 (9/9 checks, squash `7da4046`), release PR #271 develop-to-main as MERGE commit `f34a4365` (13/13 check-runs), tag v1.15.0 pushed, hand-measured notes published first and left untouched by the workflow's ensure step (log: 'Release v1.15.0 already exists — leaving its notes untouched.'), tag-build-verify success, Desktop green with 3 artifacts (AppImage 152,926,712 bytes, deb, rpm); milestones rotated (v1.15.0 closed, v1.16.0 #17 open with #193); the flatpak per-release step skipped since v1.7.0 caught up — extra-data repinned to the real v1.15.0 AppImage via scripts/flatpak-extradata.mjs and the metainfo <releases> block backfilled for 1.7.0-1.15.0; counts re-measured on the merged tip: 1038 unit / 78 files, 175 e2e / 40 files) |
@@ -19,9 +21,9 @@
 | **Last updated** | 2026-11-16 (web share target capture — issue #247: the installed PWA now registers a `share_target` (POST multipart to `/share-target`), the service worker intercepts the OS share-sheet POST before the network, stashes it in a raw-IndexedDB mailbox (`infinitenote-share-inbox`) and redirects to /, and the boot drain lands each share as a Quick Notes page via the regular import pipeline — shared title becomes the page title (capped 80), body = text + url composed, files pass through to the existing importers (image/audio/pdf/text), URL-only shares fall back to the dated quick-note title, a share always produces a page; atomic read+clear drain so two tabs can never double-import; standalone fallback page for the pre-SW edge; sw.js mirrors the share-inbox constants — pinned in sync by unit tests; counts re-measured: 983 unit / 76 files, 175 e2e checks / 40 files; also fixed the stale README badge (858/156 — missed by the #241 count sweep) and the stale PROJECT_STATUS Totals line (564/152)) |
 | **Last updated** | 2026-11-15 (community-practices adoption, researched from the comparable majors — Excalidraw, Logseq, Joplin, AppFlowy, AFFiNE: SECURITY.md added on the Joplin pattern — supported versions, private-vulnerability-reporting channel (already enabled, re-verified), reporting rules, and an explicit out-of-threat-model section adapted to local-first (DoS via imported content, physically-local attacks, plain data at rest, dependency advisories -> upstream); CODE_OF_CONDUCT.md added (Contributor Covenant 2.1); markdown issue templates converted to YAML issue forms (bug_report.yml + feature_request.yml + config.yml — every comparable with templates uses forms, none markdown); .github/copilot-instructions.md added (Excalidraw pattern) pointing Copilot at AGENTS.md's read order; CONTRIBUTING.md refreshed — dead `bun run db:generate` removed (script gone since v1.1 removed the server DB), stale counts fixed; stale counts fixed across README (858→961 unit, 156→171 e2e), PR template (34→171), AGENTS.md (7 files/24 checks→39/171), all re-measured (bun test: 961/75 files; playwright --list: 171/39 files); dependabot groups added — npm minor+patch one monthly PR, action-pin moves one weekly PR; CHANGELOG.md deliberately skipped: GitHub Releases carry the notes (v1.12-v1.14 bodies measured) and 3 of 5 comparables also rely on Releases alone; community health was 71% pre-change, re-measured post-merge) |
 | **Last updated** | 2026-11-15 (2) (community health measured at **100%** after the #243 sync — was 71%; code_of_conduct credited, `issue_template` field still null by GitHub quirk though the forms work; first grouped dependabot PR #244 handled: 4 action-pin moves in one PR — codeql-action v3->v4.39.3 (breaking changes reviewed: bundle-version floors, not input-surface; validated by the PR's own CodeQL run on the new pins) + rust-cache within v2; retargeted to develop per #216 precedent, squash-merged 4e2aa5c, synced to main) |
-| **Current version** | v1.15.0 (version files bumped via the release flow; tag + GitHub Release published at the end of the flow) |
-| **Phase** | v1.15.0 released (release train executed 2026-11-18 — first live exercise of the wave-6 Release workflow); v1.16.0 milestone in progress: #277 tables shipped, #278 general file attachments shipped this cycle, #279 custom page templates and #193 (hardware-blocked real-GPU HWR benchmark) still open; majors-research waves 1-11 landed (community practices, PR hygiene, bundle-size guard, CI caching + coverage, failure commentary, tag-push release automation, CONTRIBUTING gateway + size-report promotion, the release train itself, release-notes convention + PR feature preview, product parity: tables on pages, general file attachments) |
-| **Overall state** | 2026-11-19: 1113 unit (82 files) + the 201-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
+| **Current version** | v1.16.0 (version files bumped via the release flow; tag + GitHub Release published at the end of the flow) |
+| **Phase** | v1.15.0 released (release train executed 2026-11-18 — first live exercise of the wave-6 Release workflow); v1.16.0 milestone complete: #277 tables, #278 general file attachments and #279 custom page templates shipped — only hardware-blocked #193 remains (moved forward at release, the v1.15.0 precedent); majors-research waves 1-12 landed (community practices, PR hygiene, bundle-size guard, CI caching + coverage, failure commentary, tag-push release automation, CONTRIBUTING gateway + size-report promotion, the release train itself, release-notes convention + PR feature preview, product parity: tables on pages, general file attachments, custom page templates) |
+| **Overall state** | 2026-11-20: 1142 unit (84 files) + the 206-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
 
 ## TL;DR
 
@@ -104,35 +106,30 @@ Notes pages.
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 1038 unit tests, 175 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 1142 unit tests, 206 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- **v1.15.0 release train** (this cycle): version bump + release PR
-  develop-to-main (merge commit) + tag + GitHub Release — the first
-  live exercise of the wave-6 Release workflow (`tag-build-verify` +
-  `ensure-github-release`) on a real tag. Shipped since v1.14.0: OS
-  share capture into Quick Notes (Web Share Target, #247), the HWR
-  conversion integrity guard + focus fixes (#205/#231/#234), the stale
-  Radix dialog dismissal guard (#226), desktop CSP (#218) + web
-  security headers (#206), least-privilege CI + CodeQL + Dependabot
-  (#208/#212/#216), the Advisory-DB transitive-lockfile remediation
-  sweep (#222/#224/#230/#235) + scripts/audit-lockfile.py (#238), the
-  community-practices adoption (SECURITY.md, CoC, YAML issue forms,
-  copilot guide, #241), and majors waves 2-7 (#251/#255/#258/#261/
-  #264/#267).
-- **#193** (real-GPU HWR benchmark) parked in the v1.16.0 milestone —
-  hardware-blocked: the measurement needs a real-GPU machine; the
-  capability gate + measured WASM baseline already shipped (v1.14.0).
+- **v1.16.0 release train** (next): version bump + release PR
+  develop-to-main (merge commit) + tag v1.16.0 + GitHub Release with
+  hand-written notes under the wave-9 convention, then milestones
+  rotate (v1.16.0 closed with hardware-blocked #193 moved forward, the
+  v1.15.0 precedent; v1.17.0 opened). Shipped since v1.15.0: tables on
+  pages (#277), general file attachments (#278), custom page templates
+  (#279) — the three OneNote everyday-parity features of the
+  product-parity direction (waves 10-12).
+- **#193** (real-GPU HWR benchmark) hardware-blocked, carried forward
+  at each release (the v1.15.0 precedent): the measurement needs a
+  real-GPU machine; the capability gate + measured WASM baseline
+  already shipped (v1.14.0).
 
-## Next up — v1.16 (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — the v1.16.0 release, then v1.17 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. Real-GPU HWR benchmark to re-evaluate the WebGPU arm (#193 —
-   hardware-blocked: needs a real-GPU run; the capability gate and
-   the measured WASM baseline shipped in v1.14.0)
-2. Majors-research continuation beyond workflows: structured PR-review
-   docs and release-notes content conventions are the next candidate
-   surfaces (evidence-first, wave by wave)
+1. Cut v1.16.0 (the release train above) — the milestone's three
+   implementable issues (#277/#278/#279) are all shipped
+2. #193 real-GPU HWR benchmark — hardware-blocked, carried forward
+3. Further product-parity candidates from the majors research
+   (evidence-first, wave by wave)
 
 ## Repo map (30 seconds)
 
@@ -145,6 +142,7 @@ Notes pages.
 | `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
 | `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
 | `src/lib/docx-import.ts` / `html-import.ts` / `import-blocks.ts` | OneNote phase-1 importers: Word + HTML → structured text blocks |
+| `src/lib/page-templates.ts` | Page templates policy: names, 10 MiB cap, scene parsing, picker order (issue #279) |
 | `src/lib/tags.ts` | Page tags: normalization, dedupe, collect + filter helpers |
 | `src/lib/quick-notes.ts` | Quick capture: date keys, quick-note/daily-page titles |
 | `src/lib/audio-notes.ts` | Audio blocks: classification, recorder mime/extension picking, duration + filename helpers, link-scheme markers, import size cap (issue #67, #91, #95) |
@@ -158,7 +156,7 @@ Notes pages.
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
-| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 175 checks in 40 files, runs in CI (issue #3; measured 2026-11-18) |
+| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 206 checks in 43 files, runs in CI (issue #3; measured 2026-11-18) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke + e2e (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
 | `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
@@ -168,8 +166,8 @@ Notes pages.
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 1038 unit tests
-make e2e                             # 175 E2E tests (Playwright; boots the app if needed)
+make test                            # 1142 unit tests
+make e2e                             # 206 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
