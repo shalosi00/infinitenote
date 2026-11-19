@@ -26,6 +26,12 @@ export interface CanvasApi {
   /** Insert one curated library shape by id (issue #65). */
   insertShape: (shapeId: string) => void;
   /**
+   * Insert a rows×cols table at the next insert position (issue #277,
+   * OneNote "Insert > Table" parity). Returns false when the bounds
+   * (1-20 rows × 1-12 columns) are exceeded — the caller toasts.
+   */
+  insertTable: (rows: number, cols: number) => boolean;
+  /**
    * Convert recognized handwriting to editable text (issue #176 Phase B):
    * per-group when ink is selected, whole page otherwise; returns the
    * counts the completion toast needs.

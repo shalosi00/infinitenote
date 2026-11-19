@@ -14,7 +14,7 @@
 
 - [ ] `make test` green (new/updated unit tests for `src/lib` logic)
 - [ ] `make lint` and `make typecheck` clean
-- [ ] `make e2e` run for risky/UI changes (175 checks, local)
+- [ ] `make e2e` run for risky/UI changes (186 checks, local)
 
 ## Checklist
 

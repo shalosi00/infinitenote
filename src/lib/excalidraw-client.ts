@@ -38,6 +38,23 @@ import {
   type ShapeSkeleton,
 } from "./shape-library";
 import {
+  DEFAULT_CELL_H,
+  DEFAULT_CELL_W,
+  MAX_COLS,
+  MAX_ROWS,
+  MIN_COLS,
+  MIN_ROWS,
+  TABLE_MARKER_KEY,
+  emptyTexts,
+  planTableOp,
+  tableElements,
+  tableSkeletons,
+  type TableElementLike,
+  type TableGeometry,
+  type TableMarker,
+  type TableOp,
+} from "./table-insert";
+import {
   conversionSkeletons,
   detectDroppedConversion,
   planHwrConversion,
@@ -754,6 +771,155 @@ export function insertShapeById(
     },
   });
   return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* tables on pages (issue #277)                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Stamp the table marker into an element's customData, PRESERVING any
+ * existing customData keys (the marker must never clobber a payload another
+ * feature already put there — the audio/pdf chips share this space).
+ */
+function withTableMarker(
+  el: { customData?: Record<string, unknown> | null },
+  marker: TableMarker,
+): void {
+  el.customData = { ...(el.customData ?? {}), [TABLE_MARKER_KEY]: marker };
+}
+
+/**
+ * Convert table skeletons into live elements and append them to the scene.
+ * Shared by insertTable (a fresh table) and the structural ops (rebuild).
+ * One updateScene call = one undo step (captureUpdate IMMEDIATELY, the
+ * conversion precedent). The ops deselect, and INSERT deselects too — the
+ * HWR-E05/E06 lesson: programmatic auto-selection mounts Excalidraw's
+ * "Selected shape actions" panel and races the canvas for keyboard focus,
+ * which kills any editor opened right after (measured: a double-click into
+ * a cell within seconds of a selecting insert lost the editor before the
+ * first keystroke). A fresh table sits where it landed; the user clicks a
+ * cell to type (OneNote behavior) and drags the grid normally.
+ */
+function applyTableRebuild(
+  api: ExcalidrawImperativeAPI,
+  removed: readonly ExcalidrawElement[],
+  geo: TableGeometry,
+  texts: string[][],
+  select: boolean,
+): void {
+  const skeletons = tableSkeletons(geo, texts, () => crypto.randomUUID());
+  const created = convertToExcalidrawElements(
+    skeletons as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawElement[];
+  // stamp markers by skeleton id — regenerateIds:false keeps the ids, so
+  // every created element matches its skeleton exactly once. Deliberately
+  // NO shared groupIds: Excalidraw's double-click turns an ALREADY-SELECTED
+  // GROUP into group-leaf selection and returns (the selectedGroupIds
+  // branch of handleCanvasDoubleClick, 0.18.1 lines ~5474-5492 and identical
+  // on master — measured in e2e): a grouped cell could never reach the
+  // double-click-to-type flow. The OneNote behavior — click into a cell,
+  // type — wins; whole-table moves work by rubber-band selection, and the
+  // structural ops key off customData markers, not selection.
+  const markerById = new Map(skeletons.map((s) => [s.id, s.marker]));
+  for (const el of created) {
+    const marker = markerById.get(el.id);
+    if (marker) withTableMarker(el as unknown as { customData?: Record<string, unknown> | null }, marker);
+  }
+  const removedIds = new Set(removed.map((e) => e.id));
+  const live = api.getSceneElements().filter((e) => !removedIds.has(e.id));
+  const tombstones = removed.map((e) => ({ ...e, isDeleted: true }));
+  api.updateScene({
+    elements: [...live, ...tombstones, ...created] as ExcalidrawElement[],
+    appState: {
+      selectedElementIds: select
+        ? Object.fromEntries(created.map((e) => [e.id, true]))
+        : {},
+    },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+}
+
+/**
+ * Insert a rows×cols table (OneNote "Insert > Table" parity, issue #277)
+ * at the next insert position — the shape-library insertion path. Every
+ * element carries its marker in customData for the structural ops; the
+ * elements deliberately stay UNGROUPED (see applyTableRebuild).
+ */
+export function insertTable(
+  api: ExcalidrawImperativeAPI,
+  rows: number,
+  cols: number,
+): boolean {
+  const r = Math.floor(rows);
+  const c = Math.floor(cols);
+  if (r < MIN_ROWS || r > MAX_ROWS || c < MIN_COLS || c > MAX_COLS) return false;
+  const anchor = nextInsertPosition(api.getSceneElements());
+  const geo: TableGeometry = {
+    tableId: crypto.randomUUID(),
+    x0: anchor.x,
+    y0: anchor.y,
+    rows: r,
+    cols: c,
+    cellW: DEFAULT_CELL_W,
+    cellH: DEFAULT_CELL_H,
+  };
+  applyTableRebuild(api, [], geo, emptyTexts(r, c), false);
+  return true;
+}
+
+export interface TableOpResult {
+  ok: boolean;
+  /** Present on success when the UI should toast (whole-table delete). */
+  message?: string;
+  /** Present on failure — the exact reason the op was refused. */
+  error?: string;
+}
+
+/**
+ * Apply one structural op (add/delete row/column, delete table) to the
+ * table with the given id (issue #277). Refusals (the 1×1 floor, the
+ * growth caps, a dead table) come back as { ok: false, error } for the
+ * toast; success rebuilds the grid in one undoable updateScene. The ops
+ * deselect on success — a menu action must never leave the canvas fighting
+ * a panel for keyboard focus (HWR-E05).
+ */
+export function applyTableOp(
+  api: ExcalidrawImperativeAPI,
+  tableId: string,
+  op: TableOp,
+): TableOpResult {
+  const scene = api.getSceneElementsIncludingDeleted() as unknown as TableElementLike[];
+  const plan = planTableOp(scene, tableId, op);
+  if (plan.kind === "error") return { ok: false, error: plan.message };
+  const marked = tableElements(scene, tableId) as unknown as ExcalidrawElement[];
+  // The marked elements AND their bound labels must both go: the labels carry
+  // no marker of their own, so leaving them live would restore a ghost label
+  // over a tombstoned container (caught by e2e TB-E03: the old "revenue Q1"
+  // survived a row insert as a floating text). One doomed-id set serves the
+  // whole-table delete and the rebuild alike.
+  const doomed = new Set(marked.map((e) => e.id));
+  for (const el of marked) {
+    for (const b of el.boundElements ?? []) {
+      if (b.type === "text") doomed.add(b.id);
+    }
+  }
+  const removedWithTexts = (api.getSceneElementsIncludingDeleted() as ExcalidrawElement[]).filter(
+    (e) => doomed.has(e.id),
+  );
+  if (plan.kind === "delete") {
+    api.updateScene({
+      elements: (api.getSceneElementsIncludingDeleted() as ExcalidrawElement[]).map((e) =>
+        doomed.has(e.id) ? { ...e, isDeleted: true } : e,
+      ),
+      appState: { selectedElementIds: {} },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+    return { ok: true, message: "Table deleted." };
+  }
+  applyTableRebuild(api, removedWithTexts, plan.geo, plan.texts, false);
+  return { ok: true };
 }
 
 /* ------------------------------------------------------------------ */
