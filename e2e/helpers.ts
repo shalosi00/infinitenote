@@ -17,6 +17,11 @@ export interface NoteE2EHooks {
       viewBackgroundColor: string;
       gridModeEnabled: boolean;
       zoom: { value: number };
+      /** Scene-level selection map (in-page find navigation, issue #301). */
+      selectedElementIds: Record<string, true>;
+      /** Viewport scroll — gotoFindMatch centers the matched element. */
+      scrollX: number;
+      scrollY: number;
     };
     /** Zoom/pan the viewport to the content; pass fitToViewport to zoom out. */
     scrollToContent: (
@@ -106,6 +111,22 @@ export function canvasTheme(page: Page): Promise<"light" | "dark" | ""> {
   return page.evaluate(
     () => window.__NOTE_E2E__?.excalidraw.getAppState().theme ?? "",
   );
+}
+
+/** Ids of the currently selected scene elements (in-page find, issue #301). */
+export async function selectedElementIds(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const ids = window.__NOTE_E2E__?.excalidraw.getAppState().selectedElementIds;
+    return ids ? Object.keys(ids) : [];
+  });
+}
+
+/** Current canvas viewport scroll — in-page find centers every match. */
+export async function scrollOf(page: Page): Promise<{ x: number; y: number }> {
+  return page.evaluate(() => {
+    const st = window.__NOTE_E2E__?.excalidraw.getAppState();
+    return { x: st?.scrollX ?? Number.NaN, y: st?.scrollY ?? Number.NaN };
+  });
 }
 
 /**

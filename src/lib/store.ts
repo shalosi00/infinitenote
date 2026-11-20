@@ -28,6 +28,9 @@ interface AppStore {
   expanded: Set<string>;
   saveIndicator: SaveIndicator;
   searchOpen: boolean;
+  /** In-page find bar (Ctrl+F, issue #301) — the store closes it on every
+   *  page switch so stale element ids can never navigate. */
+  findOpen: boolean;
   trashOpen: boolean;
   shortcutsOpen: boolean;
   historyOpen: boolean;
@@ -89,6 +92,7 @@ interface AppStore {
 
   setSaveIndicator: (s: SaveIndicator) => void;
   setSearchOpen: (open: boolean) => void;
+  setFindOpen: (open: boolean) => void;
   setTrashOpen: (open: boolean) => void;
   setShortcutsOpen: (open: boolean) => void;
   setHistoryOpen: (open: boolean) => void;
@@ -140,6 +144,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   expanded: new Set<string>(),
   saveIndicator: "idle",
   searchOpen: false,
+  findOpen: false,
   trashOpen: false,
   shortcutsOpen: false,
   historyOpen: false,
@@ -204,13 +209,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ loaded: true, notebooks, sections, pages, selection, expanded });
   },
 
-  selectPage: (sel) => set({ selection: sel }),
+  selectPage: (sel) => set({ selection: sel, findOpen: false }),
 
   /** Programmatic jumps (search, tag filter) must make the sidebar show
    *  where the user landed — expand the ancestors of the target page. */
   revealSelection: (sel) =>
     set((s) => ({
       selection: sel,
+      findOpen: false,
       expanded: new Set([...s.expanded, sel.notebookId, sel.sectionId]),
     })),
   toggleExpanded: (id) =>
@@ -485,6 +491,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setSaveIndicator: (si) => set({ saveIndicator: si }),
   setSearchOpen: (open) => set({ searchOpen: open }),
+  setFindOpen: (open) => set({ findOpen: open }),
   setTrashOpen: (open) => set({ trashOpen: open }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
   setHistoryOpen: (open) => set({ historyOpen: open }),

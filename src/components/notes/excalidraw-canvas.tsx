@@ -79,6 +79,11 @@ import {
   MAX_ROWS,
 } from "@/lib/table-insert";
 import { applyTableOp, insertTable, insertPageLink as insertPageLinkImpl } from "@/lib/excalidraw-client";
+import {
+  findPageMatches,
+  type FindableElementLike,
+  type PageFindMatch,
+} from "@/lib/page-find";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
@@ -806,6 +811,29 @@ export default function ExcalidrawCanvas({
             scheduleSave();
           }
           return ok;
+        },
+        // wave 14 (issue #301): in-page find — the pure policy computes the
+        // matches over the LIVE scene (visible text elements only); matching
+        // never mutates anything
+        findMatches: (query) =>
+          findPageMatches(
+            api.getSceneElements() as unknown as readonly FindableElementLike[],
+            query,
+          ),
+        // navigation: select (the shape-library appState-selection precedent)
+        // + scroll (focusContent's primitive) — DOM focus stays wherever the
+        // caller keeps it (the find bar's input), so Enter keeps cycling.
+        // A match whose element vanished between find and goto (undo, sync)
+        // is skipped silently: the next Enter re-queries the live scene.
+        gotoFindMatch: (match: PageFindMatch) => {
+          const el = api
+            .getSceneElements()
+            .find((e) => e.id === match.elementId);
+          if (!el) return;
+          api.updateScene({
+            appState: { selectedElementIds: { [match.elementId]: true } },
+          });
+          api.scrollToContent(el);
         },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
