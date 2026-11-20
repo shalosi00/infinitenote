@@ -108,7 +108,7 @@ Notes pages.
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 1142 unit tests, 206 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 1161 unit tests, 211 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -158,7 +158,7 @@ Notes pages.
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
-| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 206 checks in 43 files, runs in CI (issue #3; measured 2026-11-18) |
+| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 211 checks in 45 files, runs in CI (issue #3; measured 2026-11-20) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke + e2e (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
 | `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
@@ -168,8 +168,8 @@ Notes pages.
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 1142 unit tests
-make e2e                             # 206 E2E tests (Playwright; boots the app if needed)
+make test                            # 1161 unit tests
+make e2e                             # 211 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
