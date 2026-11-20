@@ -16,6 +16,7 @@ import type {
   BinaryFileData,
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type { NonDeletedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import * as db from "@/lib/notes-db";
 import type { ScenePayload } from "@/lib/types";
 import type { PageBackground } from "@/lib/types";
@@ -69,11 +70,15 @@ import {
   type FileAttachmentElementLike,
 } from "@/lib/file-attachment";
 import {
+  isPageLink,
+  pageLinkTargetOf,
+} from "@/lib/page-links";
+import {
   hitTableCell,
   MAX_COLS,
   MAX_ROWS,
 } from "@/lib/table-insert";
-import { applyTableOp, insertTable } from "@/lib/excalidraw-client";
+import { applyTableOp, insertTable, insertPageLink as insertPageLinkImpl } from "@/lib/excalidraw-client";
 import { e2eHooksEnabled } from "@/lib/e2e-gate";
 import type { PdfPrintoutResult } from "@/lib/excalidraw-client";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
@@ -143,6 +148,21 @@ export interface ExcalidrawCanvasProps {
   onApiReady: (api: CanvasApi) => void;
   onSaveIndicator: (state: "saving" | "saved" | "error") => void;
   onToast: (message: string) => void;
+  /**
+   * A page-link element was activated (OneNote "Copy Link to Page"
+   * parity): resolve the target through the store and navigate; a
+   * missing/trashed target toasts there. The canvas has already
+   * prevented Excalidraw's default window.open for these links.
+   */
+  onPageLinkOpen: (pageId: string) => void;
+  /**
+   * Clipboard text pasted onto the canvas is an internal page link
+   * (`infinitenote:page/<id>`): resolve the target's title through the
+   * store and insert the linked text element; a missing target toasts
+   * and the paste is a no-op. The canvas then aborts Excalidraw's
+   * default paste path (onPaste returns false = abort).
+   */
+  onPageLinkPaste: (link: string) => void;
 }
 
 /**
@@ -474,6 +494,8 @@ export default function ExcalidrawCanvas({
   onApiReady,
   onSaveIndicator,
   onToast,
+  onPageLinkOpen,
+  onPageLinkPaste,
 }: ExcalidrawCanvasProps) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const latestScene = useRef<ScenePayload | null>(null);
@@ -775,6 +797,16 @@ export default function ExcalidrawCanvas({
             onToast(`Skipped the file attachment for "${name}" — its contents could not be read.`);
           }
         },
+        // wave 13: OneNote "Copy Link to Page" — the picker/paste path
+        // inserts a linked text element; one undo step removes it
+        insertPageLink: (targetId, label) => {
+          const ok = insertPageLinkImpl(api, targetId, label);
+          if (ok) {
+            latestScene.current = getScenePayload(api);
+            scheduleSave();
+          }
+          return ok;
+        },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
         exportPng: () => exportPng(api, titleRef.current),
@@ -950,6 +982,30 @@ export default function ExcalidrawCanvas({
     return () => wrapper.removeEventListener("contextmenu", onContextMenu, true);
   }, []);
 
+  /**
+   * Focus the interactive canvas on every pointer-down into the wrapper
+   * (capture phase). Excalidraw calls preventDefault on its pointer
+   * events, so the browser's click-to-focus never fires: after clicking
+   * a sidebar action (e.g. "Copy link to page"), focus stayed on the
+   * sidebar button, and Excalidraw's paste guard (`activeElement` must
+   * live inside the container) silently swallowed the NEXT Ctrl+V. With
+   * this, a click into the canvas restores keyboard focus there — pastes,
+   * Esc and shortcuts behave like the user expects (measured in the
+   * page-links E2E).
+   */
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const onPointerDown = () => {
+      const canvas = wrapper.querySelector(
+        "canvas.excalidraw__canvas.interactive",
+      ) as HTMLCanvasElement | null;
+      canvas?.focus();
+    };
+    wrapper.addEventListener("pointerdown", onPointerDown, true);
+    return () => wrapper.removeEventListener("pointerdown", onPointerDown, true);
+  }, []);
+
   /** The three menu actions: View / Download / Copy file name. */
   const handlePdfMenuAction = useCallback(
     (menu: PdfMenuState, action: "view" | "download" | "copy") => {
@@ -1035,6 +1091,45 @@ export default function ExcalidrawCanvas({
     [theme]
   );
 
+  /**
+   * Clipboard paste (OneNote "Copy Link to Page" parity): text that IS an
+   * internal page link becomes a linked title element instead of a plain
+   * text element — resolution/toasting/insertion live in note-app (it owns
+   * the store). Measured Excalidraw 0.18.1 contract: onPaste returning
+   * FALSE aborts the default paste, returning true CONTINUES it — so a
+   * handled page link returns false (skip default), everything else
+   * returns true (files, spreadsheets and plain text paste as before).
+   */
+  const handlePaste = useCallback(
+    (data: { text?: string }): boolean => {
+      if (isPageLink(data.text)) {
+        onPageLinkPaste(data.text as string);
+        return false;
+      }
+      return true;
+    },
+    [onPageLinkPaste],
+  );
+
+  /**
+   * Element link activation: internal page links navigate INSIDE the app
+   * (the event is cancelable — preventDefault stops Excalidraw's default
+   * window.open, which would try to launch an unknown scheme in the OS);
+   * every other element link keeps the default new-tab behavior.
+   */
+  const handleLinkOpen = useCallback(
+    (
+      element: NonDeletedExcalidrawElement,
+      event: CustomEvent<{ nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement> }>,
+    ): void => {
+      const target = pageLinkTargetOf(element.link);
+      if (!target) return;
+      event.preventDefault();
+      onPageLinkOpen(target);
+    },
+    [onPageLinkOpen],
+  );
+
   // white paper in BOTH themes — Excalidraw's dark-mode CSS filter inverts
   // the canvas, so painting white is what renders as dark (see the sync
   // effect above)
@@ -1078,6 +1173,8 @@ export default function ExcalidrawCanvas({
           };
         }}
         onLibraryChange={handleLibraryChange}
+        onPaste={handlePaste}
+        onLinkOpen={handleLinkOpen}
         UIOptions={{
           canvasActions: {
             loadScene: false,

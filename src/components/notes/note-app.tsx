@@ -16,6 +16,7 @@ import {
   History,
   Image as ImageIcon,
   LayoutTemplate,
+  Link2,
   Menu,
   Mic,
   Moon,
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppStore } from "@/lib/store";
+import { pageLinkMissingToast, pageLinkTargetOf } from "@/lib/page-links";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
 import { downloadBlob } from "@/lib/excalidraw-utils";
 import type { PageBackground, PageMeta } from "@/lib/types";
@@ -94,6 +96,7 @@ import { ShortcutsDialog } from "./shortcuts-dialog";
 import { HistoryDialog } from "./history-dialog";
 import { SaveTemplateDialog } from "./save-template-dialog";
 import { TemplatesDialog } from "./templates-dialog";
+import { PageLinkPickerDialog } from "./page-link-picker-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
 import { usePWA } from "./use-pwa";
@@ -215,6 +218,8 @@ export default function NoteApp() {
   const [tableOpen, setTableOpen] = useState(false);
   const [tableRows, setTableRows] = useState("3");
   const [tableCols, setTableCols] = useState("3");
+  // wave 13: OneNote "Copy Link to Page" — the "Link to page…" picker
+  const [pageLinkOpen, setPageLinkOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Compact screens cannot fit a flyout submenu beside the export menu (the
   // menu hugs the right edge; the flyout flips left off-screen — the PDF
@@ -611,6 +616,61 @@ export default function NoteApp() {
       return;
     }
     await canvasApi.current.importFiles(Array.from(files));
+  };
+
+  /* ------------------- internal page links (wave 13) ------------------ */
+
+  /**
+   * Resolve a page id to an openable {notebook, section, page} path: the
+   * page AND its ancestors must be alive — a link into a trashed subtree
+   * is a broken link with an explicit toast, never a half-navigation.
+   */
+  const openPageLinkTarget = (pageId: string): boolean => {
+    const st = useAppStore.getState();
+    const page = st.pages.find((p) => p.id === pageId);
+    if (!page || page.deletedAt !== null) return false;
+    const section = st.sections.find((s) => s.id === page.sectionId);
+    if (!section || section.deletedAt !== null) return false;
+    const notebook = st.notebooks.find((n) => n.id === section.notebookId);
+    if (!notebook || notebook.deletedAt !== null) return false;
+    st.selectPage({ notebookId: notebook.id, sectionId: section.id, pageId: page.id });
+    return true;
+  };
+
+  const insertLinkTo = (page: PageMeta) => {
+    const api = canvasApi.current;
+    if (!api) {
+      toast.error("Open a page first, then add links.");
+      return;
+    }
+    if (api.insertPageLink(page.id, page.title)) {
+      toast.success(`Linked to "${page.title}".`);
+    } else {
+      toast.error("Could not create the page link.");
+    }
+  };
+
+  /** Picker row clicked: insert the linked title on the open page. */
+  const handlePageLinkPick = (page: PageMeta) => insertLinkTo(page);
+
+  /** A page-link element was clicked on the canvas: navigate or toast. */
+  const handlePageLinkOpen = (pageId: string) => {
+    if (!openPageLinkTarget(pageId)) {
+      toast.error(pageLinkMissingToast());
+    }
+  };
+
+  /** Clipboard paste of `infinitenote:page/<id>`: insert or toast. */
+  const handlePageLinkPaste = (link: string) => {
+    const targetId = pageLinkTargetOf(link);
+    if (!targetId) return;
+    const st = useAppStore.getState();
+    const page = st.pages.find((p) => p.id === targetId);
+    if (!page || page.deletedAt !== null) {
+      toast.error(pageLinkMissingToast());
+      return;
+    }
+    insertLinkTo(page);
   };
 
   const handleRestoreBackup = async (files: FileList | null) => {
@@ -1193,6 +1253,12 @@ export default function NoteApp() {
             >
               <Paperclip /> {"File attachment (any file)…"}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setPageLinkOpen(true)}
+              data-testid="import-page-link"
+            >
+              <Link2 /> {"Link to page…"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{"Library"}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => backupInputRef.current?.click()}>
@@ -1558,6 +1624,8 @@ export default function NoteApp() {
                   onApiReady={handleApiReady}
                   onSaveIndicator={handleSaveIndicator}
                   onToast={showToast}
+                  onPageLinkOpen={handlePageLinkOpen}
+                  onPageLinkPaste={handlePageLinkPaste}
                 />
               </div>
             </>
@@ -1588,6 +1656,11 @@ export default function NoteApp() {
       />
       <SaveTemplateDialog onSave={handleSaveAsTemplate} />
       <TemplatesDialog />
+      <PageLinkPickerDialog
+        open={pageLinkOpen}
+        onOpenChange={setPageLinkOpen}
+        onPick={handlePageLinkPick}
+      />
       <SyncDialog onRunSync={handleRunSync} />
       <Toaster position="bottom-center" richColors closeButton />
     </div>
