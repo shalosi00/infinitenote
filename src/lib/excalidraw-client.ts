@@ -16,6 +16,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type {
   ExcalidrawElement,
+  ExcalidrawTextElement,
   NonDeletedExcalidrawElement,
   FileId,
 } from "@excalidraw/excalidraw/element/types";
@@ -31,6 +32,13 @@ import {
   CaptureUpdateAction,
 } from "@excalidraw/excalidraw";
 import { classifyFile, downloadBlob, normalizeImageStatuses, parseSceneFileText, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import {
+  CHECK_UNCHECKED,
+  applyToDoTag,
+  classifyTodoText,
+  flipChecklistText,
+  type TodoElementLike,
+} from "./checklist";
 import { pageLinkFor } from "./page-links";
 import {
   INHERIT_FILL,
@@ -1068,6 +1076,149 @@ export interface TableOpResult {
  * deselect on success — a menu action must never leave the canvas fighting
  * a panel for keyboard focus (HWR-E05).
  */
+/* -------------- checklists (issue #302) -------------- */
+
+/**
+ * Rebuild ONE text element in place with new text: convertToExcalidraw
+ * Elements with the SAME id (regenerateIds:false keeps it — the page-link
+ * / table precedents) re-measures width/height/baseline from the new text
+ * in the browser's own font metrics, and every style prop rides through
+ * so the flip is invisible except for the token. This is the table-op
+ * rebuild precedent applied to a single element.
+ *
+ * The VERSION is bumped past the replaced element's on purpose: convert
+ * stamps a fresh element (version 1), and a same-id replacement whose
+ * version reads `id@1` while the last save recorded `id@1` is
+ * indistinguishable from a metadata re-stamp to the autosave gate
+ * (sceneSignature is id@version — an equal signature DROPS the stash and
+ * the flip never persists; measured 2026-11-21: a toggle of a
+ * version-1 starter item survived on canvas but never reached the DB,
+ * the reload came back unchecked). The bump also keeps the store's
+ * version-aware reconciliation honest — a replacement must never present
+ * a version behind the element it replaces.
+ */
+function rebuildTextElement(el: ExcalidrawTextElement, newText: string): ExcalidrawElement | null {
+  const skeleton = {
+    type: "text" as const,
+    id: el.id,
+    x: el.x,
+    y: el.y,
+    text: newText,
+    fontSize: el.fontSize,
+    fontFamily: el.fontFamily,
+    strokeColor: el.strokeColor,
+    backgroundColor: el.backgroundColor,
+    fillStyle: el.fillStyle,
+    strokeWidth: el.strokeWidth,
+    strokeStyle: el.strokeStyle,
+    roughness: el.roughness,
+    opacity: el.opacity,
+    angle: el.angle,
+    textAlign: el.textAlign,
+    lineHeight: el.lineHeight,
+    // a checklist item that IS a page-link label keeps its link through
+    // the rebuild (the wave-13 marker rides the text element)
+    link: el.link || undefined,
+  };
+  const [rebuilt] = convertToExcalidrawElements(
+    [skeleton] as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawTextElement[];
+  if (!rebuilt) return null;
+  return {
+    ...rebuilt,
+    version: Math.max(el.version ?? 0, rebuilt.version ?? 0) + 1,
+    versionNonce: Math.floor(Math.random() * 2 ** 31),
+  };
+}
+
+export interface ChecklistOpResult {
+  ok: boolean;
+  /** The new checked state (toggle only). */
+  checked?: boolean;
+  /** User-facing toast line when ok is false. */
+  error?: string;
+}
+
+/**
+ * Toggle ONE checklist item's done state (issue #302): flip the `[ ]`/`[x]`
+ * token as ONE scene update = one undo step (the table-op precedent),
+ * deselecting on purpose so the following canvas undo is deterministic
+ * (the issue-#231 lesson — a selection left behind races the keyboard).
+ * Refuses elements that are not live checklist items.
+ */
+export function toggleChecklist(api: ExcalidrawImperativeAPI, elementId: string): ChecklistOpResult {
+  const scene = api.getSceneElementsIncludingDeleted() as unknown as TodoElementLike[];
+  const el = scene.find((e) => e.id === elementId && !e.isDeleted);
+  const hit = el ? classifyTodoText(el) : null;
+  if (!hit || hit.kind !== "checklist" || !el) {
+    return { ok: false, error: "Not a checklist item." };
+  }
+  const flipped = flipChecklistText(typeof el.text === "string" ? el.text : "");
+  if (!flipped) return { ok: false, error: "Not a checklist item." };
+  const rebuilt = rebuildTextElement(el as unknown as ExcalidrawTextElement, flipped);
+  if (!rebuilt) return { ok: false, error: "The checklist item could not be updated." };
+  api.updateScene({
+    elements: (scene as unknown as ExcalidrawElement[]).map((e) => (e.id === elementId ? rebuilt : e)),
+    appState: { selectedElementIds: {} },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  return { ok: true, checked: !hit.checked };
+}
+
+/**
+ * OneNote "Home > To Do tag" (issue #302): apply the `[ ] ` token to ONE
+ * plain single-line text element as ONE scene update = one undo step.
+ * Refuses elements that are not taggable plain text.
+ */
+export function applyToDoTagToElement(api: ExcalidrawImperativeAPI, elementId: string): ChecklistOpResult {
+  const scene = api.getSceneElementsIncludingDeleted() as unknown as TodoElementLike[];
+  const el = scene.find((e) => e.id === elementId && !e.isDeleted);
+  const hit = el ? classifyTodoText(el) : null;
+  if (!hit || hit.kind !== "plain" || !el) {
+    return { ok: false, error: "Only a plain single-line text can get the To Do tag." };
+  }
+  const tagged = applyToDoTag(hit.text);
+  if (!tagged) return { ok: false, error: "The To Do tag could not be applied." };
+  const rebuilt = rebuildTextElement(el as unknown as ExcalidrawTextElement, tagged);
+  if (!rebuilt) return { ok: false, error: "The To Do tag could not be applied." };
+  api.updateScene({
+    elements: (scene as unknown as ExcalidrawElement[]).map((e) => (e.id === elementId ? rebuilt : e)),
+    appState: { selectedElementIds: {} },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  return { ok: true };
+}
+
+/**
+ * Insert ONE bare checklist item (`[ ]`) at the next insert position
+ * (issue #302) — the Import-menu starter. The desktop editor opens text
+ * edits fully selected (measured: `autoSelect: !device.isTouchScreen`),
+ * so the item ships EMPTY and the flow that cannot lose its token is the
+ * menu one (type text, then "Add To Do tag"); arrows collapse the
+ * selection for the keyboard-confident in-place edit.
+ */
+export function insertChecklistItem(api: ExcalidrawImperativeAPI): boolean {
+  const at = nextInsertPosition(api.getSceneElements());
+  const skeleton = {
+    type: "text" as const,
+    id: crypto.randomUUID(),
+    text: CHECK_UNCHECKED,
+    x: at.x,
+    y: at.y,
+    fontSize: 20,
+  };
+  const [element] = convertToExcalidrawElements(
+    [skeleton] as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawElement[];
+  if (!element) return false;
+  api.updateScene({
+    elements: [...api.getSceneElements(), element],
+  });
+  return true;
+}
+
 export function applyTableOp(
   api: ExcalidrawImperativeAPI,
   tableId: string,
