@@ -44,6 +44,13 @@ export interface CanvasApi {
    * counts the completion toast needs.
    */
   convertHandwriting: () => HwrConvertOutcome;
+  /**
+   * Insert an internal page link as a linked, editable text element
+   * (OneNote "Copy Link to Page" parity): clicking it opens the target
+   * page via the canvas's onLinkOpen. Returns false when the link or
+   * label is invalid — the caller toasts.
+   */
+  insertPageLink: (pageId: string, label: string) => boolean;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
   /** True while the canvas holds un-saved edits (autosave debounce pending). */

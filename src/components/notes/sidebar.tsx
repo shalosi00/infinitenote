@@ -24,6 +24,7 @@ import {
   FolderSync,
   Keyboard,
   LayoutTemplate,
+  Link2,
   ListChecks,
   MoreHorizontal,
   Palette,
@@ -50,6 +51,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
+import { toast } from "sonner";
+import {
+  pageLinkCopyFailedToast,
+  pageLinkCopiedToast,
+  pageLinkFor,
+} from "@/lib/page-links";
 import { pageHasTag } from "@/lib/tags";
 import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
 import { MovePagesDialog } from "./move-pages-dialog";
@@ -699,6 +706,18 @@ function PageNode({
   const del = useAppStore((s) => s.deletePage);
   const move = useAppStore((s) => s.movePage);
   const selectPage = useAppStore((s) => s.selectPage);
+
+  /** OneNote "Copy Link to Page" (wave 13): copies `infinitenote:page/<id>`;
+   *  pasting it on any page inserts a clickable link to this page. */
+  const copyPageLink = () => {
+    const link = pageLinkFor(page.id);
+    if (!link) return;
+    navigator.clipboard
+      .writeText(link)
+      .then(() => toast.success(pageLinkCopiedToast()))
+      .catch(() => toast.error(pageLinkCopyFailedToast()));
+  };
+
   const isRenaming = renaming === page.id;
   const { selectMode, selectedIds, onToggleSelect } = selectProps;
   const checked = selectedIds.has(page.id);
@@ -814,6 +833,9 @@ function PageNode({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void duplicate(page.id)}>
             <Copy /> {"Duplicate"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={copyPageLink} data-testid="page-copy-link">
+            <Link2 /> {"Copy link to page"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void move(page.id, -1)}>
