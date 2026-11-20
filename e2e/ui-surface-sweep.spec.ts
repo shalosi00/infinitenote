@@ -156,17 +156,40 @@ test.describe("app surface sweep (dialogs, menus, drawer)", () => {
       const drawerOpen = async () => {
         if (await page.locator('[data-slot="sheet-content"]').first().isVisible().catch(() => false))
           return;
+        // the open click can land during a closing animation on a busy
+        // runner — click, short wait, click again; and the slide-in settle
+        // gets a 12 s budget (CI 2026-11-20: the 5 s waitForFunction timed
+        // out at phone-390 while the identical sweep passed locally)
         await page.getByRole("button", { name: "Open navigation" }).click();
-        // wait for the slide-in to fully settle — auditing mid-animation reads
-        // phantom offsets (the transform can still be a few px off its rest)
-        await page.waitForFunction(
-          () => {
-            const sheet = document.querySelector('[data-slot="sheet-content"]');
-            return !!sheet && getComputedStyle(sheet).transform === "none";
-          },
-          undefined,
-          { timeout: 5_000 },
-        );
+        const settled = () =>
+          page.waitForFunction(
+            () => {
+              const sheet = document.querySelector('[data-slot="sheet-content"]');
+              return !!sheet && getComputedStyle(sheet).transform === "none";
+            },
+            undefined,
+            { timeout: 6_000 },
+          );
+        try {
+          await settled();
+        } catch {
+          if (
+            !(await page.locator('[data-slot="sheet-content"]').first().isVisible().catch(() => false))
+          ) {
+            await page.getByRole("button", { name: "Open navigation" }).click();
+            await settled();
+          } else {
+            // visible but not settled — wait the rest of the budget out
+            await page.waitForFunction(
+              () => {
+                const sheet = document.querySelector('[data-slot="sheet-content"]');
+                return !!sheet && getComputedStyle(sheet).transform === "none";
+              },
+              undefined,
+              { timeout: 12_000 },
+            );
+          }
+        }
         await page.waitForTimeout(100);
       };
       const drawerClose = async () => {

@@ -33,6 +33,14 @@ export interface CanvasApi {
    */
   insertTable: (rows: number, cols: number) => boolean;
   /**
+   * Insert one bare checklist item (`[ ]`) at the next insert position
+   * (issue #302, OneNote To Do tag parity): a normal single-line text
+   * element whose text carries the task-list token — no new element type,
+   * the checked state IS the text. Returns false when the element could
+   * not be built — the caller toasts.
+   */
+  insertChecklistItem: () => boolean;
+  /**
    * Attach one or more files as OneNote-style file chips (issue #278,
    * OneNote "Insert > File Attachment" parity): byte-exact embedded
    * originals, downloadable offline. Files past the 10 MiB cap are

@@ -78,7 +78,15 @@ import {
   MAX_COLS,
   MAX_ROWS,
 } from "@/lib/table-insert";
-import { applyTableOp, insertTable, insertPageLink as insertPageLinkImpl } from "@/lib/excalidraw-client";
+import { hitTestTodoText, type TodoElementLike, type TodoTextHit } from "@/lib/checklist";
+import {
+  applyTableOp,
+  insertTable,
+  insertPageLink as insertPageLinkImpl,
+  insertChecklistItem as insertChecklistItemImpl,
+  toggleChecklist as toggleChecklistImpl,
+  applyToDoTagToElement as applyToDoTagImpl,
+} from "@/lib/excalidraw-client";
 import {
   findPageMatches,
   type FindableElementLike,
@@ -336,6 +344,17 @@ interface TableMenuState {
 }
 
 /**
+ * The checklist context menu open state (issue #302): cursor position +
+ * the classification of the hit text element — a checklist item toggles,
+ * a plain single-line text gets the To Do tag.
+ */
+interface TodoMenuState {
+  x: number;
+  y: number;
+  hit: TodoTextHit;
+}
+
+/**
  * Right-click menu for table cells (issue #277): the OneNote-style
  * structural ops — Add row below / Add column right / Delete row /
  * Delete column / Delete table. Fixed to the cursor, clamped into the
@@ -411,6 +430,80 @@ function TableMenu({
           {item.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Right-click menu for checklist surfaces (issue #302) — the OneNote To
+ * Do tag parity. ONE item whose meaning depends on what was hit: a
+ * checklist item gets "Toggle checked" (`[ ]`/`[x]` flip), a plain
+ * single-line text gets "Add To Do tag" (OneNote's Home > To Do tag —
+ * type first, then tag; the desktop text editor opens edits fully
+ * selected, so a pre-inserted prefix could never survive a retype).
+ * Fixed to the cursor, clamped into the viewport; closes on Escape, any
+ * outside pointerdown, wheel/pan or a contextmenu that misses (the
+ * TableMenu/PdfAttachmentMenu behavior).
+ */
+function TodoMenu({
+  menu,
+  onClose,
+  onAction,
+}: {
+  menu: TodoMenuState;
+  onClose: () => void;
+  onAction: (hit: TodoTextHit) => void;
+}) {
+  const MENU_WIDTH = 208;
+  const ITEM_HEIGHT = 36;
+  const MENU_HEIGHT = ITEM_HEIGHT + 16;
+  const left = Math.max(8, Math.min(menu.x, window.innerWidth - MENU_WIDTH - 8));
+  const top = Math.max(8, Math.min(menu.y, window.innerHeight - MENU_HEIGHT - 8));
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-todo-context-menu]")) return;
+      onClose();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    const onWheel = () => onClose();
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("wheel", onWheel, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("wheel", onWheel);
+    };
+  }, [onClose]);
+
+  const item =
+    menu.hit.kind === "checklist"
+      ? { id: "toggle" as const, label: "Toggle checked", testid: "todo-menu-toggle" }
+      : { id: "tag" as const, label: "Add To Do tag", testid: "todo-menu-add" };
+  return (
+    <div
+      data-todo-context-menu=""
+      data-testid="todo-context-menu"
+      role="menu"
+      aria-label="Checklist actions"
+      className="fixed z-50 overflow-hidden rounded-md border bg-popover py-1 text-popover-foreground shadow-md"
+      style={{ left, top, width: MENU_WIDTH }}
+    >
+      <button
+        role="menuitem"
+        data-testid={item.testid}
+        className="flex w-full cursor-pointer items-center px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+        onClick={() => onAction(menu.hit)}
+      >
+        {item.label}
+      </button>
     </div>
   );
 }
@@ -563,6 +656,14 @@ export default function ExcalidrawCanvas({
    * null while closed.
    */
   const [tableMenu, setTableMenu] = useState<TableMenuState | null>(null);
+
+  /**
+   * Checklist context menu state (issue #302). Opened by the same
+   * capture-phase contextmenu listener when the right-click lands on an
+   * actionable single-line standalone text (checklist item or taggable
+   * plain text); null while closed.
+   */
+  const [todoMenu, setTodoMenu] = useState<TodoMenuState | null>(null);
 
   /** Write the latest stashed scene into IndexedDB. */
   const doSave = useCallback(async (): Promise<void> => {
@@ -786,6 +887,18 @@ export default function ExcalidrawCanvas({
           }
           return true;
         },
+        // issue #302: OneNote To Do tag parity — one bare `[ ]` item at the
+        // next insert position; the token rides the text, so nothing new to
+        // persist. The desktop editor opens edits fully selected, so the
+        // retype-proof surfaces are the context-menu ones (Add To Do tag /
+        // Toggle checked); the starter item is the keyboard-confident path.
+        insertChecklistItem: () => {
+          if (!insertChecklistItemImpl(api)) {
+            onToast("Could not insert the checklist item.");
+            return false;
+          }
+          return true;
+        },
         // issue #278: OneNote "Insert > File Attachment" — per-file skip
         // toasts, one batch toast on success
         attachFiles: async (files) => {
@@ -989,10 +1102,33 @@ export default function ExcalidrawCanvas({
         e.preventDefault();
         e.stopPropagation();
         setPdfMenu(null);
+        setTodoMenu(null);
         setTableMenu({ x: e.clientX, y: e.clientY, ...cell });
         return;
       }
       setTableMenu(null);
+      // checklists second (issue #302): an actionable single-line
+      // standalone text under the cursor — a checklist item opens the
+      // toggle menu, a plain text the To Do-tag menu (OneNote's Home >
+      // To Do tag flow: type first, then tag). While a text EDITOR is
+      // open the WYSIWYG owns the element's text (desktop edits open
+      // fully selected — its commit would clobber any flip), so an
+      // editing session lets the native menu through.
+      if (!api.getAppState().editingTextElement) {
+        const todo = hitTestTodoText(
+          api.getSceneElements() as unknown as readonly TodoElementLike[],
+          scene.x,
+          scene.y,
+        );
+        if (todo) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPdfMenu(null);
+          setTodoMenu({ x: e.clientX, y: e.clientY, hit: todo });
+          return;
+        }
+      }
+      setTodoMenu(null);
       const hit = hitTestAttachment(
         scene.x,
         scene.y,
@@ -1092,6 +1228,28 @@ export default function ExcalidrawCanvas({
         return;
       }
       if (result.message) onToast(result.message);
+    },
+    [onToast],
+  );
+
+  /**
+   * The two checklist actions (issue #302): toggle a checklist item's
+   * done state, or apply the OneNote To Do tag to a plain single-line
+   * text. Both are ONE undoable scene update (the table-op precedent);
+   * refusals toast instead of silently doing nothing.
+   */
+  const handleTodoMenuAction = useCallback(
+    (hit: TodoTextHit) => {
+      setTodoMenu(null);
+      const api = apiRef.current;
+      if (!api) return;
+      const result =
+        hit.kind === "checklist"
+          ? toggleChecklistImpl(api, hit.elementId)
+          : applyToDoTagImpl(api, hit.elementId);
+      if (!result.ok) {
+        onToast(result.error ?? "The checklist action could not be applied.");
+      }
     },
     [onToast],
   );
@@ -1233,6 +1391,13 @@ export default function ExcalidrawCanvas({
           menu={tableMenu}
           onClose={() => setTableMenu(null)}
           onAction={(action) => handleTableMenuAction(tableMenu, action)}
+        />
+      )}
+      {todoMenu && (
+        <TodoMenu
+          menu={todoMenu}
+          onClose={() => setTodoMenu(null)}
+          onAction={handleTodoMenuAction}
         />
       )}
       {background === "ruled" && (

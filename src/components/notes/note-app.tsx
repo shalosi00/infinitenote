@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   LayoutTemplate,
   Link2,
+  ListTodo,
   Menu,
   Mic,
   Moon,
@@ -1285,6 +1286,12 @@ export default function NoteApp() {
               data-testid="import-page-link"
             >
               <Link2 /> {"Link to page…"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => canvasApi.current?.insertChecklistItem()}
+              data-testid="import-checklist"
+            >
+              <ListTodo /> {"Checklist item"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{"Library"}</DropdownMenuLabel>

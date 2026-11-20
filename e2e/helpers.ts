@@ -199,30 +199,83 @@ export async function drawRectangleOnCanvas(page: Page): Promise<void> {
   await page.mouse.up();
 }
 
-/** Create a text element with the text tool and type `text` into it. */
+/**
+ * Create a text element with the text tool and type `text` into it.
+ *
+ * Hardened against three measured CI failure shapes (2026-11-20, three
+ * consecutive runner failures on otherwise-green trees — all green
+ * locally): (1) the click→editor handshake stalls on a busy runner —
+ * the old retry RE-CLICKED with whatever tool the canvas had flipped
+ * back to (a cancelled editor returns the tool to selection, so the
+ * re-clicks could never open an editor; the wave-14 lesson) — each
+ * attempt now RE-ARMS the text tool first; (2) the canvas-focus handoff
+ * can cancel a freshly opened editor before any character lands
+ * (visible at open, gone at +250 ms — measured on the checklist wave) —
+ * the editor's visibility is re-checked after a settle before typing;
+ * (3) a committed element can vanish when a typed text races the
+ * store/boot reconciliation — the commit is verified against the
+ * serialized scene (polling 5 s) and the whole dance retries on miss.
+ */
 export async function createTextElement(page: Page, text: string): Promise<void> {
   const b = await canvasBox(page);
   // click RIGHT of the Shapes island — the floating panel overlays the
   // left-center of the canvas and can swallow the pointer event (the 0.35
   // x-ratio flaked exactly there under full-suite load; import-overlay.spec
-  // documented the same hazard for its inline clicks). The click→editor
-  // handshake can also stall on a busy CI runner (state-freshness #79
-  // flaked 4/4 attempts there on 2026-11-11 while passing locally) — so
-  // retry the click instead of trusting one shot.
+  // documented the same hazard for its inline clicks).
   const editor = page.locator(".excalidraw textarea").last();
-  let opened = false;
-  for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+  const firstLine = text.split("\n")[0].trim();
+  for (let attempt = 0; attempt < 5; attempt++) {
     await page.mouse.click(b.x + b.width * 0.6, b.y + b.height * 0.75);
+    let opened = false;
     try {
       await editor.waitFor({ state: "visible", timeout: 10_000 });
       opened = true;
     } catch {
-      // canvas not interactive yet — click again
+      // canvas not interactive yet or the click did not open an editor —
+      // re-arm the text tool (a cancelled editor flips back to selection)
+      // and retry the whole dance
     }
+    if (!opened) {
+      await setActiveTool(page, "text");
+      continue;
+    }
+    // let the late canvas-focus timer fire before typing — a steal here
+    // cancels the empty editor and the characters would land nowhere
+    await page.waitForTimeout(250);
+    if (!(await editor.isVisible().catch(() => false))) continue;
+    await page.keyboard.type(text, { delay: 20 });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    const committed = await page
+      .waitForFunction(
+        (needle) => {
+          const hooks = (
+            window as unknown as { __NOTE_E2E__?: { serializeCurrentPage?: () => string } }
+          ).__NOTE_E2E__;
+          const raw = hooks?.serializeCurrentPage?.() ?? "";
+          try {
+            const scene = JSON.parse(raw) as {
+              elements: Array<{ type?: string; isDeleted?: boolean; text?: string }>;
+            };
+            return scene.elements.some(
+              (e) =>
+                e.type === "text" &&
+                !e.isDeleted &&
+                typeof e.text === "string" &&
+                e.text.includes(needle),
+            );
+          } catch {
+            return false;
+          }
+        },
+        firstLine,
+        { timeout: 5_000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (committed) return;
   }
-  if (!opened) throw new Error("text editor never opened after 3 canvas clicks");
-  await page.keyboard.type(text, { delay: 20 });
-  await page.keyboard.press("Escape");
+  throw new Error(`text never committed after 5 attempts: "${firstLine}"`);
 }
 
 /* --------------------------- sidebar tree helpers ------------------------ */
