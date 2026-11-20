@@ -90,6 +90,7 @@ import {
 } from "@/lib/tags";
 import { Sidebar } from "./sidebar";
 import CanvasEditor from "./canvas-editor";
+import { FindBar } from "./find-bar";
 import { SearchDialog } from "./search-dialog";
 import { TrashDialog } from "./trash-dialog";
 import { ShortcutsDialog } from "./shortcuts-dialog";
@@ -461,6 +462,29 @@ export default function NoteApp() {
         e.preventDefault();
         useAppStore.getState().setSearchOpen(true);
       }
+      // issue #301 (wave 14): Ctrl/Cmd+F finds on the CURRENT page — OneNote
+      // "Find on this page" parity. preventDefault keeps the browser's own
+      // find out of the way; the bar is store-driven so it works from the
+      // canvas, the sidebar or any input. Focus lands in the input via its
+      // autoFocus (and this rAF re-focuses it when the bar is ALREADY open —
+      // the browser-find behavior of a second Ctrl+F).
+      if (mod && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        useAppStore.getState().setFindOpen(true);
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLInputElement>('[data-testid="find-input"]')?.focus();
+        });
+      }
+      // Esc closes the find bar FIRST while it is open (capture phase +
+      // stopPropagation keep Excalidraw's deselect from acting — the same
+      // one-Esc-closes-the-overlay semantics every dialog here has), and
+      // hands the keyboard back to the canvas via requestCanvasFocus.
+      if (e.key === "Escape" && useAppStore.getState().findOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().setFindOpen(false);
+        useAppStore.getState().requestCanvasFocus();
+      }
       // OneNote's quick capture is Win+Alt+N — the web equivalent is Ctrl/Cmd+Alt+N.
       // Must not fire while typing in an input/textarea (some IMEs use it).
       const target = e.target as HTMLElement | null;
@@ -489,6 +513,9 @@ export default function NoteApp() {
   // shortcuts work immediately. The shell never remounts, so the ref reliably
   // remembers what was already applied across page switches.
   const canvasFocus = useAppStore((s) => s.canvasFocus);
+  // issue #301 (wave 14): in-page find bar — store-driven like every
+  // dialog, mounted only while open (see the canvas container below)
+  const findOpen = useAppStore((s) => s.findOpen);
   const appliedFocus = useRef(0);
   useEffect(() => {
     if (canvasFocus === appliedFocus.current) return;
@@ -1507,6 +1534,12 @@ export default function NoteApp() {
                       <Table2 /> {"Insert table 3×3"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      data-testid="page-actions-find"
+                      onClick={() => useAppStore.getState().setFindOpen(true)}
+                    >
+                      <Search /> {"Find on page"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       data-testid="open-version-history"
                       onClick={() => useAppStore.getState().setHistoryOpen(true)}
                     >
@@ -1627,6 +1660,12 @@ export default function NoteApp() {
                   onPageLinkOpen={handlePageLinkOpen}
                   onPageLinkPaste={handlePageLinkPaste}
                 />
+                {/* issue #301 (wave 14): in-page find — a floating,
+                    non-modal bar over the canvas. Mounted ONLY while
+                    findOpen: closing unmounts it (fresh state on reopen)
+                    and the store closes it on every page switch, so stale
+                    element ids from a previous page can never navigate. */}
+                {findOpen && <FindBar getApi={() => canvasApi.current} />}
               </div>
             </>
           ) : (

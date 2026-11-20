@@ -9,6 +9,7 @@
 import type { ScenePayload } from "./types";
 import { isAudioFile } from "./audio-notes";
 import type { HwrConvertOutcome } from "./hwr-convert";
+import type { PageFindMatch } from "./page-find";
 
 /** Imperative surface the canvas exposes to the rest of the app. */
 export interface CanvasApi {
@@ -51,6 +52,21 @@ export interface CanvasApi {
    * label is invalid — the caller toasts.
    */
   insertPageLink: (pageId: string, label: string) => boolean;
+  /**
+   * In-page find (issue #301, OneNote "Find on this page" parity): match
+   * the query against the CURRENT page's visible text elements (standalone
+   * text + bound labels) case-insensitively, in reading order. Pure policy
+   * in src/lib/page-find.ts. An empty query returns an empty result.
+   */
+  findMatches: (query: string) => PageFindMatch[];
+  /**
+   * Select and scroll to one match returned by findMatches (same query
+   * generation — matches carry element ids). DOM focus NEVER moves: the
+   * find bar's input keeps it, so Enter/Shift+Enter keep cycling. The
+   * appState-selection shape-library precedent, scrollToContent for the
+   * viewport.
+   */
+  gotoFindMatch: (match: PageFindMatch) => void;
   /** Flush a pending debounced save immediately (used on page switch). */
   flushSave: () => Promise<void>;
   /** True while the canvas holds un-saved edits (autosave debounce pending). */
