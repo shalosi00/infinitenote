@@ -43,6 +43,89 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-21 — Checklists: OneNote "To Do tag" parity, wave 15 (#302)
+
+- **Task**: wave 15 — the sixth product-parity wave, per the wave-14
+  entry's pointer ("checklists (#302 — OneNote To Do tag parity, the
+  `[ ]`/`[x]` text-convention toggle with a one-undo-step context
+  action) is the next product-parity candidate"). Evidence pass:
+  OneNote applies a To Do tag to typed lines (Home > To Do tag — a
+  clickable checkbox per line), Joplin renders `- [ ]`/`- [x]` as
+  interactive checkboxes, Logseq's TODO keyword family cycles task
+  state; ours could only fake items with literal "[ ]" prefixes that
+  never change. Shipped this cycle, closing the v1.17.0 milestone's
+  LAST software issue (#193 hardware-blocked, moves forward).
+- **Design**: pure `src/lib/checklist.ts` (the table-insert/page-find
+  pattern): strict GFM-style parse — the token is the whole text or
+  exactly one space follows (`[ ]Buy` never parses), `[X]` parses
+  checked and flips normalize to lowercase `[x]`, multi-line text never
+  parses (one text element = one item); flip preserves the item text
+  exactly; applyToDoTag prepends `[ ] ` to plain single-line text;
+  standalone-only element classification (bound labels refused);
+  rotation-exact hit test (the attachment-chip frame math). No new
+  element type, no customData, no data-model change — the checked state
+  IS the text, so persistence/sync/backups/search are untouched.
+- **Surfaces**: a right-click context menu cloned from the
+  table-cell/PDF-chip pattern whose ONE item depends on the hit —
+  checklist item → "Toggle checked", plain single-line text →
+  "Add To Do tag" (OneNote's own flow: type first, then tag); the
+  Import menu "Checklist item" starter (one bare `[ ]` element); both
+  menu actions are ONE scene update = one undo step (the table-op
+  precedent) that DESELECTS on purpose (the issue-#231
+  deterministic-canvas-undo lesson).
+- **Lessons (all measured this cycle)**:
+  - **The desktop editor opens text edits fully selected**
+    (`autoSelect: !device.isTouchScreen`, read from the 0.18.1 dist):
+    typing after an insert would REPLACE a pre-inserted prefix, so the
+    prefix can never be delivered by insert-then-type — hence
+    tag-after-type as the primary flow.
+  - **A same-id rebuild must never present a version behind or equal to
+    the stored element's**: the toggle's rebuild shipped convert's
+    fresh version 1, equal to the last save's `id@1`, and the autosave
+    gate (sceneSignature is id@version) read the flip as a metadata
+    re-stamp — the item toggled on canvas but NEVER reached the DB
+    (probes measured live `[x]` at +3 s and unchecked after reload;
+    typed-text tags persisted because their versions differed, which
+    is why only the starter item exposed the bug). rebuildTextElement
+    now bumps the version past the replaced element's.
+  - **Multi-line text must not be menu-actionable**: the classifier's
+    "plain" branch initially omitted the newline check, so a multi-line
+    paragraph opened the menu with an "Add To Do tag" action that
+    applyToDoTag would refuse — caught by CL-E08 and fixed in
+    classifyTodoText (the menu never offers an action it cannot keep).
+  - **The canvas's left ~15% swallows text-tool clicks at every
+    height** (measured sweep: viewport x-ratios 0.08/0.15 dead at all
+    heights except the bottom row; elementFromPoint reports bare
+    canvas, so the swallowing layer is pointer-capture-invisible) —
+    the spec suite creates text right of it, as helpers.ts documented
+    for the Shapes island.
+  - **Freshly typed text after a reload races the boot**: an element
+    verified at +300 ms vanished before the next step (the
+    reload-boot scene replacement race; the HWR store-drop at ~1.5 s is
+    the documented cousin) — the spec now creates text BEFORE any
+    reload and keeps the reload test last; createTextAt re-verifies
+    past the drop window and todoOp polls.
+- **PR #306** (squash `0aad1b2`, 4/4 required checks green on head
+  `bfce349` — lint-typecheck-test, e2e, build-smoke, size-report +
+  CodeQL/title/labeler/coverage informational): 33 new unit tests
+  (checklist parse/flip/tag/classify/hit-test), 9 new E2E checks
+  (CL-E01..E09). #302 closed explicitly via API after merge.
+- **Gate**: 1225 unit / 88 files, 0 fail (base `aad43f4`: 1192/87 —
+  +33 CL-P pins); 228 e2e / 47 files (`playwright --list`); new spec
+  CL-E01..E09 9/9; neighbors table + pdf-attachment + file-attachment
+  + page-find 45/45 and shortcuts + ui-overlap + dialog-close-click +
+  search-trash + crud + page-templates + version-history +
+  ui-surface-sweep 31/31. Counts swept: README badge + commands table,
+  .github/copilot-instructions.md, PROJECT_STATUS (new Last-updated
+  row, Phase waves 1-15, Overall state, Totals, repo-map rows,
+  commands).
+- **Next cycle**: the v1.17.0 release train runs in THIS cycle
+  (release-prep version files → release PR develop-to-main → tag +
+  hand-written notes under the wave-9 convention → milestone rotation
+  with #193 moved forward — its record lands in PROJECT_STATUS Recent
+  history per the one-liner rule); after that, the next
+  product-parity candidates come from a fresh majors evidence pass.
+
 ## 2026-11-20 (3) — In-page find: OneNote "Find on this page" parity, wave 14 (#301)
 
 - **Task**: wave 14 — the fifth product-parity wave, per the wave-13
