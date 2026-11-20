@@ -358,10 +358,17 @@ test.describe.serial("in-page find (issue #301)", () => {
 
   test("PF-E08: the page-actions menu opens the find bar on desktop; the entry and the keyboard path are live on a phone viewport", async () => {
     // desktop: the ⋯ page-actions menu carries the entry (the TB-E11 menu
-    // dance: wait for the container, click inside it)
-    await page.getByTestId("page-actions").click();
+    // dance: wait for the container, click inside it). The trigger click
+    // can land during a closing animation on a busy runner (CI 2026-11-20:
+    // the menu wait timed out twice) — click, short wait, click again.
     const menu = page.getByTestId("page-actions-menu");
-    await menu.waitFor({ state: "visible", timeout: 10_000 });
+    await page.getByTestId("page-actions").click();
+    try {
+      await menu.waitFor({ state: "visible", timeout: 4_000 });
+    } catch {
+      await page.getByTestId("page-actions").click();
+      await menu.waitFor({ state: "visible", timeout: 10_000 });
+    }
     await menu.getByTestId("page-actions-find").click();
     await page.getByTestId("find-bar").waitFor({ state: "visible" });
     await page.keyboard.press("Escape");
@@ -377,7 +384,12 @@ test.describe.serial("in-page find (issue #301)", () => {
     const trigger = page.getByTestId("page-actions");
     await expect(trigger).toBeVisible();
     await trigger.click();
-    await menu.waitFor({ state: "visible", timeout: 10_000 });
+    try {
+      await menu.waitFor({ state: "visible", timeout: 4_000 });
+    } catch {
+      await trigger.click();
+      await menu.waitFor({ state: "visible", timeout: 10_000 });
+    }
     await expect(page.getByTestId("page-actions-find")).toBeAttached();
     await page.keyboard.press("Escape");
     await menu.waitFor({ state: "hidden", timeout: 10_000 });

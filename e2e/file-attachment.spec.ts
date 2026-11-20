@@ -325,10 +325,21 @@ test.describe.serial("file-attachment: chip, context menu, byte-exact download",
     }
     expect(focused, "an empty canvas spot exists to focus").toBe(true);
     await page.keyboard.press("Escape");
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const scene = JSON.parse(await serializeCurrentPage(page)) as SerializedScene;
       const names = fileChips(scene).map((c) => c.customData?.fileName);
       if (!names.includes("mobile.zip")) break;
+      // a toast can steal keyboard focus mid-loop (the documented sonner
+      // lesson) — a press that lands in the toast is lost; verify the
+      // canvas still holds focus and re-click the empty spot if not
+      const onCanvas = await page.evaluate(() => {
+        const ae = document.activeElement;
+        return !!ae && !!ae.closest(".excalidraw");
+      });
+      if (!onCanvas) {
+        await page.mouse.click(box!.x + box!.width * 0.85, box!.y + box!.height * 0.45);
+        await page.waitForTimeout(150);
+      }
       await page.keyboard.press("Control+z");
       await page.waitForTimeout(700);
     }
