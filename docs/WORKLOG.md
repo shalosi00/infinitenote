@@ -43,6 +43,87 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-20 (2) — Internal page links: OneNote "Copy Link to Page" parity, wave 13 (#295)
+
+- **Task**: wave 13 — the fourth product-parity wave, per the wave-12
+  entry's pointer ("then the next product-parity candidate"). The
+  v1.16.0 release train had already executed (#289/#291/#290/#292/#293),
+  so the cycle opened with v1.17.0 (#18) holding only hardware-blocked
+  #193. Evidence pass (2026-11-20): every comparable exposes first-class
+  page-to-page linking — OneNote's right-click page tab → "Copy Link to
+  Page" (support.microsoft.com, "Create links to notebooks, sections,
+  pages, and paragraphs"), Joplin's Tools → "Link to note…" with
+  `:/noteId` markdown links, Logseq's `[[wiki-links]]` + backlinks,
+  AppFlowy's mention-a-page inline block, AFFiNE's bi-directional links —
+  while ours had NO internal link mechanism (`infinitenote:` schemes
+  existed only as audio/PDF/file payload markers; the only cross-page
+  navigation was Ctrl+K search). Issue #295 filed into v1.17.0 with the
+  full table.
+- **Design**: a page link is a normal, EDITABLE text element whose
+  Excalidraw `link` field carries `infinitenote:page/<id>` — the
+  audio/PDF/file marker precedent (the scheme survives `sanitizeUrl`),
+  with NO payload (the target lives in the same local database). Built
+  via `convertToExcalidrawElements` so Excalidraw's own text metrics
+  size the click target. Three insertion surfaces (OneNote's trio):
+  sidebar page menu "Copy link to page" (copies the scheme URL),
+  "Link to page…" picker in the Import menu (every alive page with
+  "notebook / section" breadcrumb meta, case-insensitive, the current
+  page excluded), and paste interception (`onPaste` → linked title
+  element instead of a plain text). Navigation via cancelable
+  `onLinkOpen` (`preventDefault()` stops Excalidraw's default
+  `window.open`): the id resolves through the store, and the page AND
+  its ancestors must be alive or the click toasts "broken link" without
+  navigating. No data-model change: link fields ride the existing scene
+  persistence, sync folders, backups and version history untouched.
+- **Lessons (all measured this cycle)**:
+  - **Excalidraw 0.18.1 element links open ONLY via the link icon** —
+    in desktop editing mode `isPointHittingLink` falls through to
+    `isPointHittingLinkIcon` (the anchor icon at the element's top-right
+    corner; with `DEFAULT_LINK_SIZE` 14 + the dashed-line margin its
+    center sits at scene (x2 + 8, y1 − 8)). Clicking the element BODY
+    just selects; only `viewModeEnabled`/mobile give body-wide hits.
+    The E2E clicks the icon (measured coordinates, table-spec-style
+    scene→viewport conversion).
+  - **Excalidraw's `onPaste` contract is inverted from the obvious**:
+    returning FALSE aborts the default paste, returning true CONTINUES
+    it. The first implementation returned true for handled page links
+    and Excalidraw then ALSO created a plain text element from the link
+    text. Handled links return false; every other paste returns true.
+  - **Excalidraw preventDefaults its canvas pointer events, so clicking
+    the canvas never focuses it** — after a sidebar action (e.g. the
+    link copy), `activeElement` stayed on the sidebar button and
+    Excalidraw's paste guard (`activeElement` must live inside the
+    container) silently swallowed the next Ctrl+V. Fixed for real with
+    a wrapper-level capture-phase pointer-down listener that focuses
+    the interactive canvas — pastes, Esc and shortcuts now behave after
+    sidebar clicks (this was a genuine UX bug the parity work surfaced).
+  - **Headless Chromium does not turn a synthetic Ctrl+V into a paste
+    event carrying clipboardData** — PL-E03 keeps every app-side step
+    real (kebab copy → system clipboard read-back → canvas click) and
+    dispatches the ClipboardEvent on the container; the event still
+    flows through Excalidraw's real document-level listener, its focus
+    guard, `parseClipboard` and our `onPaste`.
+  - The sidebar tree's Radix DropdownMenu triggers ALSO carry
+    `aria-expanded="false"` — an expansion sweep scoped to
+    `button[aria-expanded="false"]` clicks kebab menus instead of
+    headers; `:not([aria-label])` excludes them.
+- **Gate**: 1161 unit / 85 files, 0 fail (base 32ed4b1: 1142/84 — +19
+  PL-P pins: scheme build/parse/validate round-trips, foreign-scheme
+  rejection incl. prefix-spoofing, toast lines); 211 e2e / 45 files
+  measured on this tree (`playwright --list`); new spec PL-E01..E04 4/4;
+  neighbors measured green in-sandbox: imports + file-attachment +
+  pdf-attachment + save-indicator-calm + shortcuts 42/42, crud +
+  page-templates + table + ui-overlap + dialog-close-click +
+  version-history 31/31. Counts swept: README badge + commands table,
+  .github/copilot-instructions.md (both previously 1142/206).
+- **Next cycle**: the parity queue behind #295 — the two remaining
+  majors-exposed behaviors we lack (measured 2026-11-20): in-page find
+  (Ctrl+F on the current page — OneNote/Joplin/Logseq all have it, our
+  Ctrl+K is cross-page only) and checklists (OneNote checkbox tags,
+  Joplin `- [ ]`, Logseq TODO) — plus the v1.17.0 milestone mechanics
+  (#193 hardware-blocked remainder). Evidence for both is in the wave-13
+  issue pass; file issues from it, then implement in roadmap order.
+
 ## 2026-11-20 — Custom page templates: OneNote Page Templates parity, wave 12 (#286)
 
 - **Task**: wave 12 — the third product-parity wave. The v1.16.0

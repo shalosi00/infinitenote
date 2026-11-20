@@ -173,7 +173,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       v1.15.0 milestone (non-goals unchanged: CJK deferred, vendored model
       unchanged)
 
-## v1.16 — Canvas structure & OneNote everyday parity (current)
+## v1.16 — Canvas structure & OneNote everyday parity (shipped in v1.16.0)
 
 - [x] Tables on pages (issue #277): OneNote "Insert > Table" parity — a table
       inserts from the header toolbar (defaults 3×3) as NATIVE Excalidraw
@@ -193,6 +193,24 @@ milestones/issues. This file is the plan; the status file is the reality.
       template, create pages from a template picker (additive Dexie v4
       table; local-only by design, included in backups)
       (docs/test-plans/page-templates.md)
+
+## v1.17 — Internal page links (current)
+
+- [x] Internal page links (issue #295): OneNote "Copy Link to Page" parity —
+      a page link is a normal, editable text element whose Excalidraw `link`
+      field carries the `infinitenote:page/<id>` marker scheme (the
+      audio/PDF/file-chip marker precedent; no payload — the target lives in
+      the same local database). "Copy link to page" in the sidebar page menu
+      copies the URL; pasting it on a canvas inserts the linked title element
+      (onPaste interception); "Link to page…" in the Import menu opens a
+      picker (every alive page with "notebook / section" breadcrumb meta,
+      case-insensitive, the current page excluded). Clicking a link element
+      resolves the id through the store and navigates (cancelable onLinkOpen
+      stops Excalidraw's default window.open); a page whose subtree was
+      trashed toasts "broken link" instead of navigating. No data-model
+      change: link fields ride the existing scene persistence, sync folders,
+      backups and version history untouched
+      (docs/test-plans/page-links.md)
 
 ## v1.15 — Representative-hardware WebGPU measurement (shipped in v1.15.0;
 the hardware-blocked benchmark remainder lives in v1.16.0 as issue #193)

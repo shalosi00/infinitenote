@@ -31,6 +31,7 @@ import {
   CaptureUpdateAction,
 } from "@excalidraw/excalidraw";
 import { classifyFile, downloadBlob, normalizeImageStatuses, parseSceneFileText, sanitizeScene, titleToFilename } from "./excalidraw-utils";
+import { pageLinkFor } from "./page-links";
 import {
   INHERIT_FILL,
   INHERIT_STROKE,
@@ -773,6 +774,67 @@ export async function attachFiles(
     });
   }
   return { attached, skippedLarge, skippedInvalid };
+}
+
+/* ------------------------------------------------------------------ */
+/* internal page links (OneNote "Copy Link to Page" parity)            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The pasted/picked page link as a CANVAS element: a normal, editable
+ * text element whose Excalidraw `link` field carries the
+ * `infinitenote:page/<id>` marker (the audio/PDF/file marker precedent —
+ * the scheme survives Excalidraw's link sanitization). Building it via
+ * `convertToExcalidrawElements` keeps Excalidraw's own text metrics, so
+ * the click target matches the rendered label exactly.
+ *
+ * Returns null when the label or the page id cannot form a valid link —
+ * the caller toasts; the scene is never mutated with a broken link.
+ */
+export function makePageLinkElement(
+  label: string,
+  pageId: string,
+  x: number,
+  y: number
+): ExcalidrawElement | null {
+  const link = pageLinkFor(pageId);
+  const text = label.trim();
+  if (!link || !text) return null;
+  const skeletons = [
+    {
+      type: "text" as const,
+      text,
+      x,
+      y,
+      fontSize: 20,
+      id: crypto.randomUUID(),
+      link,
+    },
+  ];
+  const [element] = convertToExcalidrawElements(skeletons, {
+    regenerateIds: false,
+  }) as unknown as ExcalidrawElement[];
+  return element ?? null;
+}
+
+/**
+ * Insert one internal page link at the next insert position. ONE
+ * updateScene = one undo step removes it (the tables/attachments
+ * precedent); INSERT deselects on purpose (the HWR-E05/E06 lesson).
+ * Returns false when the link or label is invalid — the caller toasts.
+ */
+export function insertPageLink(
+  api: ExcalidrawImperativeAPI,
+  pageId: string,
+  label: string
+): boolean {
+  const at = nextInsertPosition(api.getSceneElements());
+  const element = makePageLinkElement(label, pageId, at.x, at.y);
+  if (!element) return false;
+  api.updateScene({
+    elements: [...api.getSceneElements(), element],
+  });
+  return true;
 }
 
 /* ------------------------------------------------------------------ */
