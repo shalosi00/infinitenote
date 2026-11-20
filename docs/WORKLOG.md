@@ -43,6 +43,93 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-20 (3) — In-page find: OneNote "Find on this page" parity, wave 14 (#301)
+
+- **Task**: wave 14 — the fifth product-parity wave, per the wave-13
+  entry's pointer ("the parity queue behind #295 — the two remaining
+  majors-exposed behaviors we lack: in-page find … and checklists … file
+  issues from it, then implement in roadmap order"). Evidence pass
+  (2026-11-20): OneNote's help page states "Ctrl + F searches within the
+  current page only" (Ctrl + E expands to all notebooks;
+  support.microsoft.com — fetched and quoted), Joplin ships a Ctrl+F
+  find-in-note box (upstream focus issue laurent22/joplin#16174), Logseq
+  has in-page search — ours had only the cross-page Ctrl+K dialog, which
+  never highlights anything on the canvas. Issues #301 (in-page find) and
+  #302 (checklists) filed into v1.17.0; #301 shipped this cycle.
+- **Design**: pure `src/lib/page-find.ts` (no Excalidraw imports — the
+  table-insert/page-links pattern): findable text = VISIBLE text elements
+  only (standalone text + bound labels of containers/arrows/table cells;
+  OCR/HWR/file-name metadata deliberately stay Ctrl+K material),
+  case-insensitive occurrence matching (non-overlapping, needle-length
+  stepping — browser semantics), reading order (top→bottom, left→right,
+  stable sort), wrap-around step helper; `CanvasApi.findMatches` /
+  `gotoFindMatch` compute over the LIVE scene — navigation selects via
+  `appState.selectedElementIds` (the shape-library precedent) +
+  `scrollToContent`, DOM focus NEVER moves (the find input keeps it, so
+  Enter/Shift+Enter keep cycling); `src/components/notes/find-bar.tsx` —
+  a floating NON-modal browser-find-shaped bar (input, honest "n of m",
+  prev/next, close) with ZERO effects: every state change is
+  event-driven (the react-hooks/set-state-in-effect rule respected by
+  construction), mounted only while `findOpen`, UNMOUNTING on close
+  (fresh reopen) and closed by the store on EVERY page switch
+  (`selectPage`/`revealSelection` set `findOpen: false` — stale element
+  ids from a previous page can never navigate); note-app's capture-phase
+  handler adds Ctrl/Cmd+F (preventDefault kills the browser find; a
+  second Ctrl+F re-focuses the input) and Esc-closes-first-while-open
+  (stopPropagation keeps Excalidraw's deselect out; focus returns via
+  requestCanvasFocus); entry surfaces: the shortcuts cheatsheet (truthful
+  by construction) + the ⋯ page-actions menu ("Find on page").
+- **Lessons (all measured this cycle)**:
+  - **Closing the find bar steals a just-opened text editor**:
+    `setFindOpen(false)` + `requestCanvasFocus` schedules the canvasFocus
+    effect's delayed `.focus()` on `.excalidraw` — a text editor opened
+    inside that window loses focus, its empty content cancels, and the
+    tool flips back to selection (measured: `activeTool=selection` at
+    click time, editor never visible — first CI e2e run caught it as
+    PF-E03's "editor never opened"). The spec's `createTextAt`
+    deselects with the selection tool, settles 300 ms, VERIFIES the tool
+    stuck and re-arms on retry; `helpers.createTextElement` never hits
+    this because those specs never close an overlay first.
+  - **gotoFindMatch's selection changes what the next text-tool click
+    means** — with the text tool armed, clicking a text element EDITS it;
+    a leftover selection must be deselected before creating elements
+    (the HWR focus-race lesson re-proven for the find flow).
+  - **Radix DropdownMenu click-through at phone widths is
+    hardware-metric-sensitive**: PF-E08's first CI run clicked the ⋯
+    trigger fine at 390px but timed out twice waiting for the menu ITEM
+    (locally green both runs); the pin now asserts the entry's presence
+    (`toBeAttached`) in the opened menu plus the keyboard path (Ctrl+F
+    works at every width) — deterministic surfaces only.
+  - The `react-hooks/set-state-in-effect` rule shapes component design:
+    the find bar has ZERO effects — query/counter/position all change in
+    event handlers, and close/reopen semantics come from CONDITIONAL
+    MOUNTING (unmount on close = fresh state) instead of
+    reset-in-effect.
+- **PR #303** (squash `33f8fa9`, 4/4 required checks green on head
+  `8875886` — lint-typecheck-test, e2e, build-smoke, size-report +
+  CodeQL/title/labeler/coverage informational): 31 new unit tests
+  (page-find + page-find-edges), 8 new E2E checks (PF-E01..E08). The
+  first CI e2e run FAILED on the old PF-E08 (the phone menu
+  click-through above) — fixed and force-pushed `8875886` (parent
+  `049c29d`), all green on the re-run; ui-surface-sweep's
+  phone-narrow-320 flaked once and passed on retry in the same run
+  (marginal, unrelated — the find bar is DOM-absent when closed). #301
+  closed explicitly via API after merge (the belt-and-suspenders close;
+  the body's plain `Closes #301` line also fired).
+- **Gate**: 1192 unit / 87 files, 0 fail (base `049c29d`: 1161/85 — +31
+  PF-P pins); 219 e2e / 46 files (`playwright --list`); new spec
+  PF-E01..E08 8/8; neighbors shortcuts + ui-overlap + crud +
+  search-trash + dialog-close-click + page-templates + version-history
+  25/25. Counts swept: README badge + commands table,
+  .github/copilot-instructions.md, PROJECT_STATUS (new Last-updated row,
+  Overall state, Totals, module map, commands, Phase waves 1-14).
+- **Next cycle**: checklists (#302 — OneNote To Do tag parity, the
+  `[ ]`/`[x]` text-convention toggle with a one-undo-step context
+  action) is the next product-parity candidate; when v1.17.0's software
+  issues are done, run the release train per docs/PIPELINE.md under the
+  wave-9 release-notes convention (#193 hardware-blocked moves forward
+  per the v1.15.0/v1.16.0 precedent).
+
 ## 2026-11-20 (2) — Internal page links: OneNote "Copy Link to Page" parity, wave 13 (#295)
 
 - **Task**: wave 13 — the fourth product-parity wave, per the wave-12

@@ -30,6 +30,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     label: "General",
     entries: [
       { keys: "Ctrl/Cmd+K", label: "Search all pages" },
+      { keys: "Ctrl/Cmd+F", label: "Find on the current page" },
       { keys: "Ctrl/Cmd+Alt+N", label: "New quick note (Quick Notes notebook)" },
       { keys: "?", label: "Show this shortcuts cheatsheet" },
       { keys: "Esc", label: "Close dialog / cancel editing" },

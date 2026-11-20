@@ -194,7 +194,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       table; local-only by design, included in backups)
       (docs/test-plans/page-templates.md)
 
-## v1.17 — Internal page links (current)
+## v1.17 — Internal page links & in-page find (current)
 
 - [x] Internal page links (issue #295): OneNote "Copy Link to Page" parity —
       a page link is a normal, editable text element whose Excalidraw `link`
@@ -211,6 +211,22 @@ milestones/issues. This file is the plan; the status file is the reality.
       change: link fields ride the existing scene persistence, sync folders,
       backups and version history untouched
       (docs/test-plans/page-links.md)
+- [x] In-page find (issue #301): OneNote "Find on this page" parity —
+      Ctrl/Cmd+F opens a floating, non-modal find bar over the canvas
+      (browser-find shape: input, honest "n of m" counter, prev/next with
+      wrap-around, Esc closes; the capture-phase global handler suppresses
+      the browser find and a second Ctrl+F re-focuses the input). Matching
+      covers the page's VISIBLE text elements (standalone text + bound
+      labels of containers/arrows/table cells) case-insensitively per
+      occurrence, in reading order (top→bottom, left→right); navigation
+      selects + scrolls to the match WITHOUT moving DOM focus, so
+      Enter/Shift+Enter keep cycling; the store closes the bar on every
+      page switch so stale ids can never navigate. Pure policy in
+      src/lib/page-find.ts; no data-model change
+      (docs/test-plans/page-find.md)
+- [ ] Checklists (issue #302): OneNote To Do tag parity — `[ ]` / `[x]`
+      text-convention items with a Toggle-checked context action (the next
+      product-parity candidate; design sketch in the issue)
 
 ## v1.15 — Representative-hardware WebGPU measurement (shipped in v1.15.0;
 the hardware-blocked benchmark remainder lives in v1.16.0 as issue #193)
