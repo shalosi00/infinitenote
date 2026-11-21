@@ -81,6 +81,16 @@ export function defaultExpandedState(tree: TreeSnapshot, selection: Selection | 
   if (selection) {
     open.add(selection.notebookId);
     open.add(selection.sectionId);
+    // sub-sections (issue #314): a restored page nested deep in the tree
+    // is only visible when its whole ancestor chain is expanded too
+    const byId = new Map(tree.sections.map((s) => [s.id, s]));
+    const seen = new Set<string>([selection.sectionId]);
+    let cur = byId.get(selection.sectionId)?.parentId ?? null;
+    while (cur && !seen.has(cur)) {
+      open.add(cur);
+      seen.add(cur);
+      cur = byId.get(cur)?.parentId ?? null;
+    }
   } else if (tree.notebooks[0]) {
     open.add(tree.notebooks[0].id);
     const sec = tree.sections

@@ -343,7 +343,9 @@ export function computeSyncPlan(
   }));
 
   const notebooks = normalizeOrders([...nbMerged.values()], () => "root");
-  const sections = normalizeOrders([...secMerged.values()], (s) => s.notebookId);
+  // sub-sections (issue #314): sibling groups are scoped by notebook AND
+  // parent, so one parent's renumbering can never interleave with another's
+  const sections = normalizeOrders([...secMerged.values()], (s) => `${s.notebookId}|${s.parentId ?? ""}`);
   const pages = normalizeOrders([...pg.merged.values(), ...conflictCopies], (p) => p.sectionId);
 
   // ---- summary: what applying this plan changes on this device ----------
