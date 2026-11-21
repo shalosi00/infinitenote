@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1243%20unit%20%2B%20233%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1254%20unit%20%2B%20237%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -227,9 +227,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server (`http://localhost:3000`) |
-| `make test` | Unit tests (1243, bun test) |
+| `make test` | Unit tests (1254, bun test) |
 | `make lint` / `make typecheck` | ESLint / TypeScript check |
-| `bunx playwright test` | Playwright E2E suite (233 checks; boots the app automatically) |
+| `bunx playwright test` | Playwright E2E suite (237 checks; boots the app automatically) |
 | `make build` / `make start` | Production build / boot the standalone server |
 | `make status` | Quick "where do things stand" snapshot |
 

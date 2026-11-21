@@ -194,7 +194,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       table; local-only by design, included in backups)
       (docs/test-plans/page-templates.md)
 
-## v1.18 — Section depth (current)
+## v1.18 — Section depth (shipped in v1.18.0)
 
 - [x] Sub-sections (issue #314): OneNote "New Section Group" / Joplin
       sub-notebooks parity — a section can contain child sections; any
@@ -216,8 +216,14 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
+## v1.19 — Parity continues (current)
+
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0/v1.16.0/v1.17.0)
+      real GPU hardware (carried forward from v1.15.0 through v1.18.0)
+- [ ] Sub-sections phase 2: drag-to-reparent and cross-notebook section
+      moves (docs/test-plans/sub-sections.md, the wave-16 phase-2 candidates)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
 
 ## v1.17 — Internal page links & in-page find (shipped in v1.17.0)
 
