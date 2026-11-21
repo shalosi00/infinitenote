@@ -43,6 +43,105 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-22 — Section colors: OneNote "Section Color" parity + the v1.18.0 release train, wave 17 (#319/#320, release #322)
+
+- **Task**: wave 17 — the eighth product-parity wave, per the wave-16
+  entry's pointer ("the next cycle either files + ships another parity
+  candidate from a fresh majors evidence pass into v1.18.0 (then the
+  release train closes it)"). Evidence pass (2026-11-21): OneNote's help —
+  "To change the color of an entire section, right-click the tab at the
+  top of the page and choose Section Color" (support.microsoft.com) and
+  the Mac variant ("Control-click the tab … point to Section Color") —
+  while Joplin still has NO native sidebar colors (two open feature
+  requests since 2021, discourse.joplinapp.org #14925/#20673, asking
+  exactly for inheritance: "Ideally you could set a color for each
+  notebook name and all it's children would inherit that color") and
+  AppFlowy colorizes text/blocks only, never sidebar rows. Ours: colored
+  notebooks above monochrome folder icons. Shipped this cycle, closing
+  #319 into the v1.18.0 milestone; the release train then CLOSED v1.18.0
+  (see below).
+- **Design**: pure `src/lib/section-colors.ts` (the tags.ts/section-tree
+  pattern): `safeSectionColor` (external input → valid palette name or
+  null — off-palette/hand-edited values read as inherit, never a crash),
+  `effectiveSectionColor` (own override wins, `color ?? null` = inherit
+  the notebook's — Joplin's requested semantics), `sectionColorHex`.
+  `Section.color?: NotebookColor | null` is additive and NOT indexed (the
+  parentId wave-16 precedent — no Dexie version bump, old rows, old sync
+  folders and old callers stay valid). `setSectionColor` = update +
+  updatedAt. Sync carries the whole row (`ManifestSection = Omit<Section,
+  "deletedAt">`) and tree rows merge whole-row LWW — zero merge logic.
+  `restoreBackup` normalizes archive colors through `safeSectionColor`
+  (the safeTags contract). Sidebar: the section row's folder icon becomes
+  the colored swatch (the notebook row's exact pattern) so the whole tree
+  color-codes like OneNote's tabs, including the wave-16 sub-section
+  recursion; the section menu gains a Color submenu (the shared 8-color
+  palette, current selection ringed) plus "Use notebook color" reset.
+- **Lessons (all measured this cycle)**:
+  - **`restoreBackup` imports as NEW records WITHOUT wiping** — every
+    backup round-trip test that kept its setup rows (SB-P15 since wave 16,
+    this wave's SC-P9/SC-P9b) left find-by-name asserts a ~50% coin flip
+    between the setup and the restored generation: 5/8 red in full-suite
+    loops while single-file runs were always green (21/21). The first CI
+    run on #320's original head red'd lint-typecheck-test on exactly
+    SC-P9. Fix (test-side, zero production code): `eraseAllData()`
+    between `buildBackup` and `restoreBackup` — the real-world
+    import-into-empty-library flow; 10/10 green after. A green PR gate is
+    NOT a flake-rate certificate: loop the full suite before claiming
+    stability.
+  - **A modal Radix menu aria-hides the app root**: after clicking a
+    swatch inside the Color submenu, `getByRole` finds NOTHING outside
+    the menu ("element(s) not found" until closed) — closeMenus()
+    (Escape ×2, then `expect(page.locator('[role="menu"]')).toHaveCount(0)`)
+    must run BEFORE role-based assertions.
+  - **Playwright name matching is case-insensitive substring** (the
+    wave-16 lesson, re-learned the hard way): the menuitem "Color"
+    matched "Use notebook color" too — `exact: true` everywhere.
+  - The welcome seed ships "My Notebook" COLLAPSED — its section rows
+    (and swatches) exist only after expanding the notebook.
+- **PR #320** (squash `825e7bd` on head `bfb886d`, 4/4 required checks
+  green — the first head `cdf3476` red'd on the SC-P9 coin flip above and
+  was replaced by the hardened push): 11 new unit tests (SC-P1..P9b —
+  pure policy + Dexie set/clear + sync manifest + whole-row LWW + backup
+  round-trips), 4 new E2E checks (SC-N01..N04 — override/re-render,
+  reset-to-inheritance, reload survival past the ~1.5 s boot drop window,
+  sub-section inherits the NOTEBOOK color never the parent's override),
+  1 pre-existing pin hardened (SB-P15). #319 closed.
+- **Gate**: 1254 unit / 90 files, 0 fail (base `44fb066`: 1243/89 — +11
+  SC-P pins); 237 e2e / 49 files (`playwright --list`); new spec
+  SC-N01..N04 4/4; neighbors sub-sections + multiselect + tags + crud +
+  search-trash 19/19 (the sidebar-heavy surfaces). Counts swept: README
+  badge + commands table, .github/copilot-instructions.md, PROJECT_STATUS
+  (in #320), docs/ROADMAP (in #320).
+- **v1.18.0 release train executed** (per docs/PIPELINE.md "Releases"):
+  release-prep #321 (version files to 1.18.0 / versionCode 280 across
+  package.json, tauri.conf.json, Cargo.toml, the gradle kts + bubblewrap
+  manifest; fdroid Builds entry 1.18.0/280/v1.18.0; flatpak metainfo
+  1.18.0 release entry — squash `53e22ef`, 4/4 checks), release PR #322
+  develop→main as MERGE commit `16c56f0` (4/4 checks), tag v1.18.0 pushed
+  on the merge sha, GitHub Release with hand-measured notes under the
+  wave-9 convention (the wave-6 workflow verified the tagged commit and
+  preserved the hand-written notes), milestones rotated (v1.18.0 #19
+  closed with #314+#319, v1.19.0 #20 opened with hardware-blocked #193
+  moved forward — the v1.15.0/v1.16.0/v1.17.0 precedent). The AppImage
+  extra-data checksum re-pin follows via scripts/flatpak-extradata.mjs
+  once the tag's desktop.yml artifact exists (the #293 precedent).
+- **CI e2e flake evidence (the wave-16 class, recurrence)**: the
+  docs-only sweep PR's first e2e run red'd FA-E15 + TB-E01 — the SAME
+  pair wave 16 documented, on a tree byte-identical (except docs) to the
+  three heads that passed e2e earlier the same day (#320 `bfb886d`,
+  #321 `ee26ba8`, #322 `53e22ef` — all 4/4). FA-E15's 14-press bound was
+  STILL not enough in that environment (all 5 chips intact after 14
+  presses); TB-E01's insert button sat "not stable" for the full 20 s
+  click window. The rerun-failed-jobs re-run went green (10 min). The
+  bound-raise is NOT a stable fix — a future cycle should make FA-E15
+  measure the undo-stack depth it actually needs (or reset the stack
+  between attach entries) instead of guessing an environment-dependent
+  press budget.
+- **Next cycle**: v1.19.0 (#20) — sub-sections phase 2 (drag-to-reparent,
+  cross-notebook section moves, the wave-16 phase-2 candidates) or the
+  next product-parity candidate from a fresh majors evidence pass; #193
+  stays hardware-blocked and moves forward at each release.
+
 ## 2026-11-21 — Sub-sections: OneNote "New Section Group" / Joplin sub-notebooks parity, wave 16 (#314)
 
 - **Task**: wave 16 — the seventh product-parity wave, per the wave-15
