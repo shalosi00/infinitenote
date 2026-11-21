@@ -314,6 +314,11 @@ describe("sub-section data layer (issue #314)", () => {
     // the grandchild was trashed on its own EARLIER — it stays in trash
     await notes.trashSection(grand.id);
     const grandOwnTs = (await notes.db.sections.get(grand.id))!.deletedAt!;
+    // the restore discriminator is the delete TIMESTAMP: the two trash
+    // calls must land in different milliseconds (measured 2026-11-21: a
+    // fast CI runner runs both within one ms, the two deletes become
+    // indistinguishable and the separately-trashed rule cannot apply)
+    await new Promise((r) => setTimeout(r, 5));
     // then the top was trashed (child + its pages go with it)
     await notes.trashSection(top.id);
     const ts = (await notes.db.sections.get(top.id))!.deletedAt!;
