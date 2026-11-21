@@ -6,6 +6,8 @@
 
 | | |
 |---|---|
+| **Last updated** | 2026-11-21 (3) (v1.17.0 released — the release train executed per docs/PIPELINE.md "Releases": release-prep version files #308, release PR develop-to-main #310 (MERGE commit `c543621`), tag v1.17.0 + GitHub Release with hand-measured notes under the wave-9 convention (2,855-byte body; the wave-6 Release workflow verified the tagged commit and preserved the hand-written notes), milestones rotated (v1.17.0 milestone #18 closed, v1.18.0 #19 opened with hardware-blocked #193 moved forward — the v1.15.0/v1.16.0 precedent), main's tip recorded as a develop ancestor (#311, the #291 precedent). Ships vs v1.16.0: internal page links (#295), in-page find (#301), checklists (#302) — waves 13-15 of the product-parity direction — plus the e2e flake hardening (#309). Counts re-measured on the release tip: 1225 unit / 88 files, 228 e2e / 47 files) |
+
 | **Last updated** | 2026-11-21 (2) (release prep for v1.17.0 — version files bumped to 1.17.0 / versionCode 270 across package.json, tauri.conf.json, Cargo.toml, the TWA gradle + bubblewrap manifest; fdroid Builds entry added (1.17.0/270/v1.17.0); flatpak metainfo 1.17.0 release entry (the AppImage extra-data checksum re-pin follows the release via scripts/flatpak-extradata.mjs once the tag's artifacts exist); Current version row → v1.17.0. Config unit tests pin every file in lockstep with package.json; the release PR + tag + notes follow per docs/PIPELINE.md "Releases" under the wave-9 notes convention) |
 
 | **Last updated** | 2026-11-21 (checklists — OneNote "To Do tag" parity, issue #302, wave 15 of the product-parity direction and the LAST software issue of the v1.17.0 milestone: a checklist item is a NORMAL single-line text element whose text carries the `[ ]`/`[x]` GFM task-list token — no new element type, no customData, no data-model change, the checked state IS the text so persistence/sync/backups/search are untouched. Evidence was OneNote's To Do tag (type a line → Home → To Do tag → clickable checkbox; support.microsoft.com), Joplin's `- [ ]`/`- [x]` rendered checkboxes and Logseq's TODO keyword family, while ours could only fake items with literal "[ ]" prefixes that never change. Design: pure policy in src/lib/checklist.ts (the table-insert/page-find pattern) — strict GFM-style parse (token is the whole text or exactly one space follows; `[ ]Buy` never parses; `[X]` parses checked and flips normalize to lowercase `[x]`; multi-line text never parses — one text element = one item), flip with faithful item-text preservation, To Do tag application, standalone-only element classification (bound labels refused), rotation-exact hit test; the canvas exposes THREE surfaces: a right-click context menu cloned from the table-cell/PDF-chip pattern whose ONE item depends on the hit (checklist item → "Toggle checked", plain single-line text → "Add To Do tag" — OneNote's own flow, type first then tag), the Import menu "Checklist item" starter (one bare `[ ]` element at the next insert position), and both menu actions as ONE scene update = one undo step (the table-op precedent) that DESELECTS on purpose (the issue-#231 deterministic-canvas-undo lesson). One desktop constraint MEASURED and designed around: Excalidraw 0.18.1 opens text edits with `autoSelect: !device.isTouchScreen` — all text selected on desktop, so typing after an insert would REPLACE a pre-inserted prefix; the prefix can never be delivered by insert-then-type, hence tag-after-type. One persistence bug found by the spec and FIXED: the same-id rebuild shipped convert's fresh version 1, equal to the stored element's version, so the autosave gate (sceneSignature is id@version) read the flip as a metadata re-stamp and dropped it — a version-1 starter item toggled on canvas but NEVER reached the DB (probes measured live [x] at +3 s and unchecked after reload); rebuildTextElement now bumps the version past the replaced element's. A second policy gap the spec caught: multi-line text was menu-actionable as "plain" — the classifier now refuses it so the menu never offers an action it could not keep. Gate: 1225 unit / 88 files, 0 fail (base aad43f4: 1192/87 — +33 CL-P pins); 228 e2e / 47 files (`playwright --list`); new spec CL-E01..E09 9/9; neighbors table + pdf-attachment + file-attachment + page-find 45/45 and shortcuts + ui-overlap + dialog-close-click + search-trash + crud + page-templates + version-history + ui-surface-sweep 31/31; counts swept in README badge + commands table and .github/copilot-instructions.md) |
@@ -28,9 +30,10 @@
 | **Last updated** | 2026-11-16 (web share target capture — issue #247: the installed PWA now registers a `share_target` (POST multipart to `/share-target`), the service worker intercepts the OS share-sheet POST before the network, stashes it in a raw-IndexedDB mailbox (`infinitenote-share-inbox`) and redirects to /, and the boot drain lands each share as a Quick Notes page via the regular import pipeline — shared title becomes the page title (capped 80), body = text + url composed, files pass through to the existing importers (image/audio/pdf/text), URL-only shares fall back to the dated quick-note title, a share always produces a page; atomic read+clear drain so two tabs can never double-import; standalone fallback page for the pre-SW edge; sw.js mirrors the share-inbox constants — pinned in sync by unit tests; counts re-measured: 983 unit / 76 files, 175 e2e checks / 40 files; also fixed the stale README badge (858/156 — missed by the #241 count sweep) and the stale PROJECT_STATUS Totals line (564/152)) |
 | **Last updated** | 2026-11-15 (community-practices adoption, researched from the comparable majors — Excalidraw, Logseq, Joplin, AppFlowy, AFFiNE: SECURITY.md added on the Joplin pattern — supported versions, private-vulnerability-reporting channel (already enabled, re-verified), reporting rules, and an explicit out-of-threat-model section adapted to local-first (DoS via imported content, physically-local attacks, plain data at rest, dependency advisories -> upstream); CODE_OF_CONDUCT.md added (Contributor Covenant 2.1); markdown issue templates converted to YAML issue forms (bug_report.yml + feature_request.yml + config.yml — every comparable with templates uses forms, none markdown); .github/copilot-instructions.md added (Excalidraw pattern) pointing Copilot at AGENTS.md's read order; CONTRIBUTING.md refreshed — dead `bun run db:generate` removed (script gone since v1.1 removed the server DB), stale counts fixed; stale counts fixed across README (858→961 unit, 156→171 e2e), PR template (34→171), AGENTS.md (7 files/24 checks→39/171), all re-measured (bun test: 961/75 files; playwright --list: 171/39 files); dependabot groups added — npm minor+patch one monthly PR, action-pin moves one weekly PR; CHANGELOG.md deliberately skipped: GitHub Releases carry the notes (v1.12-v1.14 bodies measured) and 3 of 5 comparables also rely on Releases alone; community health was 71% pre-change, re-measured post-merge) |
 | **Last updated** | 2026-11-15 (2) (community health measured at **100%** after the #243 sync — was 71%; code_of_conduct credited, `issue_template` field still null by GitHub quirk though the forms work; first grouped dependabot PR #244 handled: 4 action-pin moves in one PR — codeql-action v3->v4.39.3 (breaking changes reviewed: bundle-version floors, not input-surface; validated by the PR's own CodeQL run on the new pins) + rust-cache within v2; retargeted to develop per #216 precedent, squash-merged 4e2aa5c, synced to main) |
-| **Current version** | v1.17.0 (version files bumped via the release flow; tag + GitHub Release published at the end of the flow) |
+| **Current version** | v1.17.0 released (tag + GitHub Release published 2026-11-21 at the release merge `c543621`; hand-written notes under the wave-9 convention) |
 
-| **Phase** | v1.15.0 released (release train executed 2026-11-18 — first live exercise of the wave-6 Release workflow); v1.16.0 released (release train executed 2026-11-20 — tables #277, file attachments #278, page templates #279 all shipped); v1.17.0 milestone (#18) open with hardware-blocked #193 + wave-13's #295 and wave-14's #301 shipped; v1.17.0's #302 shipped (the milestone's last software issue); majors-research waves 1-15 landed (community practices, PR hygiene, bundle-size guard, CI caching + coverage, failure commentary, tag-push release automation, CONTRIBUTING gateway + size-report promotion, the release train itself, release-notes convention + PR feature preview, product parity: tables on pages, general file attachments, custom page templates, internal page links, in-page find, checklists) |
+| **Phase** | v1.15.0 released (2026-11-18, first live exercise of the wave-6 Release workflow); v1.16.0 released (2026-11-20 — tables #277, file attachments #278, page templates #279); v1.17.0 released (2026-11-21 — internal page links #295, in-page find #301, checklists #302: waves 13-15 of the product-parity direction, plus the e2e flake hardening #309); v1.18.0 milestone (#19) open with hardware-blocked #193 carried forward; majors-research waves 1-15 landed |
+
 | **Overall state** | 2026-11-21: 1225 unit (88 files) + the 228-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
 
 ## TL;DR
@@ -118,27 +121,20 @@ Notes pages.
 
 ## In flight
 
-- **v1.17.0 release train** (running): release-prep version files
-  (this PR) + release PR develop-to-main (merge commit) + tag
-  v1.17.0 + GitHub Release with hand-written notes under the wave-9
-  convention, then milestones rotate (v1.17.0 closed with
-  hardware-blocked #193 moved forward, the v1.15.0/v1.16.0 precedent;
-  v1.18.0 opened). Shipped since v1.16.0: internal page links (#295,
-  wave 13), in-page find (#301, wave 14), checklists (#302, wave 15) —
-  the OneNote linking/find/checklist parity features of the
-  product-parity direction.
-- **#193** (real-GPU HWR benchmark) hardware-blocked, carried forward
-  at each release (the v1.15.0 precedent): the measurement needs a
-  real-GPU machine; the capability gate + measured WASM baseline
-  already shipped (v1.14.0).
+- **Flatpak extra-data re-pin** (next): the tag's desktop.yml AppImage
+  artifact re-pins `packaging/flatpak/`'s extra-data checksum via
+  scripts/flatpak-extradata.mjs (the #293 precedent) once the artifact
+  is published.
+- **#193** (real-GPU HWR benchmark) hardware-blocked in the v1.18.0
+  milestone (carried forward at each release, the v1.15.0/v1.16.0/v1.17.0
+  precedent): the measurement needs a real-GPU machine; the capability
+  gate + measured WASM baseline already shipped (v1.14.0).
 
-## Next up — the v1.17.0 release, then v1.18 (see [docs/ROADMAP.md](docs/ROADMAP.md))
+## Next up — v1.18 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
-1. Cut v1.17.0 (the release train above) — the milestone's last
-   software issue (#302) shipped; #193 is hardware-blocked and moves
-   forward
+1. Flatpak extra-data re-pin to the real v1.17.0 AppImage checksum
 2. #193 real-GPU HWR benchmark — hardware-blocked, carried forward
-3. Further product-parity candidates from the majors research
+3. Further product-parity candidates from a fresh majors evidence pass
    (evidence-first, wave by wave)
 
 ## Repo map (30 seconds)
@@ -184,6 +180,25 @@ make status                          # quick status snapshot (this file's head +
 
 ## Recent history
 
+- **2026-11-21 — v1.17.0 released**: release train executed per
+  docs/PIPELINE.md — release-prep version files (1.17.0 / versionCode
+  270 across package.json, tauri.conf.json, Cargo.toml, the TWA gradle
+  + bubblewrap manifest, a new fdroid Builds entry, a flatpak 1.17.0
+  release entry), release PR develop-to-main (MERGE commit), tag
+  v1.17.0 + GitHub Release with hand-measured notes (wave-9
+  convention: theme line, Highlights with measured evidence, no
+  upgrade notes — nothing to act on, measured close 1225/88 unit +
+  228/47 e2e), milestones rotated (v1.17.0 closed, v1.18.0 opened with
+  #193 moved forward), main's tip recorded as a develop ancestor.
+  Ships vs v1.16.0: internal page links (#295 — OneNote "Copy Link to
+  Page" parity: copy-link sidebar action, Link-to-page picker, paste
+  interception, click-to-navigate), in-page find (#301 — Ctrl/Cmd+F
+  over the current page's visible text, "n of m", wrap-around), and
+  checklists (#302 — OneNote To Do tag parity: `[ ]`/`[x]`
+  text-convention items, Add To Do tag + Toggle checked from one
+  context menu whose single item depends on the hit, one undo step per
+  toggle, the checked state IS the text) — plus the e2e flake
+  hardening (#309).
 - **2026-11-18 — v1.15.0 released**: release train executed per
   docs/PIPELINE.md — version-bump PR, release PR develop-to-main (merge
   commit), tag v1.15.0 + GitHub Release with hand-measured notes,
