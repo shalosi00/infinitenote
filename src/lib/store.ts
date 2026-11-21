@@ -56,7 +56,11 @@ interface AppStore {
   moveNotebook: (id: string, dir: -1 | 1) => Promise<void>;
   deleteNotebook: (id: string) => Promise<void>;
 
-  addSection: (notebookId: string, name?: string) => Promise<void>;
+  addSection: (
+    notebookId: string,
+    name?: string,
+    parentId?: string | null
+  ) => Promise<void>;
   renameSection: (id: string, name: string) => Promise<void>;
   moveSection: (id: string, dir: -1 | 1) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
@@ -253,15 +257,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
     await get().refresh();
   },
 
-  addSection: async (notebookId, name) => {
+  addSection: async (notebookId, name, parentId = null) => {
     const nb = get().notebooks.find((n) => n.id === notebookId);
     const count = get().sections.filter((s) => s.notebookId === notebookId).length;
     const sec = await db.createSection(
       notebookId,
       name?.trim() || generatedNames().section(count + 1),
+      parentId,
     );
     await get().refresh();
-    set((s) => ({ expanded: new Set([...s.expanded, nb ? nb.id : "", sec.id]) }));
+    // sub-sections (issue #314): opening the parent reveals the new child
+    set((s) => ({
+      expanded: new Set([
+        ...s.expanded,
+        nb ? nb.id : "",
+        ...(parentId ? [parentId] : []),
+        sec.id,
+      ]),
+    }));
   },
   renameSection: async (id, name) => {
     await db.renameSection(id, name);
