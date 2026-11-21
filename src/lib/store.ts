@@ -63,6 +63,11 @@ interface AppStore {
   ) => Promise<void>;
   renameSection: (id: string, name: string) => Promise<void>;
   moveSection: (id: string, dir: -1 | 1) => Promise<void>;
+  /**
+   * OneNote "Section Color" parity (issue #319): null clears the override
+   * (the row inherits the notebook's color again).
+   */
+  setSectionColor: (id: string, color: NotebookColor | null) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
 
   addPage: (sectionId: string, title?: string) => Promise<void>;
@@ -282,6 +287,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   moveSection: async (id, dir) => {
     await db.moveSection(id, dir);
+    await get().refresh();
+  },
+  setSectionColor: async (id, color) => {
+    await db.setSectionColor(id, color);
     await get().refresh();
   },
   deleteSection: async (id) => {

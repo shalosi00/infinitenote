@@ -384,6 +384,12 @@ describe("sub-section data layer (issue #314)", () => {
     await notes.createPage(grand.id, "Deep page");
 
     const backup = await notes.buildBackup();
+    // restore imports as NEW records without wiping — import into an EMPTY
+    // library (the real-world restore flow) so the find-by-name asserts
+    // below can never be ambiguous between the setup generation and the
+    // restored one (full-suite evidence surfaced by the section-colors
+    // file landing, issue #319)
+    await notes.eraseAllData();
     const restoredCount = await notes.restoreBackup(backup);
     expect(restoredCount).toBe(1);
 

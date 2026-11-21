@@ -22,6 +22,7 @@ import { generatedNames } from "./generated-names";
 import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
+import { safeSectionColor } from "./section-colors";
 import { ancestorSectionIds, subtreeSectionIds } from "./section-tree";
 import {
   buildPageVersion,
@@ -32,7 +33,14 @@ import {
   type PageVersionSource,
   type PageVersionSummary,
 } from "./version-history";
-import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
+import type {
+  Notebook,
+  NotebookColor,
+  PageMeta,
+  PageRow,
+  ScenePayload,
+  Section,
+} from "./types";
 import {
   MAX_TEMPLATE_BYTES,
   TemplateError,
@@ -271,6 +279,18 @@ export async function createSection(
 
 export async function renameSection(id: string, name: string): Promise<void> {
   await db.sections.update(id, { name, updatedAt: now() });
+}
+
+/**
+ * OneNote "Section Color" parity (issue #319): set an explicit section
+ * color override; null clears the override so the row inherits the
+ * notebook's color again. The render policy lives in section-colors.ts.
+ */
+export async function setSectionColor(
+  id: string,
+  color: NotebookColor | null,
+): Promise<void> {
+  await db.sections.update(id, { color, updatedAt: now() });
 }
 
 export async function moveSection(id: string, dir: -1 | 1): Promise<void> {
@@ -878,6 +898,7 @@ export async function restoreBackup(json: string): Promise<number> {
       sections?: Array<{
         id?: string;
         parentId?: string | null;
+        color?: NotebookColor;
         name?: string;
         pages?: Array<{
         title?: string;
@@ -930,6 +951,9 @@ export async function restoreBackup(json: string): Promise<number> {
           id: secId,
           notebookId: nbId,
           name: sec.name?.trim() || generatedNames().restoredSection,
+          // an off-palette archive color restores as inherit, not a crash
+          // (the safeTags contract, issue #319)
+          color: safeSectionColor(sec.color) ?? undefined,
           order: secOrder,
           createdAt: ts,
           updatedAt: ts,
