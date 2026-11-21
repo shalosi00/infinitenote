@@ -325,7 +325,14 @@ test.describe.serial("file-attachment: chip, context menu, byte-exact download",
     }
     expect(focused, "an empty canvas spot exists to focus").toBe(true);
     await page.keyboard.press("Escape");
-    for (let i = 0; i < 6; i++) {
+    // press bound: selection changes (deselect clicks, Escape) sit ON the
+    // undo stack ahead of the attach entry, so the number of presses needed
+    // is environment-dependent — measured 2026-11-21: three CI heads in a
+    // row exhausted 6 presses (develop tip 370ec6d run 44845113254, PR
+    // heads d00c845/e8af386) while the same spec passes locally 26/26; the
+    // loop breaks the moment the chip is gone and the archive.zip guard
+    // still bounds over-eating, so a wider bound is strictly safer
+    for (let i = 0; i < 14; i++) {
       const scene = JSON.parse(await serializeCurrentPage(page)) as SerializedScene;
       const names = fileChips(scene).map((c) => c.customData?.fileName);
       if (!names.includes("mobile.zip")) break;
