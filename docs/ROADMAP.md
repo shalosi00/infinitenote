@@ -194,7 +194,32 @@ milestones/issues. This file is the plan; the status file is the reality.
       table; local-only by design, included in backups)
       (docs/test-plans/page-templates.md)
 
-## v1.17 — Internal page links & in-page find (current)
+## v1.18 — Section depth (current)
+
+- [x] Sub-sections (issue #314): OneNote "New Section Group" / Joplin
+      sub-notebooks parity — a section can contain child sections; any
+      section holds pages AND child sections at once (no second row type,
+      Joplin's model). "New sub-section" in the section's actions menu
+      auto-expands the parent; sibling scopes (create/move/order/sync
+      normalization) are per notebook+parent; trash/restore/purge cascade
+      over the whole subtree with the separately-trashed-stays-trashed
+      rule; restore resurrects trashed ancestors with their pages;
+      `parentId` is additive (no Dexie migration, old sync folders and
+      backups stay valid) and backups re-map ids so nesting survives a
+      round-trip; selection restore expands the ancestor chain. Phase-2
+      candidates: drag-to-reparent, cross-notebook section moves
+      (docs/test-plans/sub-sections.md)
+- [x] Section colors (issue #319): OneNote "Section Color" parity — a
+      section carries its own color (additive `color`, NOT indexed, null =
+      inherit the notebook's); the row's folder icon becomes the colored
+      swatch (effectiveSectionColor), the section menu gains the 8-color
+      Color submenu + "Use notebook color" reset; sync carries the whole
+      row (whole-row LWW) and backups restore invalid colors as inherit
+      (safeSectionColor).
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0/v1.16.0/v1.17.0)
+
+## v1.17 — Internal page links & in-page find (shipped in v1.17.0)
 
 - [x] Internal page links (issue #295): OneNote "Copy Link to Page" parity —
       a page link is a normal, editable text element whose Excalidraw `link`
@@ -224,9 +249,9 @@ milestones/issues. This file is the plan; the status file is the reality.
       page switch so stale ids can never navigate. Pure policy in
       src/lib/page-find.ts; no data-model change
       (docs/test-plans/page-find.md)
-- [ ] Checklists (issue #302): OneNote To Do tag parity — `[ ]` / `[x]`
-      text-convention items with a Toggle-checked context action (the next
-      product-parity candidate; design sketch in the issue)
+- [x] Checklists (issue #302): OneNote To Do tag parity — `[ ]` / `[x]`
+      text-convention items with a Toggle-checked context action
+      (shipped in v1.17.0, docs/test-plans/handwriting.md wave-15 section)
 
 ## v1.15 — Representative-hardware WebGPU measurement (shipped in v1.15.0;
 the hardware-blocked benchmark remainder lives in v1.16.0 as issue #193)

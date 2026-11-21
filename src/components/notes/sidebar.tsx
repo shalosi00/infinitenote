@@ -9,6 +9,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { plural } from "@/lib/plural";
+import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
+import { childSections, topLevelSections } from "@/lib/section-tree";
 import {
   ArrowDown,
   ArrowUp,
@@ -18,9 +20,8 @@ import {
   ChevronRight,
   Copy,
   FileText,
-  FolderClosed,
   FolderInput,
-  FolderOpen,
+  FolderPlus,
   FolderSync,
   Keyboard,
   LayoutTemplate,
@@ -30,6 +31,7 @@ import {
   Palette,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Tag as TagIcon,
   Trash2,
@@ -402,7 +404,9 @@ function NotebookNode({
 
   const isRenaming = renaming === notebook.id;
   const openFirstPage = () => {
-    const sec = [...sections].sort(byOrder)[0];
+    // sub-sections (issue #314): the first visible section is the first
+    // top-level one; children only open through their expanded parent
+    const sec = topLevelSections(sections, notebook.id)[0] ?? [...sections].sort(byOrder)[0];
     if (sec) {
       const page = pages
         .filter((p) => p.sectionId === sec.id)
@@ -513,14 +517,14 @@ function NotebookNode({
 
       {expanded && (
         <div className="ml-3 flex flex-col gap-0.5 border-l pl-1">
-          {[...sections]
-            .sort(byOrder)
+          {topLevelSections(sections, notebook.id)
             .map((sec) => (
               <SectionNode
                 key={sec.id}
                 section={sec}
                 notebook={notebook}
-                pages={pages.filter((p) => p.sectionId === sec.id)}
+                allSections={sections}
+                allPages={pages}
                 selection={selection}
                 renaming={renaming}
                 setRenaming={setRenaming}
@@ -548,7 +552,8 @@ function NotebookNode({
 function SectionNode({
   section,
   notebook,
-  pages,
+  allSections,
+  allPages,
   selection,
   renaming,
   setRenaming,
@@ -557,7 +562,10 @@ function SectionNode({
 }: {
   section: Section;
   notebook: Notebook;
-  pages: PageMeta[];
+  /** every section of this section's notebook (the recursion material) */
+  allSections: Section[];
+  /** every page of this section's notebook */
+  allPages: PageMeta[];
   selection: Selection | null;
   renaming: string | null;
   setRenaming: (v: string | null) => void;
@@ -567,10 +575,13 @@ function SectionNode({
   const expanded = useAppStore((s) => s.expanded.has(section.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addPage = useAppStore((s) => s.addPage);
+  const addSection = useAppStore((s) => s.addSection);
   const openTemplatesPicker = useAppStore((s) => s.openTemplatesPicker);
+  const ownPages = allPages.filter((p) => p.sectionId === section.id);
   const rename = useAppStore((s) => s.renameSection);
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
+  const recolor = useAppStore((s) => s.setSectionColor);
 
   const isRenaming = renaming === section.id;
 
@@ -588,11 +599,16 @@ function SectionNode({
           ) : (
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
-          {expanded ? (
-            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            <FolderClosed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          )}
+          {/* OneNote "Section Color" parity (issue #319): the tab's color IS
+              the affordance — own override when set, notebook color inherited
+              when not (section-colors.ts). Same swatch pattern as the
+              notebook row above. */}
+          <span
+            className="h-3.5 w-3.5 shrink-0 rounded-sm border border-black/10"
+            style={{ backgroundColor: sectionColorHex(section, notebook) }}
+            data-testid="section-color"
+            aria-hidden
+          />
           {isRenaming ? (
             <RenameInput
               initial={section.name}
@@ -630,9 +646,44 @@ function SectionNode({
             <DropdownMenuItem onClick={() => openTemplatesPicker(section.id)}>
               <LayoutTemplate /> {"New page from template…"}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => void addSection(notebook.id, undefined, section.id)}
+            >
+              <FolderPlus /> {"New sub-section"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(section.id)}>
               <Pencil /> {"Rename"}
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Palette /> {"Color"}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-40">
+                <div className="grid grid-cols-4 gap-1.5 p-2">
+                  {NOTEBOOK_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={`Set section color ${c}`}
+                      className="h-6 w-6 rounded-md border-2 ring-offset-2 transition-transform hover:scale-110 data-[active]:ring-2"
+                      data-active={effectiveSectionColor(section, notebook) === c}
+                      style={{
+                        backgroundColor: NOTEBOOK_COLOR_HEX[c],
+                        borderColor:
+                          effectiveSectionColor(section, notebook) === c
+                            ? "var(--foreground)"
+                            : "transparent",
+                      }}
+                      onClick={() => void recolor(section.id, c)}
+                    />
+                  ))}
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => void recolor(section.id, null)}>
+                  <RotateCcw /> {"Use notebook color"}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void move(section.id, -1)}>
               <ArrowUp /> {"Move up"}
@@ -650,7 +701,7 @@ function SectionNode({
 
       {expanded && (
         <div className="ml-4 flex flex-col gap-0.5 border-l pl-1">
-          {[...pages]
+          {[...ownPages]
             .sort(byOrder)
             .map((page) => (
               <PageNode
@@ -665,6 +716,20 @@ function SectionNode({
                 selectProps={selectProps}
               />
             ))}
+          {childSections(allSections, section.id).map((child) => (
+            <SectionNode
+              key={child.id}
+              section={child}
+              notebook={notebook}
+              allSections={allSections}
+              allPages={allPages}
+              selection={selection}
+              renaming={renaming}
+              setRenaming={setRenaming}
+              onNavigate={onNavigate}
+              selectProps={selectProps}
+            />
+          ))}
           <button
             type="button"
             className="flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"

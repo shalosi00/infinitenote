@@ -22,6 +22,8 @@ import { generatedNames } from "./generated-names";
 import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
+import { safeSectionColor } from "./section-colors";
+import { ancestorSectionIds, subtreeSectionIds } from "./section-tree";
 import {
   buildPageVersion,
   pruneToCapacity,
@@ -31,7 +33,14 @@ import {
   type PageVersionSource,
   type PageVersionSummary,
 } from "./version-history";
-import type { Notebook, PageMeta, PageRow, ScenePayload, Section } from "./types";
+import type {
+  Notebook,
+  NotebookColor,
+  PageMeta,
+  PageRow,
+  ScenePayload,
+  Section,
+} from "./types";
 import {
   MAX_TEMPLATE_BYTES,
   TemplateError,
@@ -244,12 +253,20 @@ export async function listSections(): Promise<Section[]> {
   return alive(await db.sections.toArray());
 }
 
-export async function createSection(notebookId: string, name: string): Promise<Section> {
-  const siblings = await db.sections.where("notebookId").equals(notebookId).toArray();
+export async function createSection(
+  notebookId: string,
+  name: string,
+  parentId: string | null = null
+): Promise<Section> {
+  // siblings share the parent: top-level sections and children of other
+  // sections never influence a new row's order (issue #314)
+  const all = await db.sections.where("notebookId").equals(notebookId).toArray();
+  const siblings = all.filter((s) => (s.parentId ?? null) === parentId);
   const maxOrder = Math.max(0, ...siblings.map((s) => s.order));
   const sec: Section = {
     id: newId(),
     notebookId,
+    parentId,
     name,
     order: maxOrder + 1,
     createdAt: now(),
@@ -264,11 +281,23 @@ export async function renameSection(id: string, name: string): Promise<void> {
   await db.sections.update(id, { name, updatedAt: now() });
 }
 
+/**
+ * OneNote "Section Color" parity (issue #319): set an explicit section
+ * color override; null clears the override so the row inherits the
+ * notebook's color again. The render policy lives in section-colors.ts.
+ */
+export async function setSectionColor(
+  id: string,
+  color: NotebookColor | null,
+): Promise<void> {
+  await db.sections.update(id, { color, updatedAt: now() });
+}
+
 export async function moveSection(id: string, dir: -1 | 1): Promise<void> {
   const sec = await db.sections.get(id);
   if (!sec) return;
   const siblings = (await db.sections.where("notebookId").equals(sec.notebookId).toArray())
-    .filter((s) => s.deletedAt === null)
+    .filter((s) => s.deletedAt === null && (s.parentId ?? null) === (sec.parentId ?? null))
     .sort(byOrder);
   const idx = siblings.findIndex((s) => s.id === id);
   const target = idx + dir;
@@ -284,11 +313,21 @@ export async function moveSection(id: string, dir: -1 | 1): Promise<void> {
 export async function trashSection(id: string): Promise<void> {
   const ts = now();
   await db.transaction("rw", [db.sections, db.pages], async () => {
-    await db.sections.update(id, { deletedAt: ts, updatedAt: ts });
-    const pages = await db.pages.where("sectionId").equals(id).toArray();
-    for (const p of pages) {
-      if (p.deletedAt !== null) continue; // already trashed on its own
-      await db.pages.update(p.id, { deletedAt: ts });
+    // the cascade covers the whole subtree (issue #314) — the notebook
+    // cascade pattern one level generalized: only ALIVE members are
+    // stamped, so separately-trashed children keep their own timestamp
+    // and are never resurrected by a later restore of the parent
+    const all = await db.sections.toArray();
+    const ids = subtreeSectionIds(all, id);
+    for (const sid of ids) {
+      const s = all.find((row) => row.id === sid);
+      if (!s || s.deletedAt !== null) continue; // already trashed on its own
+      await db.sections.update(sid, { deletedAt: ts, updatedAt: ts });
+      const pages = await db.pages.where("sectionId").equals(sid).toArray();
+      for (const p of pages) {
+        if (p.deletedAt !== null) continue; // already trashed on its own
+        await db.pages.update(p.id, { deletedAt: ts });
+      }
     }
   });
 }
@@ -298,19 +337,45 @@ export async function restoreSection(id: string): Promise<void> {
   if (!sec?.deletedAt) return;
   const ts = sec.deletedAt;
   await db.transaction("rw", [db.sections, db.pages, db.notebooks], async () => {
-    await db.sections.update(id, { deletedAt: null, updatedAt: now() });
+    const all = await db.sections.toArray();
+    // subtree members trashed together with the restored section (same ts)
+    const subtree = subtreeSectionIds(all, id);
+    // trashed ancestors come back too (OneNote-like: the family restores);
+    // each resurrected ancestor also brings back the pages stamped at its
+    // own delete time, so the end state matches restoring it directly
+    const ancestors = ancestorSectionIds(all, id);
+    const resurrect: Section[] = [];
+    for (const sid of subtree) {
+      const s = all.find((row) => row.id === sid);
+      if (s && s.deletedAt === ts) resurrect.push(s);
+    }
+    for (const aid of ancestors) {
+      const s = all.find((row) => row.id === aid);
+      if (s && s.deletedAt !== null) resurrect.push(s);
+    }
+    for (const s of resurrect) {
+      await db.sections.update(s.id, { deletedAt: null, updatedAt: now() });
+      const pages = await db.pages.where("sectionId").equals(s.id).toArray();
+      for (const p of pages) {
+        if (p.deletedAt === s.deletedAt) await db.pages.update(p.id, { deletedAt: null });
+      }
+    }
     const nb = await db.notebooks.get(sec.notebookId);
     // if parent notebook is still trashed, bring it back too (OneNote-like)
     if (nb?.deletedAt) await db.notebooks.update(nb.id, { deletedAt: null });
-    const pages = await db.pages.where("sectionId").equals(id).toArray();
-    for (const p of pages) if (p.deletedAt === ts) await db.pages.update(p.id, { deletedAt: null });
   });
 }
 
 export async function purgeSection(id: string): Promise<void> {
   await db.transaction("rw", [db.sections, db.pages, db.tombstones, db.pageVersions], async () => {
-    const sec = await db.sections.get(id);
-    if (sec) await purgeRowsOfSection(sec);
+    // the whole subtree dies: every descendant section, its pages, their
+    // version snapshots and one tombstone per row (issue #314)
+    const all = await db.sections.toArray();
+    const ids = subtreeSectionIds(all, id);
+    for (const sid of ids) {
+      const sec = all.find((row) => row.id === sid);
+      if (sec) await purgeRowsOfSection(sec);
+    }
   });
 }
 
@@ -831,6 +896,9 @@ export async function restoreBackup(json: string): Promise<number> {
       name?: string;
       color?: Notebook["color"];
       sections?: Array<{
+        id?: string;
+        parentId?: string | null;
+        color?: NotebookColor;
         name?: string;
         pages?: Array<{
         title?: string;
@@ -867,6 +935,15 @@ export async function restoreBackup(json: string): Promise<number> {
         deletedAt: null,
       });
       let secOrder = 0;
+      // phase 1 — create every section as a fresh row and remember which
+      // ORIGINAL archive id it came from, so nesting (issue #314) can be
+      // re-attached in phase 2 with the new ids
+      const sectionIdMap = new Map<string, string>();
+      const createdSections: Array<{
+        newId: string;
+        oldId: string | null;
+        oldParentId: string | null;
+      }> = [];
       for (const sec of nb.sections ?? []) {
         const secId = newId();
         secOrder += 1;
@@ -874,11 +951,35 @@ export async function restoreBackup(json: string): Promise<number> {
           id: secId,
           notebookId: nbId,
           name: sec.name?.trim() || generatedNames().restoredSection,
+          // an off-palette archive color restores as inherit, not a crash
+          // (the safeTags contract, issue #319)
+          color: safeSectionColor(sec.color) ?? undefined,
           order: secOrder,
           createdAt: ts,
           updatedAt: ts,
           deletedAt: null,
         });
+        createdSections.push({
+          newId: secId,
+          oldId: typeof sec.id === "string" ? sec.id : null,
+          oldParentId: typeof sec.parentId === "string" ? sec.parentId : null,
+        });
+        if (typeof sec.id === "string") sectionIdMap.set(sec.id, secId);
+      }
+      // phase 2 — re-attach parents: only within the same notebook and only
+      // when the archive row exists; anything else restores as top level
+      for (const row of createdSections) {
+        if (!row.oldParentId) continue;
+        const mapped = sectionIdMap.get(row.oldParentId);
+        if (mapped) {
+          await db.sections.update(row.newId, { parentId: mapped, updatedAt: ts });
+        }
+      }
+      // phase 3 — pages, index-aligned with the section creation order
+      let sectionIndex = 0;
+      for (const sec of nb.sections ?? []) {
+        const secId = createdSections[sectionIndex]?.newId;
+        sectionIndex += 1;
         let pageOrder = 0;
         for (const page of sec.pages ?? []) {
           pageOrder += 1;

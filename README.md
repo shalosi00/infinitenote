@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1225%20unit%20%2B%20228%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1243%20unit%20%2B%20233%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -32,7 +32,7 @@ and sync yourself. No account, no telemetry, no lock-in.
 
 | | |
 |---|---|
-| **OneNote-style notebooks** | Notebooks → sections → pages, with colors, drag order, duplicate, trash with restore, and up to 25 restore-able versions per page. |
+| **OneNote-style notebooks** | Notebooks → sections → pages — sections nest into sub-sections (OneNote "New Section Group" / Joplin sub-notebooks style) — with colors, drag order, duplicate, trash with restore, and up to 25 restore-able versions per page. |
 | **Infinite canvas** | Draw, handwrite and type anywhere (Excalidraw engine) — ink overlays text, images, audio players and PDF printouts on the same page. |
 | **Search everything** | `Ctrl+K` full-text search across every page — including text recognized in images (OCR) and in your handwriting. |
 | **On-device intelligence** | "Recognize text in images" (tesseract.js, English + German) and "Recognize handwriting (English)" (TrOCR model, ≈64 MB, downloaded once) run 100% locally. Your ink and images never leave the device. |
@@ -56,7 +56,9 @@ and sync yourself. No account, no telemetry, no lock-in.
 **Notebook**
 
 - **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder,
-  color, duplicate.
+  color, duplicate — and nest sections inside each other (OneNote's
+  "New Section Group" / Joplin's sub-notebooks): any section can hold pages
+  AND child sections, subtree trash/restore included.
 - **Page version history** — automatic snapshots every 5 minutes on structural
   change, manual "Save version now", and a safety copy before every restore;
   roll back to any of the last 25 versions per page.
@@ -225,9 +227,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server (`http://localhost:3000`) |
-| `make test` | Unit tests (1225, bun test) |
+| `make test` | Unit tests (1243, bun test) |
 | `make lint` / `make typecheck` | ESLint / TypeScript check |
-| `bunx playwright test` | Playwright E2E suite (228 checks; boots the app automatically) |
+| `bunx playwright test` | Playwright E2E suite (233 checks; boots the app automatically) |
 | `make build` / `make start` | Production build / boot the standalone server |
 | `make status` | Quick "where do things stand" snapshot |
 
