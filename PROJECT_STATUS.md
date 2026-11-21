@@ -6,6 +6,8 @@
 
 | | |
 |---|---|
+| **Last updated** | 2026-11-21 (4) (sub-sections — OneNote "New Section Group" / Joplin sub-notebooks parity, issue #314, wave 16 of the product-parity direction and the fresh-majors-evidence-pass the wave-15 entry pointed to: a section can now CONTAIN child sections — any section holds pages AND child sections at once, no second row type (Joplin's model, OneNote's right-click-the-tab flow: the section menu gains "New sub-section" and auto-expands the parent). Evidence pass (2026-11-21): OneNote's help page "Right-click any section tab, and then click New Section Group" + "A section group lets you combine multiple sections into their own group" (support.microsoft.com), Joplin's help "Sub-notebooks allow organising multiple notebooks into a tree of notebooks" (joplinapp.org), while our sections were flat — exactly one level under notebooks. Design: pure policy in src/lib/section-tree.ts (topLevelSections/childSections/subtreeSectionIds/ancestorSectionIds/sectionSiblingKey, all cycle-safe) — Section gains an OPTIONAL parentId (additive, NOT indexed: no Dexie version bump, old rows/folders valid, `parentId ?? null` the canonical read); sibling scopes (create order / move swap / sync normalizeOrders) group by notebook+parent so children of different parents never interleave; trash/restore/purge cascade over the whole SUBTREE (the notebook-cascade pattern one level generalized) with the separately-trashed-stays-trashed rule, restore resurrects trashed ancestors WITH their pages (end state equals restoring them directly); backups re-map original ids in two phases so nesting survives a round-trip and a dangling parentId restores as top level; sidebar renders the section tree recursively (pages, then child sections, then Add page), openFirstPage prefers the first top-level section, and defaultExpandedState expands the ANCESTOR CHAIN of a restored nested page. Gate: 1243 unit / 89 files, 0 fail (base 370ec6d: 1225/88 — +18 SB-P pins); 233 e2e / 48 files (`playwright --list`); new spec SB-N01..N05 5/5; neighbors multiselect + crud + search-trash + quick-notes 14/14 and file-attachment + table 26/26. Shipped with PR #315 (squash `a35b940`, 9/9 checks on head `d00c845` — e2e green after the FA-E15 CI-flake re-run, diagnosed + fixed test-side in the follow-up #317 with the SB-P13 clock separation measured on the same evidence chain). Counts swept: README badge + commands table, .github/copilot-instructions.md, PROJECT_STATUS (new Last-updated row, Phase waves 1-16, Overall state, Totals, section-tree repo-map row, e2e row, commands)) |
+
 | **Last updated** | 2026-11-21 (3) (v1.17.0 released — the release train executed per docs/PIPELINE.md "Releases": release-prep version files #308, release PR develop-to-main #310 (MERGE commit `c543621`), tag v1.17.0 + GitHub Release with hand-measured notes under the wave-9 convention (2,855-byte body; the wave-6 Release workflow verified the tagged commit and preserved the hand-written notes), milestones rotated (v1.17.0 milestone #18 closed, v1.18.0 #19 opened with hardware-blocked #193 moved forward — the v1.15.0/v1.16.0 precedent), main's tip recorded as a develop ancestor (#311, the #291 precedent). Ships vs v1.16.0: internal page links (#295), in-page find (#301), checklists (#302) — waves 13-15 of the product-parity direction — plus the e2e flake hardening (#309). Counts re-measured on the release tip: 1225 unit / 88 files, 228 e2e / 47 files) |
 
 | **Last updated** | 2026-11-21 (2) (release prep for v1.17.0 — version files bumped to 1.17.0 / versionCode 270 across package.json, tauri.conf.json, Cargo.toml, the TWA gradle + bubblewrap manifest; fdroid Builds entry added (1.17.0/270/v1.17.0); flatpak metainfo 1.17.0 release entry (the AppImage extra-data checksum re-pin follows the release via scripts/flatpak-extradata.mjs once the tag's artifacts exist); Current version row → v1.17.0. Config unit tests pin every file in lockstep with package.json; the release PR + tag + notes follow per docs/PIPELINE.md "Releases" under the wave-9 notes convention) |
@@ -32,9 +34,9 @@
 | **Last updated** | 2026-11-15 (2) (community health measured at **100%** after the #243 sync — was 71%; code_of_conduct credited, `issue_template` field still null by GitHub quirk though the forms work; first grouped dependabot PR #244 handled: 4 action-pin moves in one PR — codeql-action v3->v4.39.3 (breaking changes reviewed: bundle-version floors, not input-surface; validated by the PR's own CodeQL run on the new pins) + rust-cache within v2; retargeted to develop per #216 precedent, squash-merged 4e2aa5c, synced to main) |
 | **Current version** | v1.17.0 released (tag + GitHub Release published 2026-11-21 at the release merge `c543621`; hand-written notes under the wave-9 convention) |
 
-| **Phase** | v1.15.0 released (2026-11-18, first live exercise of the wave-6 Release workflow); v1.16.0 released (2026-11-20 — tables #277, file attachments #278, page templates #279); v1.17.0 released (2026-11-21 — internal page links #295, in-page find #301, checklists #302: waves 13-15 of the product-parity direction, plus the e2e flake hardening #309); v1.18.0 milestone (#19) open with hardware-blocked #193 carried forward; majors-research waves 1-15 landed |
+| **Phase** | v1.15.0 released (2026-11-18, first live exercise of the wave-6 Release workflow); v1.16.0 released (2026-11-20 — tables #277, file attachments #278, page templates #279); v1.17.0 released (2026-11-21 — internal page links #295, in-page find #301, checklists #302: waves 13-15 of the product-parity direction, plus the e2e flake hardening #309); v1.18.0 milestone (#19) open with hardware-blocked #193 carried forward; majors-research waves 1-16 landed (16 = sub-sections, #314) |
 
-| **Overall state** | 2026-11-21: 1225 unit (88 files) + the 228-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
+| **Overall state** | 2026-11-21: 1243 unit (89 files) + the 233-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
 
 ## TL;DR
 
@@ -117,7 +119,7 @@ Notes pages.
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 1225 unit tests, 228 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 1243 unit tests, 233 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
@@ -144,6 +146,7 @@ Notes pages.
 | `src/lib/types.ts` | Data model: Notebook/Section/Page, BackupFile |
 | `src/lib/notes-db.ts` | Dexie schema + CRUD + trash cascade + backup/restore |
 | `src/lib/tree-ops.ts` | OneNote-style selection semantics after delete |
+| `src/lib/section-tree.ts` | Sub-section tree policy: sibling scopes, cycle-safe subtree/ancestor traversal, sync sibling key (issue #314) |
 | `src/lib/search.ts` | Scene text extraction + ranked search |
 | `src/lib/store.ts` | Zustand store, single-flight load, welcome seed |
 | `src/lib/excalidraw-utils.ts` / `-client.ts` | SSR-safe canvas API contract / browser runtime |
@@ -163,7 +166,7 @@ Notes pages.
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
-| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 228 checks in 47 files, runs in CI (issue #3; measured 2026-11-21) |
+| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 233 checks in 48 files, runs in CI (issue #3; measured 2026-11-21) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke + e2e (required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
 | `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
@@ -173,8 +176,8 @@ Notes pages.
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 1225 unit tests
-make e2e                             # 228 E2E tests (Playwright; boots the app if needed)
+make test                            # 1243 unit tests
+make e2e                             # 233 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
