@@ -132,3 +132,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.18.0
+    versionCode: 280
+    commit: v1.18.0
+    subdir: android-twa
+    gradle:
+      - yes

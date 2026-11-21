@@ -51,6 +51,17 @@
   </screenshots>
 
   <releases>
+    <release version="1.18.0" date="2026-11-22">
+      <description>
+        <p>Sub-sections arrive (OneNote's section groups / Joplin's
+        sub-notebooks): a section can contain child sections — any section
+        holds pages AND child sections at once, subtree trash/restore/purge
+        cascades, and nesting that survives backups and sync. Section colors
+        arrive too (OneNote's "Section Color"): every section carries its own
+        color with notebook inheritance, recolored from the section menu's
+        Color submenu.</p>
+      </description>
+    </release>
     <release version="1.17.0" date="2026-11-21">
       <description>
         <p>Checklists arrive: every page can carry OneNote-style To Do items — type a line, right-click it and Add To Do tag, then Toggle checked as you complete items; the checked state is the text itself, so it survives reload, sync, backups and search untouched. An Import-menu Checklist item starter drops a bare checkbox line.</p>
