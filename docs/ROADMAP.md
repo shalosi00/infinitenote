@@ -209,6 +209,13 @@ milestones/issues. This file is the plan; the status file is the reality.
       round-trip; selection restore expands the ancestor chain. Phase-2
       candidates: drag-to-reparent, cross-notebook section moves
       (docs/test-plans/sub-sections.md)
+- [x] Section colors (issue #319): OneNote "Section Color" parity — a
+      section carries its own color (additive `color`, NOT indexed, null =
+      inherit the notebook's); the row's folder icon becomes the colored
+      swatch (effectiveSectionColor), the section menu gains the 8-color
+      Color submenu + "Use notebook color" reset; sync carries the whole
+      row (whole-row LWW) and backups restore invalid colors as inherit
+      (safeSectionColor).
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0/v1.16.0/v1.17.0)
 

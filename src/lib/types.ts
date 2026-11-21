@@ -57,6 +57,14 @@ export interface Section {
    * shape). Optional by design: old rows and old sync folders stay valid.
    */
   parentId?: string | null;
+  /**
+   * Explicit color override (OneNote "Section Color" parity, issue #319).
+   * null/absent = inherit the notebook's color (`color ?? null` is the
+   * canonical read; the policy lives in section-colors.ts). Additive and
+   * NOT indexed — the parentId precedent: no Dexie version bump, old rows
+   * and old sync folders stay valid.
+   */
+  color?: NotebookColor | null;
   name: string;
   order: number;
   createdAt: number;
