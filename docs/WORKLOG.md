@@ -43,6 +43,106 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-21 — Sub-sections: OneNote "New Section Group" / Joplin sub-notebooks parity, wave 16 (#314)
+
+- **Task**: wave 16 — the seventh product-parity wave, per the wave-15
+  entry's pointer ("the next product-parity candidates come from a fresh
+  majors evidence pass"). Evidence pass (2026-11-21): every comparable
+  organizes the hierarchy one level deeper than we do — OneNote's help
+  page ("Right-click any section tab, and then click New Section Group";
+  "A section group lets you combine multiple sections into their own
+  group", support.microsoft.com) makes section groups a first-class
+  structural feature, Joplin's help makes sub-notebooks a tree
+  ("Sub-notebooks allow organising multiple notebooks into a tree of
+  notebooks", joplinapp.org) — while our sections were flat, exactly one
+  level under notebooks. AppFlowy's Recent view was the runner-up
+  candidate (recent-view sync + recent/favorite iOS widgets) but Joplin
+  has NO native favorites/recents (plugins only) and OneNote has none
+  in-app, so the structural gap won. Shipped this cycle, closing #314
+  into the v1.18.0 milestone.
+- **Design**: pure `src/lib/section-tree.ts` (the table-insert/page-find
+  pattern): sibling scopes group by notebook+parent; `subtreeSectionIds`
+  (root-first depth-first, cycle-safe) and `ancestorSectionIds`
+  (nearest-parent-first, dangling-parent-tolerant) are the single source
+  of traversal truth for the data layer, the sync normalizer and the
+  sidebar. `Section.parentId?: string | null` is additive and NOT indexed
+  — no Dexie version bump, old rows and old sync folders stay valid,
+  `parentId ?? null` is the canonical read. Cascades generalize the
+  notebook pattern one level: trash stamps the ALIVE subtree at one
+  timestamp (separately-trashed descendants keep their own ts), restore
+  resurrects the subtree stamped at the section's own ts PLUS trashed
+  ancestors with their pages (end state equals restoring them directly),
+  purge hard-deletes the subtree with per-row tombstones. `restoreBackup`
+  re-maps original section ids to fresh ids in two phases so nesting
+  survives a round-trip; a dangling parentId restores as top level.
+  Sidebar renders the section tree recursively (own pages, then child
+  sections, then Add page); the section menu gains "New sub-section"
+  (OneNote's flow) and the parent auto-expands; `defaultExpandedState`
+  walks the ancestor chain so a restored nested page is visible after
+  reload. Multi-select semantics untouched (`visiblePageIds` is
+  per-node).
+- **Lessons (all measured this cycle)**:
+  - **Playwright getByRole `name` is SUBSTRING matching by default**:
+    `getByRole("menuitem", { name: "New page" })` strict-violated against
+    "New page from template…" (both resolve; the error is a strict-mode
+    violation listing both). Every menu-item locator in the new spec uses
+    `exact: true` where siblings share a prefix.
+  - **A Radix menu click resolves before the async store action
+    commits**: SB-N05 read the sidebar text immediately after clicking
+    "Move up" and raced the `refresh()` re-render — the assertion saw the
+    pre-swap order. `expect.poll` on the text order (instead of an
+    immediate read) is the pattern for anything behind a store action.
+  - **The SB-P6 pin caught a real policy flaw**: the ancestor walk
+    reported a DANGLING parentId ("gone" — no row) as an ancestor;
+    `ancestorSectionIds` now ends the chain at a missing row (the restore
+    loop would have skipped it, but the policy function should not lie).
+  - **The reload-boot drop window (wave 15's lesson) applies to sections
+    too**: one cold-boot run saw the created child vanish between tests
+    (late boot re-hydrating from a pre-creation snapshot) — SB-N01 now
+    re-verifies past ~1.6 s, mirroring the handwriting spec's pattern.
+  - **CI e2e flake evidence**: the PR head's first e2e run failed
+    FA-E15 + TB-E01; develop's own tip run (44845113254, base 370ec6d,
+    WITHOUT the change) also failed FA-E15 (+ ui-surface-sweep
+    phone-390); both specs pass locally 26/26 on the branch — the
+    rerun-failed-jobs re-run went green — until the THIRD head
+    (the docs-only worklog PR) failed FA-E15 twice in a row, which
+    flipped the diagnosis from "flaky" to "deterministic in CI":
+    selection snapshots (deselect clicks, Escape) sit ON the undo stack
+    ahead of the attach entry, so the required press count is
+    environment-dependent. Fixed test-side in #317: FA-E15's bound
+    6 → 14 (the loop still breaks on first success; the archive.zip
+    guard still bounds over-eating).
+- **Test-health follow-up (#317)**, merged same cycle (squash `8abd3e2`,
+  9/9 checks on head `f4d798b`): the FA-E15 bound above PLUS the SB-P13
+  clock separation — the same fast-CI evidence caught my OWN restore
+  test failing when two `trashSection` calls landed in the SAME
+  millisecond: the restore discriminator IS the delete timestamp, so
+  same-ms deletes are indistinguishable BY DESIGN; the test now
+  separates the calls by 5 ms and documents the model boundary. No
+  production code changed in #317 — it is a test-health PR, and the
+  first e2e red run on a docs-only PR is what forced the deeper look.
+- **PR #315** (squash `a35b940`, 9/9 checks green on head `d00c845` —
+  lint-typecheck-test, e2e, build-smoke, size-report + CodeQL/title/
+  labeler/coverage informational; e2e green after one documented flake
+  re-run): 18 new unit tests (SB-P pins in
+  src/lib/__tests__/sub-sections.test.ts — pure policy + merge
+  normalization + fake-indexeddb cascades + backup round-trip), 5 new
+  E2E checks (SB-N01..N05). #314 closed.
+- **Gate**: 1243 unit / 89 files, 0 fail (base `370ec6d`: 1225/88 —
+  +18 SB-P pins); 233 e2e / 48 files (`playwright --list`); new spec
+  SB-N01..N05 5/5; neighbors multiselect + crud + search-trash +
+  quick-notes 14/14 (sidebar-heavy surfaces) and file-attachment + table
+  26/26 (the flaked pair, verified locally). Counts swept: README badge +
+  commands table, .github/copilot-instructions.md, PROJECT_STATUS (new
+  Last-updated row, Phase waves 1-16, Overall state, Totals, section-tree
+  repo-map row, e2e row, commands), docs/ROADMAP (new v1.18 block, stale
+  v1.17 checklist checkbox ticked).
+- **Next cycle**: v1.18.0 holds #193 (hardware-blocked) only again — the
+  next cycle either files + ships another parity candidate from a fresh
+  majors evidence pass into v1.18.0 (then the release train closes it),
+  or, if the evidence pass comes up empty, runs the release train and
+  moves #193 forward (the v1.15.0/v1.16.0/v1.17.0 precedent).
+
 ## 2026-11-21 — Checklists: OneNote "To Do tag" parity, wave 15 (#302)
 
 - **Task**: wave 15 — the sixth product-parity wave, per the wave-14
