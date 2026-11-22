@@ -269,7 +269,7 @@ checklists, and **ink to shape** — drawn shapes become
 perfect geometry in one undo step. Next up on the
 [roadmap](docs/ROADMAP.md) /
 [milestones](https://github.com/shalosi00/infinitenote/milestones):
-the v1.20 line — further parity candidates from fresh majors evidence
+the v1.21 line — further parity candidates from fresh majors evidence
 passes, plus the hardware-blocked real-GPU handwriting benchmark.
 
 ## Acknowledgements
