@@ -67,8 +67,10 @@ import {
   conversionSkeletons,
   detectDroppedConversion,
   planHwrConversion,
+  shouldHealConversion,
   type HwrConvertOutcome,
 } from "./hwr-convert";
+import { inkShapeSkeletons, planInkShapes, type InkShapesOutcome } from "./ink-shapes";
 import { extractDocxBlocks } from "./docx-import";
 import { extractHtmlContent, type HtmlContent } from "./html-import";
 import { headingFontSize, estimateLineCount, withIntrinsicFallback, type ImportedBlock } from "./import-blocks";
@@ -1369,6 +1371,15 @@ export function convertHandwritingToText(
         return;
       }
       if (!dropped.length) return; // healthy — the only path a normal run ever takes
+      // Same-scene check (#329 hardening): the guard fires ~1.5 s later on
+      // whatever scene the api hosts THEN — when the canvas switched pages
+      // or the user deleted the ink in the window, the created text is
+      // "missing" simply because its scene is gone. Re-applying would
+      // convert unrelated ink on a foreign page (or log the found-nothing
+      // error). Heal only while the original ink is still alive.
+      if (!shouldHealConversion([...inkIds], api.getSceneElementsIncludingDeleted())) {
+        return;
+      }
       console.warn(
         `[hwr-convert] the store dropped ${dropped.length} converted text element(s) ` +
           `~${CONVERSION_INTEGRITY_DELAY_MS}ms after insertion — re-applying ` +
@@ -1383,6 +1394,135 @@ export function convertHandwritingToText(
     }, CONVERSION_INTEGRITY_DELAY_MS);
   }
   return { converted: plan.targets.length, alreadyConverted: plan.alreadyConverted, selected };
+}
+
+/* ------------------------------------------------------------------ */
+/* ink to shape (issue #329)                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The strokes of the LAST ink-to-shape run, kept for the integrity heal:
+ * a re-entry re-plans over these ids (strokes already converted are gone
+ * from the scene and skipped silently — planInkShapes contract), so the
+ * heal is bounded at one pass with no duplicate shapes.
+ */
+let lastInkShapeStrokeIds: string[] = [];
+
+/**
+ * Ink to shape (issue #329, OneNote "Ink to Shape" parity): selected
+ * freedraw strokes that classify as a shape are REPLACED by the perfect
+ * geometry; strokes that do not classify stay ink and are counted for the
+ * guidance toast. Selection-scoped only — no selection is a no-op the
+ * caller guides on (conversion replaces ink; page-wide replacement would
+ * be destructive).
+ *
+ * ONE native `updateScene` deletes the converted strokes and inserts the
+ * fitted shapes (CaptureUpdateAction.IMMEDIATELY) — a single Ctrl+Z
+ * restores the original ink, and structural idempotency means restored
+ * ink is simply convertible again (no customData flag — the measured
+ * HWR-E06 undo hazard: Excalidraw's undo does not revert customData).
+ *
+ * The shapes inherit each stroke's own color/width/roughness — the
+ * replacement must look like the ink drew itself.
+ *
+ * Integrity guard (the hwr-convert pattern): ~1.5 s after the run the
+ * created shape ids are re-checked against the elements map INCLUDING
+ * tombstones. A TOMBSTONED shape is a legitimate undo/delete — never
+ * touched. A shape missing from the map entirely is the measured store
+ * drop — healed by re-running over the remembered stroke ids.
+ */
+export function convertInkToShapes(
+  api: ExcalidrawImperativeAPI,
+  opts: { scheduleIntegrityCheck?: boolean; healStrokeIds?: readonly string[] } = {},
+): InkShapesOutcome {
+  const payload = getScenePayload(api);
+  const appState = api.getAppState();
+  const aliveInkIds = new Set(
+    (payload.elements as Array<{ id?: unknown; type?: unknown; isDeleted?: unknown }>)
+      .filter((e) => e && e.type === "freedraw" && !e.isDeleted && typeof e.id === "string")
+      .map((e) => e.id as string),
+  );
+  const selectedIds = new Set(
+    Object.keys(appState.selectedElementIds ?? {}).filter((id) => aliveInkIds.has(id)),
+  );
+  const selected = selectedIds.size > 0;
+  const ids = selected ? selectedIds : new Set(opts.healStrokeIds ?? []);
+  const plan = planInkShapes(payload, ids);
+  if (!plan.targets.length) {
+    return { converted: 0, leftAsInk: plan.unrecognized.length, selected };
+  }
+  lastInkShapeStrokeIds = plan.targets.map((t) => t.id);
+  const targetIds = new Set(plan.targets.map((t) => t.id));
+  // fresh ids per conversion — placeholder skeleton ids must never reach
+  // the live scene twice (insertShapeById / conversionSkeletons precedent)
+  const skeletons = inkShapeSkeletons(plan).map((s) => ({ ...s, id: crypto.randomUUID() }));
+  const created = convertToExcalidrawElements(
+    skeletons as unknown as Parameters<typeof convertToExcalidrawElements>[0],
+    { regenerateIds: false },
+  ) as unknown as ExcalidrawElement[];
+  // ONE scene update: tombstone the converted strokes, append the shapes.
+  // Deselect on purpose (the #231 precedent) — selecting the fresh shapes
+  // mounts Excalidraw's "Selected shape actions" panel and races the
+  // canvas for keyboard focus; the toast reports the outcome instead.
+  // Tombstone the converted strokes EXACTLY like Excalidraw's own
+  // mutateElement does: isDeleted plus a version bump and a fresh nonce.
+  // Measured (probe, this cycle): a tombstone WITHOUT the version bump
+  // breaks the store/history resurrection — undo removed the shapes but
+  // kept the strokes deleted (the user's ink was gone after ONE Ctrl+Z),
+  // because the history reconciles by element version and a same-version
+  // tombstone reads as "no change".
+  const elements = api.getSceneElements().map((el) =>
+    targetIds.has(el.id)
+      ? ({
+          ...el,
+          isDeleted: true,
+          version: (el.version ?? 0) + 1,
+          versionNonce: Math.floor(Math.random() * 2 ** 31),
+        } as ExcalidrawElement)
+      : el,
+  );
+  api.updateScene({
+    elements: [...elements, ...created] as ExcalidrawElement[],
+    appState: {
+      selectedElementIds: {},
+    },
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  if (opts.scheduleIntegrityCheck !== false) {
+    const createdIds = created.map((e) => e.id);
+    setTimeout(() => {
+      let dropped: string[] = [];
+      try {
+        dropped = detectDroppedConversion(createdIds, api.getSceneElementsIncludingDeleted());
+      } catch (err) {
+        // an api whose canvas was remounted mid-window can throw on access;
+        // the new canvas is authoritative — nothing to heal here
+        console.warn("ink-shape] integrity check could not read the scene:", err);
+        return;
+      }
+      if (!dropped.length) return; // healthy — the only path a normal run ever takes
+      // Same-scene check (the hwr-convert hardening above): heal only while
+      // the original strokes are still alive in the hosted scene.
+      if (!shouldHealConversion([...aliveInkIds], api.getSceneElementsIncludingDeleted())) {
+        return;
+      }
+      console.warn(
+        `ink-shape] the store dropped ${dropped.length} converted shape(s) ` +
+          `~${CONVERSION_INTEGRITY_DELAY_MS}ms after insertion — re-applying ` +
+          `(the hwr-convert store-drop precedent, docs/test-plans/ink-shapes.md)`,
+      );
+      const healed = convertInkToShapes(api, {
+        scheduleIntegrityCheck: false,
+        healStrokeIds: lastInkShapeStrokeIds,
+      });
+      if (healed.converted === 0) {
+        console.error(
+          "ink-shape] re-apply found nothing to convert — the original strokes are gone without their shapes",
+        );
+      }
+    }, CONVERSION_INTEGRITY_DELAY_MS);
+  }
+  return { converted: plan.targets.length, leftAsInk: plan.unrecognized.length, selected };
 }
 
 /* ------------------------------------------------------------------ */

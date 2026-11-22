@@ -25,6 +25,7 @@ import { sanitizeScene, sceneSignature, structuralSceneJson, downloadBlob } from
 import {
   classifyFile,
   convertHandwritingToText,
+  convertInkToShapes,
   getScenePayload,
   insertShapeById,
   importExcalidrawFile,
@@ -879,6 +880,9 @@ export default function ExcalidrawCanvas({
         },
         // issue #176 Phase B: recognized handwriting → editable text
         convertHandwriting: () => convertHandwritingToText(api),
+        // issue #329: OneNote "Ink to Shape" — selected strokes become
+        // perfect geometry; unrecognizable strokes stay ink
+        convertInkShapes: () => convertInkToShapes(api),
         // issue #277: OneNote "Insert > Table" — out-of-bounds sizes toast
         insertTable: (rows, cols) => {
           if (!insertTable(api, rows, cols)) {
