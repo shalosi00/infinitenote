@@ -23,6 +23,7 @@ import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
 import { safeSectionColor } from "./section-colors";
+import { isSectionGroup, normalizeSectionKind } from "./section-groups";
 import { ancestorSectionIds, canReparent, subtreeSectionIds } from "./section-tree";
 import {
   buildPageVersion,
@@ -256,17 +257,32 @@ export async function listSections(): Promise<Section[]> {
 export async function createSection(
   notebookId: string,
   name: string,
-  parentId: string | null = null
+  parentId: string | null = null,
+  kind: Section["kind"] = null
 ): Promise<Section> {
   // siblings share the parent: top-level sections and children of other
   // sections never influence a new row's order (issue #314)
   const all = await db.sections.where("notebookId").equals(notebookId).toArray();
+  // section groups (issue #337): a group's parents are the notebook top
+  // level and other groups (the Graph OneNote model) — never a plain
+  // section, which holds pages. The UI only ever creates top-level groups
+  // (the OneNote right-click-a-section-tab path); this guard keeps the
+  // data layer honest for any future caller.
+  if (kind === "group" && parentId !== null) {
+    const parent = all.find((s) => s.id === parentId);
+    if (!parent || parent.deletedAt !== null || !isSectionGroup(parent)) {
+      throw new Error("a section group can only live at the notebook top level or inside another section group");
+    }
+  }
   const siblings = all.filter((s) => (s.parentId ?? null) === parentId);
   const maxOrder = Math.max(0, ...siblings.map((s) => s.order));
   const sec: Section = {
     id: newId(),
     notebookId,
     parentId,
+    // plain sections carry NO kind field at all — the pre-#337 row shape
+    // (structured clone drops undefined properties, old rows stay valid)
+    kind: kind ?? undefined,
     name,
     order: maxOrder + 1,
     createdAt: now(),
@@ -328,7 +344,8 @@ export type SectionMoveResult = "moved" | "noop" | "invalid";
  *   restorable in its new notebook
  * - pages need no writes: they follow their sectionId
  * - invalid targets (trashed source/targets, a self/descendant parent,
- *   a dangling parent id) return "invalid" with zero writes
+ *   a dangling parent id, a group mover under a plain section) return
+ *   "invalid" with zero writes
  * - a section already living at the target returns "noop" with zero
  *   writes (drop on its own parent must not reorder)
  */
@@ -346,6 +363,10 @@ export async function moveSectionTo(
     const parent = all.find((s) => s.id === targetParentId);
     if (!parent || parent.deletedAt !== null) return "invalid";
     if (parent.notebookId !== targetNotebookId) return "invalid";
+    // section groups (issue #337): a group never nests under a plain
+    // section (the Graph OneNote model) — zero-write "invalid", mirroring
+    // the canReparent drag rule at the write layer
+    if (isSectionGroup(sec) && !isSectionGroup(parent)) return "invalid";
     if (!canReparent(all, id, targetParentId)) return "invalid";
   }
 
@@ -591,7 +612,8 @@ export async function trashPage(id: string): Promise<void> {
  * existing pages while preserving their sidebar-visible order (notebook →
  * section → page). Pages already in the target (and trashed/unknown ids) are
  * skipped. Returns how many pages actually moved; 0 also when the target
- * section is missing or trashed.
+ * section is missing, trashed, or a section group (groups hold no pages,
+ * issue #337).
  */
 export async function movePagesToSection(
   pageIds: readonly string[],
@@ -599,6 +621,10 @@ export async function movePagesToSection(
 ): Promise<number> {
   const target = await db.sections.get(targetSectionId);
   if (!target || target.deletedAt !== null) return 0;
+  // section groups hold no pages (issue #337, OneNote semantics: groups
+  // keep sections together, sections hold pages) — the dialog omits them,
+  // the data layer answers 0 with zero writes
+  if (isSectionGroup(target)) return 0;
   const ids = [...new Set(pageIds)];
   if (ids.length === 0) return 0;
 
@@ -967,6 +993,7 @@ export async function restoreBackup(json: string): Promise<number> {
         id?: string;
         parentId?: string | null;
         color?: NotebookColor;
+        kind?: unknown;
         name?: string;
         pages?: Array<{
         title?: string;
@@ -1022,6 +1049,9 @@ export async function restoreBackup(json: string): Promise<number> {
           // an off-palette archive color restores as inherit, not a crash
           // (the safeTags contract, issue #319)
           color: safeSectionColor(sec.color) ?? undefined,
+          // a hand-edited archive kind restores as a plain section, not a
+          // crash (the same tolerance contract, issue #337)
+          kind: normalizeSectionKind(sec.kind) ?? undefined,
           order: secOrder,
           createdAt: ts,
           updatedAt: ts,

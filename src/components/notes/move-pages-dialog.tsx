@@ -4,6 +4,8 @@
  * Move-pages picker (issue #27): lists every alive section grouped by
  * notebook as a move target for the current multi-selection. Rows where
  * nothing would move (every selected page already lives there) are disabled.
+ * Section groups (issue #337) are NOT targets — groups hold sections,
+ * never pages (OneNote semantics); the data layer rejects them with 0.
  */
 import { FolderClosed, NotebookPen } from "lucide-react";
 import { plural } from "@/lib/plural";
@@ -15,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { isSectionGroup } from "@/lib/section-groups";
 import { byOrder, type Notebook, type PageMeta, type Section } from "@/lib/types";
 
 export function MovePagesDialog({
@@ -59,7 +62,7 @@ export function MovePagesDialog({
                 </p>
                 <div className="flex flex-col gap-0.5">
                   {sections
-                    .filter((s) => s.notebookId === nb.id)
+                    .filter((s) => s.notebookId === nb.id && !isSectionGroup(s))
                     .sort(byOrder)
                     .map((sec) => {
                       // every selected page already in this section → no-op

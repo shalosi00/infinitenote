@@ -17,6 +17,8 @@ export interface GeneratedNames {
   notebook: (n: number) => string;
   /** default section title */
   section: (n: number) => string;
+  /** default section-group title (issue #337), e.g. "Section group 3" */
+  sectionGroup: (n: number) => string;
   /** default page title */
   page: (n: number) => string;
   /** duplicate-page suffix, e.g. "Notes (copy)" */
@@ -51,6 +53,7 @@ export interface GeneratedNames {
 const ENGLISH_NAMES: GeneratedNames = {
   notebook: (n) => `Notebook ${n}`,
   section: (n) => `Section ${n}`,
+  sectionGroup: (n) => `Section group ${n}`,
   page: (n) => `Page ${n}`,
   copy: (title) => `${title} (copy)`,
   conflict: (title, date) => `${title} (conflict ${date})`,

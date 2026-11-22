@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/core";
 import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
+import { isSectionGroup } from "@/lib/section-groups";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
 import {
   ArrowDown,
@@ -33,10 +34,13 @@ import {
   ChevronRight,
   Copy,
   FileText,
+  FolderClosed,
   FolderInput,
+  FolderOpen,
   FolderPlus,
   FolderSync,
   Keyboard,
+  LayoutGrid,
   LayoutTemplate,
   Link2,
   ListChecks,
@@ -480,6 +484,7 @@ function NotebookNode({
   const expanded = useAppStore((s) => s.expanded.has(notebook.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addSection = useAppStore((s) => s.addSection);
+  const addSectionGroup = useAppStore((s) => s.addSectionGroup);
   const rename = useAppStore((s) => s.renameNotebook);
   const recolor = useAppStore((s) => s.recolorNotebook);
   const del = useAppStore((s) => s.deleteNotebook);
@@ -498,8 +503,11 @@ function NotebookNode({
   const isRenaming = renaming === notebook.id;
   const openFirstPage = () => {
     // sub-sections (issue #314): the first visible section is the first
-    // top-level one; children only open through their expanded parent
-    const sec = topLevelSections(sections, notebook.id)[0] ?? [...sections].sort(byOrder)[0];
+    // top-level one; children only open through their expanded parent.
+    // Section groups (issue #337) hold no pages — they are never page
+    // hosts, so the first PAGE-carrying top-level row wins.
+    const sec = topLevelSections(sections, notebook.id).find((s) => !isSectionGroup(s)) ??
+      [...sections].sort(byOrder).find((s) => !isSectionGroup(s));
     if (sec) {
       const page = pages
         .filter((p) => p.sectionId === sec.id)
@@ -571,6 +579,9 @@ function NotebookNode({
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuItem onClick={() => void addSection(notebook.id)}>
               <Plus /> {"New section"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void addSectionGroup(notebook.id)}>
+              <LayoutGrid /> {"New section group"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(notebook.id)}>
               <Pencil /> {"Rename"}
@@ -678,6 +689,7 @@ function SectionNode({
   const toggle = useAppStore((s) => s.toggleExpanded);
   const addPage = useAppStore((s) => s.addPage);
   const addSection = useAppStore((s) => s.addSection);
+  const addSectionGroup = useAppStore((s) => s.addSectionGroup);
   const openTemplatesPicker = useAppStore((s) => s.openTemplatesPicker);
   const ownPages = allPages.filter((p) => p.sectionId === section.id);
   const rename = useAppStore((s) => s.renameSection);
@@ -717,6 +729,10 @@ function SectionNode({
   };
 
   const isRenaming = renaming === section.id;
+  // OneNote "Section Groups" (issue #337): a group is a section container —
+  // it holds sections, never pages, so its menu and its expanded body
+  // render the group affordances instead of the page ones.
+  const group = isSectionGroup(section);
 
   return (
     <div data-testid="section-row" data-section-id={section.id}>
@@ -744,13 +760,31 @@ function SectionNode({
           {/* OneNote "Section Color" parity (issue #319): the tab's color IS
               the affordance — own override when set, notebook color inherited
               when not (section-colors.ts). Same swatch pattern as the
-              notebook row above. */}
-          <span
-            className="h-3.5 w-3.5 shrink-0 rounded-sm border border-black/10"
-            style={{ backgroundColor: sectionColorHex(section, notebook) }}
-            data-testid="section-color"
-            aria-hidden
-          />
+              notebook row above. Section groups (issue #337) take the folder
+              glyph instead — OneNote: "a bit like folders on a hard drive" —
+              and carry no color of their own. */}
+          {group ? (
+            expanded ? (
+              <FolderOpen
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                data-testid="section-group-icon"
+                aria-hidden
+              />
+            ) : (
+              <FolderClosed
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                data-testid="section-group-icon"
+                aria-hidden
+              />
+            )
+          ) : (
+            <span
+              className="h-3.5 w-3.5 shrink-0 rounded-sm border border-black/10"
+              style={{ backgroundColor: sectionColorHex(section, notebook) }}
+              data-testid="section-color"
+              aria-hidden
+            />
+          )}
           {isRenaming ? (
             <RenameInput
               initial={section.name}
@@ -782,53 +816,74 @@ function SectionNode({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuItem onClick={() => void addPage(section.id)}>
-              <Plus /> {"New page"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openTemplatesPicker(section.id)}>
-              <LayoutTemplate /> {"New page from template…"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => void addSection(notebook.id, undefined, section.id)}
-            >
-              <FolderPlus /> {"New sub-section"}
-            </DropdownMenuItem>
+            {group ? (
+              <>
+                {/* groups hold sections (their whole purpose), never pages */}
+                <DropdownMenuItem
+                  onClick={() => void addSection(notebook.id, undefined, section.id)}
+                >
+                  <Plus /> {"New section"}
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => void addPage(section.id)}>
+                  <Plus /> {"New page"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openTemplatesPicker(section.id)}>
+                  <LayoutTemplate /> {"New page from template…"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => void addSection(notebook.id, undefined, section.id)}
+                >
+                  <FolderPlus /> {"New sub-section"}
+                </DropdownMenuItem>
+                {/* the OneNote-documented path (right-click any section tab →
+                    "New Section Group"): the group lands at the NOTEBOOK top
+                    level, appended after the existing tabs */}
+                <DropdownMenuItem onClick={() => void addSectionGroup(notebook.id)}>
+                  <LayoutGrid /> {"New section group"}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onClick={() => setRenaming(section.id)}>
               <Pencil /> {"Rename"}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onMoveToSection(section.id)}>
               <FolderInput /> {"Move to…"}
             </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Palette /> {"Color"}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-40">
-                <div className="grid grid-cols-4 gap-1.5 p-2">
-                  {NOTEBOOK_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Set section color ${c}`}
-                      className="h-6 w-6 rounded-md border-2 ring-offset-2 transition-transform hover:scale-110 data-[active]:ring-2"
-                      data-active={effectiveSectionColor(section, notebook) === c}
-                      style={{
-                        backgroundColor: NOTEBOOK_COLOR_HEX[c],
-                        borderColor:
-                          effectiveSectionColor(section, notebook) === c
-                            ? "var(--foreground)"
-                            : "transparent",
-                      }}
-                      onClick={() => void recolor(section.id, c)}
-                    />
-                  ))}
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => void recolor(section.id, null)}>
-                  <RotateCcw /> {"Use notebook color"}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            {!group && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Palette /> {"Color"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-40">
+                  <div className="grid grid-cols-4 gap-1.5 p-2">
+                    {NOTEBOOK_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={`Set section color ${c}`}
+                        className="h-6 w-6 rounded-md border-2 ring-offset-2 transition-transform hover:scale-110 data-[active]:ring-2"
+                        data-active={effectiveSectionColor(section, notebook) === c}
+                        style={{
+                          backgroundColor: NOTEBOOK_COLOR_HEX[c],
+                          borderColor:
+                            effectiveSectionColor(section, notebook) === c
+                              ? "var(--foreground)"
+                              : "transparent",
+                        }}
+                        onClick={() => void recolor(section.id, c)}
+                      />
+                    ))}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void recolor(section.id, null)}>
+                    <RotateCcw /> {"Use notebook color"}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void move(section.id, -1)}>
               <ArrowUp /> {"Move up"}
@@ -846,21 +901,22 @@ function SectionNode({
 
       {expanded && (
         <div className="ml-4 flex flex-col gap-0.5 border-l pl-1">
-          {[...ownPages]
-            .sort(byOrder)
-            .map((page) => (
-              <PageNode
-                key={page.id}
-                page={page}
-                notebook={notebook}
-                section={section}
-                selected={selection?.pageId === page.id}
-                renaming={renaming}
-                setRenaming={setRenaming}
-                onNavigate={onNavigate}
-                selectProps={selectProps}
-              />
-            ))}
+          {!group &&
+            [...ownPages]
+              .sort(byOrder)
+              .map((page) => (
+                <PageNode
+                  key={page.id}
+                  page={page}
+                  notebook={notebook}
+                  section={section}
+                  selected={selection?.pageId === page.id}
+                  renaming={renaming}
+                  setRenaming={setRenaming}
+                  onNavigate={onNavigate}
+                  selectProps={selectProps}
+                />
+              ))}
           {childSections(allSections, section.id).map((child) => (
             <SectionNode
               key={child.id}
@@ -879,9 +935,11 @@ function SectionNode({
           <button
             type="button"
             className="flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-            onClick={() => void addPage(section.id)}
+            onClick={() =>
+              void (group ? addSection(notebook.id, undefined, section.id) : addPage(section.id))
+            }
           >
-            <Plus className="h-3.5 w-3.5" /> {"Add page"}
+            <Plus className="h-3.5 w-3.5" /> {group ? "Add section" : "Add page"}
           </button>
         </div>
       )}

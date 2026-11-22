@@ -220,8 +220,12 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.19.0)
-- [ ] "Section groups" as a separate row type (the sub-sections phase-3
-      candidate named by the wave-18/wave-19 pointers)
+- [x] "Section groups" as a separate row type — OneNote "Section Groups"
+      parity shipped 2026-11-23 (issue #337): folder-glyph groups land at
+      the notebook top level via "New section group" on the notebook and
+      section menus; groups hold sections, never pages; a group nests only
+      under the top level or another group (the Graph OneNote model);
+      subtree trash/restore/purge, sync and backup carry it for free
 - [ ] Further product-parity candidates from a fresh majors evidence pass
       (evidence-first, wave by wave)
 
