@@ -146,3 +146,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.20.0
+    versionCode: 300
+    commit: v1.20.0
+    subdir: android-twa
+    gradle:
+      - yes
