@@ -43,6 +43,81 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-22 — Ink to shape: OneNote "Ink to Shape" parity, wave 19 (#329/#330)
+
+- **Task**: wave 19 — the tenth product-parity wave, per the wave-18
+  entry's pointer ("further product-parity candidates from fresh majors
+  evidence passes — evidence-first, wave by wave"; the sub-sections
+  phase-3 "section groups" row type stays a named future wave). Evidence
+  pass (2026-11-22): OneNote's help — "Draw a shape on the page. From the
+  Shapes gallery on the ribbon select Ink to Shape" (support.microsoft.com,
+  "Convert your Ink to Shapes and Math Equations") plus Draw-and-Hold and
+  the iPad "Ink to shape tool" — while Joplin has NO native inking (its
+  only drawing path is the third-party beta js-draw plugin, no shape
+  recognition — joplinapp.org/plugins) and AppFlowy's freehand board is
+  still an open feature request (AppFlowy-IO/AppFlowy#2091, 2023). Ours
+  runs Excalidraw freedraw ink on every page — the one majors gap left in
+  the drawing surface. Shipped this cycle, closing #329 into the v1.19.0
+  milestone.
+- **Design**: pure classifier `src/lib/ink-shapes.ts` (no DOM /
+  @excalidraw imports — the shape-library/hwr-convert contract): open
+  strokes → line (chord deviation ≤ max(6 px, 7%)); closed strokes →
+  circle via Kasa least-squares fit (radial error ≤ 16% of r, fit sanity
+  r ≤ 4× bbox diagonal) → axis-aligned bbox-ellipse fallback (≤ 25%) →
+  corner analysis (RDP + near-straight-vertex pruning so a square drawn
+  starting mid-edge still yields exactly 4 corners) → rectangle /
+  diamond (a 45°-rotated square IS a diamond) / triangle (closed 3-corner
+  line loop — Excalidraw has no triangle primitive). Every threshold an
+  exported constant; honest v1 misses documented (rotated rectangles and
+  ellipses, arrows, multi-stroke grouping stay ink — a four-stroke
+  rectangle degrades into four perfect lines). Selection-scoped ONLY
+  (conversion REPLACES ink — no page-wide mode by design); the runtime
+  replacement lands as ONE updateScene = one Ctrl+Z restores the ink; the
+  shapes inherit each stroke's own color/width/roughness; deselect-on-
+  purpose (#231); structural idempotency (no customData — the measured
+  HWR-E06 hazard). Test plan docs/test-plans/ink-shapes.md; committed
+  E2E fixture with deterministic LCG noise.
+- **Lessons (all measured this cycle)**:
+  - **A tombstone without a version bump breaks the store/history
+    resurrection.** The replacement tombstoned strokes via
+    `{...el, isDeleted: true}` WITHOUT bumping `version` — the probe
+    showed undo removing the shapes but KEEPING the strokes deleted
+    (freedraw 1 → {}): the history reconciles by element version and a
+    same-version tombstone reads as "no change". The tombstone now bumps
+    version + a fresh nonce exactly like Excalidraw's own mutateElement;
+    probe after: one undo → freedraw 4 (the ink fully restored).
+  - **The ~1.5 s integrity heal must stay on its own scene.** The guard
+    reads whatever scene the api hosts THEN — a page switch inside the
+    window had the hwr-convert heal re-apply (or log "re-apply found
+    nothing to convert") on a foreign page, caught live twice by HWR-E04's
+    afterAll error-catcher while validating neighbors on this branch. New
+    pure `shouldHealConversion` (hwr-convert.ts, IS-P21/P22) is shared by
+    BOTH conversion guards: heal only while an original ink stroke is
+    still ALIVE in the hosted scene.
+  - The e2e Playwright browser cache wiped itself again (chromium
+    headless-shell 1255 missing); `bunx playwright install chromium`.
+  - README's Roadmap paragraph was stale at v1.12-era text ("next up:
+    ink-to-text Phase B") — missed by the wave-16/17/18 sweeps because
+    they grep-anchored the badge/commands only; the prose is now read in
+    full on every sweep (swept this cycle).
+- **PR #330** (squash `ae06a3b` on head `aee0041`, 4/4 required checks
+  green): 24 new unit tests (IS-P1..P22 + the b-variants, incl. the two
+  guard-hardening pins), 5 new E2E checks (IS-N01..N05), counts swept
+  across PROJECT_STATUS/README/copilot/ROADMAP and
+  docs/test-plans/ink-shapes.md (new). #329 closed.
+- **Gate**: 1292 unit / 92 files, 0 fail (base 2f82603: 1268/91 — +24
+  IS-P pins); 247 e2e / 51 files (`playwright --list`); new spec
+  IS-N01..N05 5/5 twice (fitted bounds on the real conversion, live
+  mouse-drawn circle, one-undo + reload persistence, guidance toasts);
+  neighbors handwriting 7/7 (green after the guard hardening) +
+  handwriting-undo + shape-library 17/17.
+- **Next**: the v1.19.0 milestone is now done except hardware-blocked
+  #193 (real-GPU HWR benchmark, carried forward — the v1.15.0→v1.18.0
+  precedent) → the release train closes v1.19.0; the next milestone opens
+  with the sub-sections phase-3 candidates ("section groups" as a
+  separate row type) and further product-parity candidates from fresh
+  majors evidence passes (evidence-first, wave by wave).
+
 ## 2026-11-22 — Section moves: sub-sections phase 2 + the v1.18.0 follow-through chores, wave 18 (#325/#326, #324, #327)
 
 - **Task**: wave 18 — the ninth product-parity wave and the ROADMAP v1.19
