@@ -8,9 +8,22 @@
  * - select mode: checkbox multi-select with bulk move/delete (issue #27)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  useDraggable,
+  useDndContext,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
-import { childSections, topLevelSections } from "@/lib/section-tree";
+import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
 import {
   ArrowDown,
   ArrowUp,
@@ -62,6 +75,7 @@ import {
 import { pageHasTag } from "@/lib/tags";
 import { allSelected, pruneSelected, toggleSelected, visiblePageIds } from "@/lib/multi-select";
 import { MovePagesDialog } from "./move-pages-dialog";
+import { MoveSectionDialog } from "./move-section-dialog";
 import { ThemesDialog } from "./themes-dialog";
 import { useSyncDialog } from "./sync-dialog";
 import { NOTEBOOK_COLORS, NOTEBOOK_COLOR_HEX, type Notebook, type PageMeta, type Section } from "@/lib/types";
@@ -108,6 +122,55 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const [selectedRaw, setSelectedRaw] = useState<ReadonlySet<string>>(new Set());
   const [moveOpen, setMoveOpen] = useState(false);
   const [themesOpen, setThemesOpen] = useState(false);
+
+  /* -------- section moves (issue #325): drag gesture + dialog path -------- */
+  const moveSectionTo = useAppStore((s) => s.moveSectionTo);
+  const [moveSectionId, setMoveSectionId] = useState<string | null>(null);
+  // 6px activation distance so clicks, double-click renames and menu
+  // opens on the same rows never turn into accidental drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const onSectionMove = (targetNotebookId: string, targetParentId: string | null) => {
+    const id = moveSectionId;
+    setMoveSectionId(null);
+    if (!id) return;
+    void moveSectionTo(id, targetNotebookId, targetParentId).then((result) => {
+      if (result === "moved") toast.success("Section moved");
+    });
+  };
+
+  // Drop semantics (the gesture mirror of the dialog): a section dropped
+  // on a notebook joins that notebook's top level (cross-notebook
+  // allowed); dropped on another section it nests under it. Invalid
+  // targets never highlight (the nodes gate their own visual state via
+  // canReparent) and end up here as nothing more than an unhandled id.
+  const onDragEnd = (e: DragEndEvent) => {
+    const activeId = String(e.active.id);
+    const overId = e.over?.id != null ? String(e.over.id) : null;
+    if (!overId || overId === activeId) return;
+    const st = useAppStore.getState();
+    const src = st.sections.find((s) => s.id === activeId);
+    if (!src) return;
+    const targetNotebook = st.notebooks.find((n) => n.id === overId);
+    if (targetNotebook) {
+      void moveSectionTo(activeId, targetNotebook.id, null).then((r) => {
+        if (r === "moved") {
+          toast.success(`Moved "${src.name}" to ${targetNotebook.name}`);
+        }
+      });
+      return;
+    }
+    const targetSection = st.sections.find((s) => s.id === overId);
+    if (targetSection && canReparent(st.sections, activeId, overId)) {
+      void moveSectionTo(activeId, targetSection.notebookId, overId).then((r) => {
+        if (r === "moved") {
+          toast.success(`Moved "${src.name}" under ${targetSection.name}`);
+        }
+      });
+    }
+  };
 
   // entering the tag filter view is a navigation event — it cancels select
   // mode. zustand is an external store, so this is a subscription (setState
@@ -238,6 +301,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             onNavigate={onNavigate}
           />
         ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
+          onDragEnd={onDragEnd}
+        >
         <nav aria-label={"Notebook tree"} className="flex flex-col gap-0.5 p-2">
           {notebooks.map((nb) => (
             <NotebookNode
@@ -249,6 +317,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               renaming={renaming}
               setRenaming={setRenaming}
               onNavigate={onNavigate}
+              onMoveToSection={setMoveSectionId}
               selectProps={
                 selectMode
                   ? { selectMode, selectedIds: selected, onToggleSelect }
@@ -264,6 +333,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </p>
           )}
         </nav>
+        </DndContext>
         )}
       </ScrollArea>
 
@@ -358,6 +428,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <ThemesDialog open={themesOpen} onOpenChange={setThemesOpen} />
+      <MoveSectionDialog
+        open={moveSectionId !== null}
+        onOpenChange={(o) => {
+          if (!o) setMoveSectionId(null);
+        }}
+        notebooks={notebooks}
+        sections={sections}
+        sectionId={moveSectionId}
+        onMove={onSectionMove}
+      />
       <MovePagesDialog
         open={moveOpen}
         onOpenChange={setMoveOpen}
@@ -384,6 +464,7 @@ function NotebookNode({
   setRenaming,
   onNavigate,
   selectProps,
+  onMoveToSection,
 }: {
   notebook: Notebook;
   sections: Section[];
@@ -393,6 +474,8 @@ function NotebookNode({
   setRenaming: (v: string | null) => void;
   onNavigate?: () => void;
   selectProps: SelectModeProps;
+  /** opens the "Move to…" dialog for a section (issue #325) */
+  onMoveToSection: (sectionId: string) => void;
 }) {
   const expanded = useAppStore((s) => s.expanded.has(notebook.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
@@ -401,6 +484,16 @@ function NotebookNode({
   const recolor = useAppStore((s) => s.recolorNotebook);
   const del = useAppStore((s) => s.deleteNotebook);
   const move = useAppStore((s) => s.moveNotebook);
+
+  // drop target (issue #325): a section dropped on a notebook joins its
+  // top level — cross-notebook allowed, same-notebook is a no-op success
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: notebook.id,
+    data: { type: "notebook" },
+  });
+  const dragActive = useDndContext().active != null;
+  const dropHighlight = isOver && dragActive;
+  const setRowRef = (el: HTMLDivElement | null) => setDropRef(el);
 
   const isRenaming = renaming === notebook.id;
   const openFirstPage = () => {
@@ -419,10 +512,15 @@ function NotebookNode({
   };
 
   return (
-    <div className="select-none">
+    <div className="select-none" data-testid="notebook-node">
       <div
-        className="group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-sidebar-accent"
+        ref={setRowRef}
+        className={`group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-sidebar-accent ${
+          dropHighlight ? "bg-accent/60 ring-1 ring-ring" : ""
+        }`}
         data-testid="notebook-row"
+        data-notebook-id={notebook.id}
+        data-drop-active={dropHighlight || undefined}
       >
         <button
           type="button"
@@ -530,6 +628,7 @@ function NotebookNode({
                 setRenaming={setRenaming}
                 onNavigate={onNavigate}
                 selectProps={selectProps}
+                onMoveToSection={onMoveToSection}
               />
             ))}
           <button
@@ -559,6 +658,7 @@ function SectionNode({
   setRenaming,
   onNavigate,
   selectProps,
+  onMoveToSection,
 }: {
   section: Section;
   notebook: Notebook;
@@ -571,6 +671,8 @@ function SectionNode({
   setRenaming: (v: string | null) => void;
   onNavigate?: () => void;
   selectProps: SelectModeProps;
+  /** opens the "Move to…" dialog for a section (issue #325) */
+  onMoveToSection: (sectionId: string) => void;
 }) {
   const expanded = useAppStore((s) => s.expanded.has(section.id));
   const toggle = useAppStore((s) => s.toggleExpanded);
@@ -582,12 +684,52 @@ function SectionNode({
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
   const recolor = useAppStore((s) => s.setSectionColor);
+  // global alive sections (issue #325): the dragged section may come from
+  // ANOTHER notebook, so the self/descendant check needs the whole tree,
+  // not just this branch's allSections
+  const allTreeSections = useAppStore((s) => s.sections);
+
+  // drag source + drop target (issue #325): drag a section onto another
+  // section to nest it, onto a notebook to move it to that notebook's top
+  // level. Listeners only — the full attributes set would give the row div
+  // role="button" (name = all its text) and collide with every existing
+  // getByRole locator; keyboard users move sections via the "Move to…"
+  // dialog. Self and own-subtree targets never highlight (canReparent).
+  const {
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({ id: section.id, data: { type: "section", name: section.name } });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: section.id,
+    data: { type: "section" },
+  });
+  const activeId = useDndContext().active?.id;
+  const activeSectionId = activeId != null ? String(activeId) : null;
+  const dropValid =
+    activeSectionId !== null &&
+    activeSectionId !== section.id &&
+    canReparent(allTreeSections, activeSectionId, section.id);
+  const dropHighlight = isOver && dropValid;
+  const setRowRef = (el: HTMLDivElement | null) => {
+    setDragRef(el);
+    setDropRef(el);
+  };
 
   const isRenaming = renaming === section.id;
 
   return (
     <div data-testid="section-row" data-section-id={section.id}>
-      <div className="group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-sidebar-accent">
+      <div
+        ref={setRowRef}
+        {...listeners}
+        className={`group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-sidebar-accent ${
+          isDragging ? "opacity-40" : ""
+        } ${dropHighlight ? "bg-accent/60 ring-1 ring-ring" : ""}`}
+        data-testid="section-row-handle"
+        data-section-id={section.id}
+        data-drop-active={dropHighlight || undefined}
+      >
         <button
           type="button"
           className="flex min-h-9 min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
@@ -653,6 +795,9 @@ function SectionNode({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setRenaming(section.id)}>
               <Pencil /> {"Rename"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onMoveToSection(section.id)}>
+              <FolderInput /> {"Move to…"}
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -728,6 +873,7 @@ function SectionNode({
               setRenaming={setRenaming}
               onNavigate={onNavigate}
               selectProps={selectProps}
+              onMoveToSection={onMoveToSection}
             />
           ))}
           <button

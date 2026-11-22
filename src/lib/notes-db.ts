@@ -23,7 +23,7 @@ import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
 import { safeSectionColor } from "./section-colors";
-import { ancestorSectionIds, subtreeSectionIds } from "./section-tree";
+import { ancestorSectionIds, canReparent, subtreeSectionIds } from "./section-tree";
 import {
   buildPageVersion,
   pruneToCapacity,
@@ -308,6 +308,74 @@ export async function moveSection(id: string, dir: -1 | 1): Promise<void> {
     await db.sections.update(a.id, { order: b.order });
     await db.sections.update(b.id, { order: a.order });
   });
+}
+
+/** Result of moveSectionTo (issue #325). */
+export type SectionMoveResult = "moved" | "noop" | "invalid";
+
+/**
+ * Sub-sections phase 2 (issue #325): move a section — with its whole
+ * subtree — to a new home. `targetParentId` null = top level of
+ * `targetNotebookId`; a section id = nested under that section
+ * (cross-notebook allowed — the OneNote drag-the-section-tab flow, with
+ * the "Move or Copy" dialog as the keyboard/touch path).
+ *
+ * - the moved root gets `{notebookId, parentId, order}` (appended to the
+ *   end of the target sibling scope, movePagesToSection's convention)
+ * - every descendant keeps its own parentId/order (the subtree moves
+ *   as-is) and follows the root's notebookId — trashed descendants
+ *   included, their deletedAt stamps untouched, so the subtree stays
+ *   restorable in its new notebook
+ * - pages need no writes: they follow their sectionId
+ * - invalid targets (trashed source/targets, a self/descendant parent,
+ *   a dangling parent id) return "invalid" with zero writes
+ * - a section already living at the target returns "noop" with zero
+ *   writes (drop on its own parent must not reorder)
+ */
+export async function moveSectionTo(
+  id: string,
+  targetNotebookId: string,
+  targetParentId: string | null
+): Promise<SectionMoveResult> {
+  const sec = await db.sections.get(id);
+  if (!sec || sec.deletedAt !== null) return "invalid";
+  const nb = await db.notebooks.get(targetNotebookId);
+  if (!nb || nb.deletedAt !== null) return "invalid";
+  const all = await db.sections.toArray();
+  if (targetParentId !== null) {
+    const parent = all.find((s) => s.id === targetParentId);
+    if (!parent || parent.deletedAt !== null) return "invalid";
+    if (parent.notebookId !== targetNotebookId) return "invalid";
+    if (!canReparent(all, id, targetParentId)) return "invalid";
+  }
+
+  // already there → a successful no-op (drop on its own parent must
+  // never reorder the siblings it landed on)
+  if (sec.notebookId === targetNotebookId && (sec.parentId ?? null) === targetParentId) {
+    return "noop";
+  }
+
+  const siblings = all.filter(
+    (s) =>
+      s.deletedAt === null &&
+      s.notebookId === targetNotebookId &&
+      (s.parentId ?? null) === targetParentId
+  );
+  const maxOrder = Math.max(0, ...siblings.map((s) => s.order));
+  const ts = now();
+  await db.transaction("rw", db.sections, async () => {
+    await db.sections.update(id, {
+      notebookId: targetNotebookId,
+      parentId: targetParentId,
+      order: maxOrder + 1,
+      updatedAt: ts,
+    });
+    const descendantIds = subtreeSectionIds(all, id).filter((sid) => sid !== id);
+    for (const sid of descendantIds) {
+      await db.sections.update(sid, { notebookId: targetNotebookId, updatedAt: ts });
+    }
+  });
+  return "moved";
 }
 
 export async function trashSection(id: string): Promise<void> {

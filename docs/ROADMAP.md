@@ -220,8 +220,15 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.18.0)
-- [ ] Sub-sections phase 2: drag-to-reparent and cross-notebook section
-      moves (docs/test-plans/sub-sections.md, the wave-16 phase-2 candidates)
+- [x] Sub-sections phase 2: drag-to-reparent and cross-notebook section
+      moves (issue #325, shipped 2026-11-22): moveSectionTo rewrites the
+      moved root {notebookId, parentId, order} plus the subtree's
+      notebookId, pages follow their sectionId (zero page writes); the
+      drag gesture (@dnd-kit, listeners-only rows) and the section menu's
+      "Move to…" dialog — the OneNote "Move or Copy" path and the
+      keyboard/touch path Joplin lacks — share the store action; invalid
+      targets never highlight and never accept; the new home auto-expands
+      (docs/test-plans/sub-sections.md, phase-2 section)
 - [ ] Further product-parity candidates from a fresh majors evidence pass
       (evidence-first, wave by wave)
 
