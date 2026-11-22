@@ -65,6 +65,15 @@ export interface Section {
    * and old sync folders stay valid.
    */
   color?: NotebookColor | null;
+  /**
+   * OneNote "Section Groups" parity (issue #337, sub-sections phase 3):
+   * "group" marks the row as a section group — a container that holds
+   * sections only, never pages. Absent/null = a plain section (the pre-
+   * #337 shape). Additive and NOT indexed — the parentId/color precedent:
+   * no Dexie version bump, old rows and old sync folders stay valid; the
+   * policy lives in section-groups.ts.
+   */
+  kind?: "group" | null;
   name: string;
   order: number;
   createdAt: number;

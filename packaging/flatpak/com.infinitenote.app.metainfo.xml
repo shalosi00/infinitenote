@@ -51,6 +51,15 @@
   </screenshots>
 
   <releases>
+    <release version="1.20.0" date="2026-11-23">
+      <description>
+        <p>Section groups arrive (OneNote's Section Groups): "New section
+        group" on the notebook and section menus lands a folder-glyph group
+        that keeps related sections together and holds no pages of its own;
+        groups nest at the notebook top level or under other groups, and
+        sections, pages, trash, sync and backup all behave around them.</p>
+      </description>
+    </release>
     <release version="1.19.0" date="2026-11-22">
       <description>
         <p>Sections move (sub-sections phase 2): drag a section onto another

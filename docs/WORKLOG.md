@@ -43,6 +43,83 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-23 — Section groups: OneNote "Section Groups" parity, wave 20 (#337/#338)
+
+- **Task**: wave 20 — the eleventh product-parity wave and the
+  sub-sections **phase-3 candidate** the wave-18/wave-19 pointers and the
+  PROJECT_STATUS Next-up list named ("'Section groups' as a separate row
+  type"). Evidence pass (2026-11-23): OneNote's help — "A bit like folders
+  on a hard drive, section groups keep related sections together. A
+  section group can hold as many sections as you want, along with all
+  their pages"; creation = right-click any section tab → "New Section
+  Group", the group landing as a peer of the section tabs
+  (support.microsoft.com) — while the Microsoft Graph OneNote model nests
+  groups under groups (sectionGroup carries parentSectionGroup + a nested
+  sectionGroups collection) and sections never contain groups, and Joplin
+  has no group type at all (only desktop drag-only sub-notebooks,
+  joplinapp.org/help/apps/subnotebooks). Shipped this cycle, closing #337
+  into the v1.20.0 milestone.
+- **Design**: `Section.kind?: "group" | null` — additive, NOT indexed, no
+  Dexie version bump (the parentId #314 / color #319 precedent); `kind ??
+  null` the canonical read; plain sections carry NO kind field, so old
+  rows and old sync folders stay byte-stable. Pure policy
+  `src/lib/section-groups.ts` (isSectionGroup, normalizeSectionKind — a
+  hand-edited "folder"/wrong type degrades to a plain section, the
+  safeTags/safeSectionColor contract). Placement per the Graph model: a
+  group's parents are the notebook top level and other groups; a group
+  NEVER nests under a plain section — enforced twice (canReparent for the
+  drag, moveSectionTo at the write layer, zero-write "invalid"); anything
+  may nest UNDER a group. Groups hold no pages: no New page / templates /
+  color menu on group rows, the expanded body's tail button is "Add
+  section", the bulk-move dialog omits groups, movePagesToSection answers
+  0 with zero writes. Notebook menu + section menu gain "New section
+  group" (the OneNote-documented path lands it at the notebook top level,
+  appended to the end of the sibling scope, generated name "Section group
+  N", the notebook auto-expands). Group rows render the folder glyph
+  (FolderClosed/FolderOpen) instead of the color swatch — OneNote: "a bit
+  like folders on a hard drive". Trash/restore/purge untouched (the #314
+  subtree machinery covers group subtrees); sync/backup zero merge logic
+  (whole-row LWW carries kind; restoreBackup normalizes via
+  normalizeSectionKind); openFirstPage skips groups (the first
+  page-carrying top-level row wins). Test plan
+  docs/test-plans/section-groups.md.
+- **Lessons (all measured this cycle)**:
+  - **The generated-name counter counts groups as sections** — the store
+    names a fresh section from ALL sections of the notebook (groups are
+    sections, OneNote's tabs and group tabs share one scope), so after a
+    group exists the next "New section" is "Section 4", not "Section 3".
+    SG-N02/N04/N05 failed on the assumption (locator 0 matches, 15 s);
+    fixed test-side — the behavior is correct-by-design.
+  - **Subtree locators see descendants** — `groupRow.getByRole("button",
+    { name: "Add page" })` matched the CHILD section's tail button inside
+    the group's subtree (1 element, expected 0). The honest invariant is
+    "no page ROWS in the group's body", not "no Add-page buttons in the
+    subtree"; SG-N02 now asserts `[data-testid="page-row"]` count 0.
+  - **Docs-sweep drift found and fixed**: the PROJECT_STATUS commands
+    cheat-sheet was stale since wave 16 (1243/233) and copilot's e2e line
+    at the wave-18 counts (242/50) — both swept this cycle; the wave-19
+    "read the prose in full" lesson applied again.
+  - The e2e Playwright browser cache wiped itself again (chromium
+    headless-shell 1255 missing); `bunx playwright install chromium`.
+  - The sandbox reverted HEAD twice mid-cycle (once to a stale
+    release-prep commit while the wave branch was checked out) — the
+    staging + apply.sh discipline held: every apply.sh re-run reproduced
+    the full green gate from staging alone, and the docs copies made in
+    the reverted window had to be re-fetched from the fresh tree before
+    editing.
+- **PR #338** (squash `7de54a1` on head `c7e4717`, 4/4 required checks
+  green): 18 new unit tests (SG-P1..P18), 5 new E2E checks (SG-N01..N05),
+  counts swept across PROJECT_STATUS/README/copilot/ROADMAP and
+  docs/test-plans/section-groups.md (new). #337 closed via the API after
+  the squash (develop merges never auto-close).
+- **Gate**: 1310 unit / 93 files, 0 fail (base fa867eb: 1292/92 — +18
+  SG-P pins); 252 e2e / 52 files (`playwright --list`); new spec
+  SG-N01..N05 5/5 (incl. the mid-drag data-drop-active assert on the REAL
+  dnd-kit pipeline, the reload persistence and the subtree trash/restore
+  round-trip); neighbors sub-sections + section-move + section-colors +
+  multiselect + crud + search-trash 24/24 (the sidebar-heavy surfaces,
+  verified locally on the branch).
+
 ## 2026-11-22 — Ink to shape: OneNote "Ink to Shape" parity, wave 19 (#329/#330)
 
 - **Task**: wave 19 — the tenth product-parity wave, per the wave-18

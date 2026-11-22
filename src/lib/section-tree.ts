@@ -15,6 +15,7 @@
  */
 import type { Section } from "./types";
 import { byOrder } from "./types";
+import { isSectionGroup } from "./section-groups";
 
 /** The effective parent id of a section (absent field = top level). */
 export function parentOf(s: Section): string | null {
@@ -91,6 +92,11 @@ export function ancestorSectionIds(
  * subtreeSectionIds' visitor set, so a corrupted `parentId` loop cannot
  * hang a drag. Notebook-level targets (top-level moves) carry no parent
  * id and are validated by the data layer instead.
+ *
+ * Section groups (issue #337, sub-sections phase 3): a GROUP's parents are
+ * the notebook top level and other groups — the Microsoft Graph OneNote
+ * model — so a group can never nest under a plain section; any row may
+ * nest UNDER a group (that is a group's whole purpose).
  */
 export function canReparent(
   sections: readonly Section[],
@@ -98,7 +104,13 @@ export function canReparent(
   targetParentId: string
 ): boolean {
   if (sectionId === targetParentId) return false;
-  return !subtreeSectionIds(sections, sectionId).includes(targetParentId);
+  if (subtreeSectionIds(sections, sectionId).includes(targetParentId)) return false;
+  const mover = sections.find((s) => s.id === sectionId);
+  if (mover && isSectionGroup(mover)) {
+    const target = sections.find((s) => s.id === targetParentId);
+    if (!target || !isSectionGroup(target)) return false;
+  }
+  return true;
 }
 
 /**

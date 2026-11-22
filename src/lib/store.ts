@@ -63,6 +63,14 @@ interface AppStore {
     name?: string,
     parentId?: string | null
   ) => Promise<void>;
+  /**
+   * OneNote "Section Groups" parity (issue #337, sub-sections phase 3):
+   * create a section group at the NOTEBOOK top level — the OneNote path
+   * (right-click any section tab → "New Section Group" lands a peer of the
+   * section tabs). Groups hold sections, never pages. The notebook row
+   * auto-expands to reveal the new group.
+   */
+  addSectionGroup: (notebookId: string) => Promise<void>;
   renameSection: (id: string, name: string) => Promise<void>;
   moveSection: (id: string, dir: -1 | 1) => Promise<void>;
   /**
@@ -298,6 +306,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   renameSection: async (id, name) => {
     await db.renameSection(id, name);
     await get().refresh();
+  },
+  addSectionGroup: async (notebookId) => {
+    const count = get().sections.filter((s) => s.notebookId === notebookId).length;
+    const group = await db.createSection(
+      notebookId,
+      generatedNames().sectionGroup(count + 1),
+      null, // the OneNote-documented path lands the group at the top level
+      "group",
+    );
+    await get().refresh();
+    // the group's parent is the notebook itself — open the notebook so the
+    // new group is visible at once (the addSection reveal convention)
+    set((s) => ({
+      expanded: new Set([...s.expanded, notebookId, group.id]),
+    }));
   },
   moveSection: async (id, dir) => {
     await db.moveSection(id, dir);

@@ -11,9 +11,13 @@
  *
  * Targets inside the moved subtree are disabled (a section can never
  * nest inside itself — canReparent), and so is the section's current
- * home (already there — nothing to move).
+ * home (already there — nothing to move). Section groups (issue #337)
+ * appear as nest targets with their folder glyph; a GROUP mover has its
+ * plain-section targets disabled (a group never nests under a plain
+ * section — the Graph OneNote model), while any section may nest under
+ * a group.
  */
-import { FolderInput, NotebookPen } from "lucide-react";
+import { FolderClosed, FolderInput, NotebookPen } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { canReparent } from "@/lib/section-tree";
+import { isSectionGroup } from "@/lib/section-groups";
 import { byOrder, type Notebook, type Section } from "@/lib/types";
 
 export function MoveSectionDialog({
@@ -108,7 +113,11 @@ export function MoveSectionDialog({
                             className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-accent focus-visible:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                             onClick={() => onMove(sec.notebookId, sec.id)}
                           >
-                            <FolderInput className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            {isSectionGroup(sec) ? (
+                              <FolderClosed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <FolderInput className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            )}
                             <span className="min-w-0 flex-1 truncate">{sec.name}</span>
                           </button>
                         );
