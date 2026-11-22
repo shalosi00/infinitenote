@@ -51,6 +51,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.19.0" date="2026-11-22">
+      <description>
+        <p>Sections move (sub-sections phase 2): drag a section onto another
+        to nest it or onto a notebook for a cross-notebook top-level move,
+        with a Move-to dialog as the keyboard path; invalid targets never
+        accept. Ink to shape arrives (OneNote's Ink to Shape): drawn shapes
+        become perfect geometry in one undo step, while strokes that do not
+        look like a shape stay ink.</p>
+      </description>
+    </release>
     <release version="1.18.0" date="2026-11-22">
       <description>
         <p>Sub-sections arrive (OneNote's section groups / Joplin's
