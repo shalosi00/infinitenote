@@ -43,6 +43,101 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-22 — Section moves: sub-sections phase 2 + the v1.18.0 follow-through chores, wave 18 (#325/#326, #324, #327)
+
+- **Task**: wave 18 — the ninth product-parity wave and the ROADMAP v1.19
+  candidate the wave-16 phase-2 list named ("drag-to-reparent,
+  cross-notebook section moves"). Evidence pass (2026-11-22): OneNote
+  ships BOTH paths — drag-and-drop of section tabs between notebooks /
+  into section groups plus the right-click → "Move or Copy" dialog
+  (support.microsoft.com, "Move or copy notes between notebooks and
+  sections") — while Joplin's "Sub-notebooks" help is drag-only ("to
+  create a subnotebook, drag and drop it onto another notebook") and its
+  community keeps asking for the dialog alternative ("We need better
+  ways to move notebooks", discourse.joplinapp.org, 2024). Ours ships
+  both; the dialog is the keyboard/touch path an Android-first product
+  needs. Shipped this cycle, closing #325 into the v1.19.0 milestone.
+- **Design**: `moveSectionTo(id, targetNotebookId, targetParentId)` →
+  "moved" | "noop" | "invalid" — the moved root gets `{notebookId,
+  parentId, order}` appended to the END of the target sibling scope (the
+  movePagesToSection convention), descendants keep their structure and
+  follow the root's notebookId (trashed descendants included, their
+  deletedAt stamps untouched — the subtree stays restorable in its new
+  notebook), pages need ZERO writes (they carry only sectionId); every
+  invalid target (trashed source/targets, dangling parents, a parent in
+  a different notebook than the declared target, self/descendant
+  parents) is rejected with zero writes, and drop-on-own-parent is a
+  zero-write noop. `canReparent` in section-tree.ts (cycle-safe, the
+  SB-P5/P7 visitor-set pattern). Sidebar rows became draggable AND
+  droppable via **@dnd-kit/core — a declared dependency since the
+  scaffold that had NEVER been imported** (no package.json change).
+  "Move to…" dialog mirrors the drag (the OneNote "Move or Copy" flow);
+  the store action expands the new ancestor chain and selection is
+  id-stable (ids never change on a move — open pages keep working).
+- **Lessons (all measured this cycle)**:
+  - **A stateful `describe.serial` group is NOT an atomic scheduling
+    unit under `fullyParallel` with multiple workers + retries.** The
+    first CI run failed SM-N05 twice, deterministically, while the same
+    spec passed twice locally (dev server AND the production standalone
+    build). The log shows the smoking gun: the four PASSING siblings
+    re-ran as "(retry #1)" — the scheduler re-dispatches serial-group
+    members, `beforeAll` re-runs on the new worker, and the reload test
+    then legitimately sees a freshly re-seeded context (the received
+    sidebar text was the pristine seed, byte for byte). Fix: every test
+    now resets to the seed and performs its own moves, per-test pages
+    replace the shared beforeAll page — and 5/5 green twice against the
+    production build, then 4/4 required checks on CI. Stateful-serial
+    specs are now a known anti-pattern in this suite.
+  - **dnd-kit's full `attributes` spread would have broken every
+    existing `getByRole` locator**: it gives the row div
+    `role="button"` whose accessible name is ALL its text (chevron +
+    name + children). Listeners only; the dialog is the keyboard path.
+    The 6px PointerSensor activation distance keeps clicks,
+    double-click renames and menu opens from turning into drags.
+  - **Playwright's raw mouse steps drive dnd-kit deterministically**:
+    move to the source, down, +14px (past the activation constraint),
+    then to the target in 14 steps — and the REAL pointerWithin
+    pipeline is assertable mid-drag via the `data-drop-active`
+    attribute (SM-N03 highlights the target BEFORE the drop lands;
+    SM-N04 proves the cycle guard by the attribute's ABSENCE).
+  - **`git rm --cached` aborts atomically**: one missing pathspec (a
+    log file a restore had wiped) silently shipped nothing and the
+    first cleanup amend removed nothing — the diff-stat caught the
+    stray helper scripts before the PR opened.
+  - The e2e Playwright browser cache wiped itself again mid-cycle
+    (chromium 1200 → 1255); `bunx playwright install chromium` fixes it.
+  - **FA-E15 flaked a third time** (on #327's byte-identical-tree run —
+    hardening #317 narrowed but did not eliminate it): the #264
+    precedent applies — re-run only the e2e job, green after.
+- **PR #326** (squash `e443cea` on head `bb8b1f4`, 4/4 required checks
+  green — the first head `4906880` red'd on SM-N05 above and was
+  replaced by the self-contained rewrite): 14 new unit tests
+  (SM-P1..P14 — pure policy + Dexie move primitive + sync whole-row LWW
+  + backup round-trip), 5 new E2E checks (SM-N01..N05), counts swept
+  across PROJECT_STATUS/README/copilot/ROADMAP and
+  docs/test-plans/sub-sections.md (full phase-2 section). #325 closed.
+- **Also this cycle** (the v1.18.0 release-train follow-through the
+  release sweep left behind): **#324** — the flatpak extra-data re-pin
+  to the real v1.18.0 AppImage (the #313/#293 precedent; the computed
+  sha256 d944a458… matches the release API's asset digest
+  byte-for-byte), and **#327** — main's tip recorded as a develop
+  ancestor via the #291/#311 `-s ours` MERGE `0936e9d` (skipped in the
+  v1.18.0 release train; without it the next develop-to-main rotation
+  has nothing to compare and strict up-to-date blocks — verified:
+  `git merge-base --is-ancestor origin/main origin/develop` now true,
+  trees byte-identical).
+- **Gate**: 1268 unit / 91 files, 0 fail (base 37f7ff9: 1254/90 — +14
+  SM-P pins); 242 e2e / 50 files (`playwright --list`); new spec
+  SM-N01..N05 5/5 (twice against the production standalone build);
+  neighbors sub-sections + multiselect + crud + section-colors +
+  search-trash 19/19 (the sidebar-heavy surfaces, verified locally on
+  the branch).
+- **Next**: the v1.19.0 milestone keeps #193 (real-GPU HWR benchmark,
+  hardware-blocked, carried forward — the v1.15.0→v1.18.0 precedent)
+  plus the sub-sections phase-3 candidates ("section groups" as a
+  separate row type) and further product-parity candidates from fresh
+  majors evidence passes (evidence-first, wave by wave).
+
 ## 2026-11-22 — Section colors: OneNote "Section Color" parity + the v1.18.0 release train, wave 17 (#319/#320, release #322)
 
 - **Task**: wave 17 — the eighth product-parity wave, per the wave-16
