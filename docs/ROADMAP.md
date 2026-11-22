@@ -194,7 +194,7 @@ milestones/issues. This file is the plan; the status file is the reality.
       table; local-only by design, included in backups)
       (docs/test-plans/page-templates.md)
 
-## v1.18 — Section depth (current)
+## v1.18 — Section depth (shipped in v1.18.0)
 
 - [x] Sub-sections (issue #314): OneNote "New Section Group" / Joplin
       sub-notebooks parity — a section can contain child sections; any
@@ -216,8 +216,39 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
+## v1.19 — Parity continues (current)
+
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0/v1.16.0/v1.17.0)
+      real GPU hardware (carried forward from v1.15.0 through v1.18.0)
+- [x] Sub-sections phase 2: drag-to-reparent and cross-notebook section
+      moves (issue #325, shipped 2026-11-22): moveSectionTo rewrites the
+      moved root {notebookId, parentId, order} plus the subtree's
+      notebookId, pages follow their sectionId (zero page writes); the
+      drag gesture (@dnd-kit, listeners-only rows) and the section menu's
+      "Move to…" dialog — the OneNote "Move or Copy" path and the
+      keyboard/touch path Joplin lacks — share the store action; invalid
+      targets never highlight and never accept; the new home auto-expands
+      (docs/test-plans/sub-sections.md, phase-2 section)
+- [x] Ink to shape (issue #329, shipped 2026-11-22): OneNote "Ink to Shape"
+      parity — selected freedraw strokes that classify as a shape are
+      replaced by the perfect geometry (line / ellipse / rectangle /
+      diamond / closed-line triangle) in ONE undo-able scene update while
+      unrecognizable strokes stay ink with a guidance toast; the fitted
+      shapes inherit each stroke's own style; the integrity guards of BOTH
+      conversions (handwriting text + ink shapes) now heal only on their
+      own scene via the shared shouldHealConversion
+      (docs/test-plans/ink-shapes.md)
+- [x] Ink to shape (issue #329, shipped 2026-11-22): OneNote "Ink to Shape"
+      parity — selected freedraw strokes that classify as a shape are
+      replaced by the perfect geometry (line / ellipse / rectangle /
+      diamond / closed-line triangle) in ONE undo-able scene update while
+      unrecognizable strokes stay ink with a guidance toast; the fitted
+      shapes inherit each stroke's own style; the integrity guards of BOTH
+      conversions (handwriting text + ink shapes) now heal only on their
+      own scene via the shared shouldHealConversion
+      (docs/test-plans/ink-shapes.md)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
 
 ## v1.17 — Internal page links & in-page find (shipped in v1.17.0)
 

@@ -84,6 +84,24 @@ export function ancestorSectionIds(
 }
 
 /**
+ * Whether `sectionId` may be re-parented under `targetParentId` (phase 2,
+ * issue #325 — drag-to-reparent + cross-notebook moves). A section can
+ * never become its own descendant: the target must not be the section
+ * itself nor anything inside its subtree. Cycle-safe — the check runs on
+ * subtreeSectionIds' visitor set, so a corrupted `parentId` loop cannot
+ * hang a drag. Notebook-level targets (top-level moves) carry no parent
+ * id and are validated by the data layer instead.
+ */
+export function canReparent(
+  sections: readonly Section[],
+  sectionId: string,
+  targetParentId: string
+): boolean {
+  if (sectionId === targetParentId) return false;
+  return !subtreeSectionIds(sections, sectionId).includes(targetParentId);
+}
+
+/**
  * Stable sibling-order key for whole-row normalization (sync merge):
  * sections of different parents never share a group, so renumbering one
  * parent's siblings cannot touch another parent's.

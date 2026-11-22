@@ -9,6 +9,7 @@
 import type { ScenePayload } from "./types";
 import { isAudioFile } from "./audio-notes";
 import type { HwrConvertOutcome } from "./hwr-convert";
+import type { InkShapesOutcome } from "./ink-shapes";
 import type { PageFindMatch } from "./page-find";
 
 /** Imperative surface the canvas exposes to the rest of the app. */
@@ -53,6 +54,13 @@ export interface CanvasApi {
    * counts the completion toast needs.
    */
   convertHandwriting: () => HwrConvertOutcome;
+  /**
+   * Ink to shape (issue #329, OneNote "Ink to Shape" parity): selected
+   * freedraw strokes that classify as a shape are replaced by the perfect
+   * geometry (strokes that do not classify stay ink). Returns the counts
+   * the completion toast needs.
+   */
+  convertInkShapes: () => InkShapesOutcome;
   /**
    * Insert an internal page link as a linked, editable text element
    * (OneNote "Copy Link to Page" parity): clicking it opens the target

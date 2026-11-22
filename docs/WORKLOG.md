@@ -43,6 +43,275 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-22 — Ink to shape: OneNote "Ink to Shape" parity, wave 19 (#329/#330)
+
+- **Task**: wave 19 — the tenth product-parity wave, per the wave-18
+  entry's pointer ("further product-parity candidates from fresh majors
+  evidence passes — evidence-first, wave by wave"; the sub-sections
+  phase-3 "section groups" row type stays a named future wave). Evidence
+  pass (2026-11-22): OneNote's help — "Draw a shape on the page. From the
+  Shapes gallery on the ribbon select Ink to Shape" (support.microsoft.com,
+  "Convert your Ink to Shapes and Math Equations") plus Draw-and-Hold and
+  the iPad "Ink to shape tool" — while Joplin has NO native inking (its
+  only drawing path is the third-party beta js-draw plugin, no shape
+  recognition — joplinapp.org/plugins) and AppFlowy's freehand board is
+  still an open feature request (AppFlowy-IO/AppFlowy#2091, 2023). Ours
+  runs Excalidraw freedraw ink on every page — the one majors gap left in
+  the drawing surface. Shipped this cycle, closing #329 into the v1.19.0
+  milestone.
+- **Design**: pure classifier `src/lib/ink-shapes.ts` (no DOM /
+  @excalidraw imports — the shape-library/hwr-convert contract): open
+  strokes → line (chord deviation ≤ max(6 px, 7%)); closed strokes →
+  circle via Kasa least-squares fit (radial error ≤ 16% of r, fit sanity
+  r ≤ 4× bbox diagonal) → axis-aligned bbox-ellipse fallback (≤ 25%) →
+  corner analysis (RDP + near-straight-vertex pruning so a square drawn
+  starting mid-edge still yields exactly 4 corners) → rectangle /
+  diamond (a 45°-rotated square IS a diamond) / triangle (closed 3-corner
+  line loop — Excalidraw has no triangle primitive). Every threshold an
+  exported constant; honest v1 misses documented (rotated rectangles and
+  ellipses, arrows, multi-stroke grouping stay ink — a four-stroke
+  rectangle degrades into four perfect lines). Selection-scoped ONLY
+  (conversion REPLACES ink — no page-wide mode by design); the runtime
+  replacement lands as ONE updateScene = one Ctrl+Z restores the ink; the
+  shapes inherit each stroke's own color/width/roughness; deselect-on-
+  purpose (#231); structural idempotency (no customData — the measured
+  HWR-E06 hazard). Test plan docs/test-plans/ink-shapes.md; committed
+  E2E fixture with deterministic LCG noise.
+- **Lessons (all measured this cycle)**:
+  - **A tombstone without a version bump breaks the store/history
+    resurrection.** The replacement tombstoned strokes via
+    `{...el, isDeleted: true}` WITHOUT bumping `version` — the probe
+    showed undo removing the shapes but KEEPING the strokes deleted
+    (freedraw 1 → {}): the history reconciles by element version and a
+    same-version tombstone reads as "no change". The tombstone now bumps
+    version + a fresh nonce exactly like Excalidraw's own mutateElement;
+    probe after: one undo → freedraw 4 (the ink fully restored).
+  - **The ~1.5 s integrity heal must stay on its own scene.** The guard
+    reads whatever scene the api hosts THEN — a page switch inside the
+    window had the hwr-convert heal re-apply (or log "re-apply found
+    nothing to convert") on a foreign page, caught live twice by HWR-E04's
+    afterAll error-catcher while validating neighbors on this branch. New
+    pure `shouldHealConversion` (hwr-convert.ts, IS-P21/P22) is shared by
+    BOTH conversion guards: heal only while an original ink stroke is
+    still ALIVE in the hosted scene.
+  - The e2e Playwright browser cache wiped itself again (chromium
+    headless-shell 1255 missing); `bunx playwright install chromium`.
+  - README's Roadmap paragraph was stale at v1.12-era text ("next up:
+    ink-to-text Phase B") — missed by the wave-16/17/18 sweeps because
+    they grep-anchored the badge/commands only; the prose is now read in
+    full on every sweep (swept this cycle).
+- **PR #330** (squash `ae06a3b` on head `aee0041`, 4/4 required checks
+  green): 24 new unit tests (IS-P1..P22 + the b-variants, incl. the two
+  guard-hardening pins), 5 new E2E checks (IS-N01..N05), counts swept
+  across PROJECT_STATUS/README/copilot/ROADMAP and
+  docs/test-plans/ink-shapes.md (new). #329 closed.
+- **Gate**: 1292 unit / 92 files, 0 fail (base 2f82603: 1268/91 — +24
+  IS-P pins); 247 e2e / 51 files (`playwright --list`); new spec
+  IS-N01..N05 5/5 twice (fitted bounds on the real conversion, live
+  mouse-drawn circle, one-undo + reload persistence, guidance toasts);
+  neighbors handwriting 7/7 (green after the guard hardening) +
+  handwriting-undo + shape-library 17/17.
+- **Next**: the v1.19.0 milestone is now done except hardware-blocked
+  #193 (real-GPU HWR benchmark, carried forward — the v1.15.0→v1.18.0
+  precedent) → the release train closes v1.19.0; the next milestone opens
+  with the sub-sections phase-3 candidates ("section groups" as a
+  separate row type) and further product-parity candidates from fresh
+  majors evidence passes (evidence-first, wave by wave).
+
+## 2026-11-22 — Section moves: sub-sections phase 2 + the v1.18.0 follow-through chores, wave 18 (#325/#326, #324, #327)
+
+- **Task**: wave 18 — the ninth product-parity wave and the ROADMAP v1.19
+  candidate the wave-16 phase-2 list named ("drag-to-reparent,
+  cross-notebook section moves"). Evidence pass (2026-11-22): OneNote
+  ships BOTH paths — drag-and-drop of section tabs between notebooks /
+  into section groups plus the right-click → "Move or Copy" dialog
+  (support.microsoft.com, "Move or copy notes between notebooks and
+  sections") — while Joplin's "Sub-notebooks" help is drag-only ("to
+  create a subnotebook, drag and drop it onto another notebook") and its
+  community keeps asking for the dialog alternative ("We need better
+  ways to move notebooks", discourse.joplinapp.org, 2024). Ours ships
+  both; the dialog is the keyboard/touch path an Android-first product
+  needs. Shipped this cycle, closing #325 into the v1.19.0 milestone.
+- **Design**: `moveSectionTo(id, targetNotebookId, targetParentId)` →
+  "moved" | "noop" | "invalid" — the moved root gets `{notebookId,
+  parentId, order}` appended to the END of the target sibling scope (the
+  movePagesToSection convention), descendants keep their structure and
+  follow the root's notebookId (trashed descendants included, their
+  deletedAt stamps untouched — the subtree stays restorable in its new
+  notebook), pages need ZERO writes (they carry only sectionId); every
+  invalid target (trashed source/targets, dangling parents, a parent in
+  a different notebook than the declared target, self/descendant
+  parents) is rejected with zero writes, and drop-on-own-parent is a
+  zero-write noop. `canReparent` in section-tree.ts (cycle-safe, the
+  SB-P5/P7 visitor-set pattern). Sidebar rows became draggable AND
+  droppable via **@dnd-kit/core — a declared dependency since the
+  scaffold that had NEVER been imported** (no package.json change).
+  "Move to…" dialog mirrors the drag (the OneNote "Move or Copy" flow);
+  the store action expands the new ancestor chain and selection is
+  id-stable (ids never change on a move — open pages keep working).
+- **Lessons (all measured this cycle)**:
+  - **A stateful `describe.serial` group is NOT an atomic scheduling
+    unit under `fullyParallel` with multiple workers + retries.** The
+    first CI run failed SM-N05 twice, deterministically, while the same
+    spec passed twice locally (dev server AND the production standalone
+    build). The log shows the smoking gun: the four PASSING siblings
+    re-ran as "(retry #1)" — the scheduler re-dispatches serial-group
+    members, `beforeAll` re-runs on the new worker, and the reload test
+    then legitimately sees a freshly re-seeded context (the received
+    sidebar text was the pristine seed, byte for byte). Fix: every test
+    now resets to the seed and performs its own moves, per-test pages
+    replace the shared beforeAll page — and 5/5 green twice against the
+    production build, then 4/4 required checks on CI. Stateful-serial
+    specs are now a known anti-pattern in this suite.
+  - **dnd-kit's full `attributes` spread would have broken every
+    existing `getByRole` locator**: it gives the row div
+    `role="button"` whose accessible name is ALL its text (chevron +
+    name + children). Listeners only; the dialog is the keyboard path.
+    The 6px PointerSensor activation distance keeps clicks,
+    double-click renames and menu opens from turning into drags.
+  - **Playwright's raw mouse steps drive dnd-kit deterministically**:
+    move to the source, down, +14px (past the activation constraint),
+    then to the target in 14 steps — and the REAL pointerWithin
+    pipeline is assertable mid-drag via the `data-drop-active`
+    attribute (SM-N03 highlights the target BEFORE the drop lands;
+    SM-N04 proves the cycle guard by the attribute's ABSENCE).
+  - **`git rm --cached` aborts atomically**: one missing pathspec (a
+    log file a restore had wiped) silently shipped nothing and the
+    first cleanup amend removed nothing — the diff-stat caught the
+    stray helper scripts before the PR opened.
+  - The e2e Playwright browser cache wiped itself again mid-cycle
+    (chromium 1200 → 1255); `bunx playwright install chromium` fixes it.
+  - **FA-E15 flaked a third time** (on #327's byte-identical-tree run —
+    hardening #317 narrowed but did not eliminate it): the #264
+    precedent applies — re-run only the e2e job, green after.
+- **PR #326** (squash `e443cea` on head `bb8b1f4`, 4/4 required checks
+  green — the first head `4906880` red'd on SM-N05 above and was
+  replaced by the self-contained rewrite): 14 new unit tests
+  (SM-P1..P14 — pure policy + Dexie move primitive + sync whole-row LWW
+  + backup round-trip), 5 new E2E checks (SM-N01..N05), counts swept
+  across PROJECT_STATUS/README/copilot/ROADMAP and
+  docs/test-plans/sub-sections.md (full phase-2 section). #325 closed.
+- **Also this cycle** (the v1.18.0 release-train follow-through the
+  release sweep left behind): **#324** — the flatpak extra-data re-pin
+  to the real v1.18.0 AppImage (the #313/#293 precedent; the computed
+  sha256 d944a458… matches the release API's asset digest
+  byte-for-byte), and **#327** — main's tip recorded as a develop
+  ancestor via the #291/#311 `-s ours` MERGE `0936e9d` (skipped in the
+  v1.18.0 release train; without it the next develop-to-main rotation
+  has nothing to compare and strict up-to-date blocks — verified:
+  `git merge-base --is-ancestor origin/main origin/develop` now true,
+  trees byte-identical).
+- **Gate**: 1268 unit / 91 files, 0 fail (base 37f7ff9: 1254/90 — +14
+  SM-P pins); 242 e2e / 50 files (`playwright --list`); new spec
+  SM-N01..N05 5/5 (twice against the production standalone build);
+  neighbors sub-sections + multiselect + crud + section-colors +
+  search-trash 19/19 (the sidebar-heavy surfaces, verified locally on
+  the branch).
+- **Next**: the v1.19.0 milestone keeps #193 (real-GPU HWR benchmark,
+  hardware-blocked, carried forward — the v1.15.0→v1.18.0 precedent)
+  plus the sub-sections phase-3 candidates ("section groups" as a
+  separate row type) and further product-parity candidates from fresh
+  majors evidence passes (evidence-first, wave by wave).
+
+## 2026-11-22 — Section colors: OneNote "Section Color" parity + the v1.18.0 release train, wave 17 (#319/#320, release #322)
+
+- **Task**: wave 17 — the eighth product-parity wave, per the wave-16
+  entry's pointer ("the next cycle either files + ships another parity
+  candidate from a fresh majors evidence pass into v1.18.0 (then the
+  release train closes it)"). Evidence pass (2026-11-21): OneNote's help —
+  "To change the color of an entire section, right-click the tab at the
+  top of the page and choose Section Color" (support.microsoft.com) and
+  the Mac variant ("Control-click the tab … point to Section Color") —
+  while Joplin still has NO native sidebar colors (two open feature
+  requests since 2021, discourse.joplinapp.org #14925/#20673, asking
+  exactly for inheritance: "Ideally you could set a color for each
+  notebook name and all it's children would inherit that color") and
+  AppFlowy colorizes text/blocks only, never sidebar rows. Ours: colored
+  notebooks above monochrome folder icons. Shipped this cycle, closing
+  #319 into the v1.18.0 milestone; the release train then CLOSED v1.18.0
+  (see below).
+- **Design**: pure `src/lib/section-colors.ts` (the tags.ts/section-tree
+  pattern): `safeSectionColor` (external input → valid palette name or
+  null — off-palette/hand-edited values read as inherit, never a crash),
+  `effectiveSectionColor` (own override wins, `color ?? null` = inherit
+  the notebook's — Joplin's requested semantics), `sectionColorHex`.
+  `Section.color?: NotebookColor | null` is additive and NOT indexed (the
+  parentId wave-16 precedent — no Dexie version bump, old rows, old sync
+  folders and old callers stay valid). `setSectionColor` = update +
+  updatedAt. Sync carries the whole row (`ManifestSection = Omit<Section,
+  "deletedAt">`) and tree rows merge whole-row LWW — zero merge logic.
+  `restoreBackup` normalizes archive colors through `safeSectionColor`
+  (the safeTags contract). Sidebar: the section row's folder icon becomes
+  the colored swatch (the notebook row's exact pattern) so the whole tree
+  color-codes like OneNote's tabs, including the wave-16 sub-section
+  recursion; the section menu gains a Color submenu (the shared 8-color
+  palette, current selection ringed) plus "Use notebook color" reset.
+- **Lessons (all measured this cycle)**:
+  - **`restoreBackup` imports as NEW records WITHOUT wiping** — every
+    backup round-trip test that kept its setup rows (SB-P15 since wave 16,
+    this wave's SC-P9/SC-P9b) left find-by-name asserts a ~50% coin flip
+    between the setup and the restored generation: 5/8 red in full-suite
+    loops while single-file runs were always green (21/21). The first CI
+    run on #320's original head red'd lint-typecheck-test on exactly
+    SC-P9. Fix (test-side, zero production code): `eraseAllData()`
+    between `buildBackup` and `restoreBackup` — the real-world
+    import-into-empty-library flow; 10/10 green after. A green PR gate is
+    NOT a flake-rate certificate: loop the full suite before claiming
+    stability.
+  - **A modal Radix menu aria-hides the app root**: after clicking a
+    swatch inside the Color submenu, `getByRole` finds NOTHING outside
+    the menu ("element(s) not found" until closed) — closeMenus()
+    (Escape ×2, then `expect(page.locator('[role="menu"]')).toHaveCount(0)`)
+    must run BEFORE role-based assertions.
+  - **Playwright name matching is case-insensitive substring** (the
+    wave-16 lesson, re-learned the hard way): the menuitem "Color"
+    matched "Use notebook color" too — `exact: true` everywhere.
+  - The welcome seed ships "My Notebook" COLLAPSED — its section rows
+    (and swatches) exist only after expanding the notebook.
+- **PR #320** (squash `825e7bd` on head `bfb886d`, 4/4 required checks
+  green — the first head `cdf3476` red'd on the SC-P9 coin flip above and
+  was replaced by the hardened push): 11 new unit tests (SC-P1..P9b —
+  pure policy + Dexie set/clear + sync manifest + whole-row LWW + backup
+  round-trips), 4 new E2E checks (SC-N01..N04 — override/re-render,
+  reset-to-inheritance, reload survival past the ~1.5 s boot drop window,
+  sub-section inherits the NOTEBOOK color never the parent's override),
+  1 pre-existing pin hardened (SB-P15). #319 closed.
+- **Gate**: 1254 unit / 90 files, 0 fail (base `44fb066`: 1243/89 — +11
+  SC-P pins); 237 e2e / 49 files (`playwright --list`); new spec
+  SC-N01..N04 4/4; neighbors sub-sections + multiselect + tags + crud +
+  search-trash 19/19 (the sidebar-heavy surfaces). Counts swept: README
+  badge + commands table, .github/copilot-instructions.md, PROJECT_STATUS
+  (in #320), docs/ROADMAP (in #320).
+- **v1.18.0 release train executed** (per docs/PIPELINE.md "Releases"):
+  release-prep #321 (version files to 1.18.0 / versionCode 280 across
+  package.json, tauri.conf.json, Cargo.toml, the gradle kts + bubblewrap
+  manifest; fdroid Builds entry 1.18.0/280/v1.18.0; flatpak metainfo
+  1.18.0 release entry — squash `53e22ef`, 4/4 checks), release PR #322
+  develop→main as MERGE commit `16c56f0` (4/4 checks), tag v1.18.0 pushed
+  on the merge sha, GitHub Release with hand-measured notes under the
+  wave-9 convention (the wave-6 workflow verified the tagged commit and
+  preserved the hand-written notes), milestones rotated (v1.18.0 #19
+  closed with #314+#319, v1.19.0 #20 opened with hardware-blocked #193
+  moved forward — the v1.15.0/v1.16.0/v1.17.0 precedent). The AppImage
+  extra-data checksum re-pin follows via scripts/flatpak-extradata.mjs
+  once the tag's desktop.yml artifact exists (the #293 precedent).
+- **CI e2e flake evidence (the wave-16 class, recurrence)**: the
+  docs-only sweep PR's first e2e run red'd FA-E15 + TB-E01 — the SAME
+  pair wave 16 documented, on a tree byte-identical (except docs) to the
+  three heads that passed e2e earlier the same day (#320 `bfb886d`,
+  #321 `ee26ba8`, #322 `53e22ef` — all 4/4). FA-E15's 14-press bound was
+  STILL not enough in that environment (all 5 chips intact after 14
+  presses); TB-E01's insert button sat "not stable" for the full 20 s
+  click window. The rerun-failed-jobs re-run went green (10 min). The
+  bound-raise is NOT a stable fix — a future cycle should make FA-E15
+  measure the undo-stack depth it actually needs (or reset the stack
+  between attach entries) instead of guessing an environment-dependent
+  press budget.
+- **Next cycle**: v1.19.0 (#20) — sub-sections phase 2 (drag-to-reparent,
+  cross-notebook section moves, the wave-16 phase-2 candidates) or the
+  next product-parity candidate from a fresh majors evidence pass; #193
+  stays hardware-blocked and moves forward at each release.
+
 ## 2026-11-21 — Sub-sections: OneNote "New Section Group" / Joplin sub-notebooks parity, wave 16 (#314)
 
 - **Task**: wave 16 — the seventh product-parity wave, per the wave-15
