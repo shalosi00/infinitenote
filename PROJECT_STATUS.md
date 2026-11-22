@@ -6,6 +6,7 @@
 
 | | |
 |---|---|
+| **Last updated** | 2026-11-23 (section groups — OneNote "Section Groups" parity, issue #337, sub-sections phase 3, wave 20 of the product-parity direction and the phase-3 candidate the wave-18/wave-19 pointers and the Next-up list named: a SECTION GROUP is now a separate row type — a notebook container that keeps related sections together and holds NO pages of its own. Evidence pass (2026-11-23): OneNote's help "A bit like folders on a hard drive, section groups keep related sections together. A section group can hold as many sections as you want, along with all their pages", creation = right-click any section tab → "New Section Group", the group landing as a peer of the section tabs (support.microsoft.com "Create a section group in OneNote"); the Microsoft Graph OneNote model nests groups under groups (sectionGroup carries parentSectionGroup + a nested sectionGroups collection) while sections never contain groups; Joplin has no group type at all — only desktop drag-only sub-notebooks (joplinapp.org/help/apps/subnotebooks). Design: Section.kind?: "group" | null — additive, NOT indexed, no Dexie version bump (the parentId #314 / color #319 precedent), `kind ?? null` the canonical read, plain sections carry NO kind field so old rows and old sync folders stay byte-stable; pure policy src/lib/section-groups.ts (isSectionGroup, normalizeSectionKind — a hand-edited "folder" or wrong type degrades to a plain section, the safeTags/safeSectionColor contract); placement: a group's parents are the notebook top level and other groups, a group NEVER nests under a plain section — enforced in canReparent (drag) AND moveSectionTo (write layer, zero-write "invalid"); anything may nest UNDER a group; groups hold no pages — no New page / templates / color menu on group rows, the expanded body's tail button is "Add section", the bulk-move dialog omits groups and movePagesToSection answers 0 with zero writes; notebook menu + section menu gain "New section group" (the OneNote-documented path lands it at the notebook top level, appended to the end of the sibling scope, generated name "Section group N", the notebook auto-expands); group rows render the folder glyph (FolderClosed/FolderOpen — OneNote: "a bit like folders on a hard drive") instead of the color swatch; trash/restore/purge untouched (the #314 subtree machinery covers group subtrees); sync/backup zero merge logic — whole-row LWW carries kind (SG-P15/P16), restoreBackup normalizes via normalizeSectionKind so hand-edited archive kinds restore as plain sections; openFirstPage skips groups (the first page-carrying top-level row wins). Gate: 1310 unit / 93 files, 0 fail (base fa867eb: 1292/92 — +18 SG-P pins); 252 e2e / 52 files (`playwright --list`); new spec SG-N01..N05 5/5 — incl. the mid-drag data-drop-active assert on the REAL dnd-kit pipeline, the reload persistence and the subtree trash/restore round-trip; neighbors sub-sections + section-move + section-colors + multiselect + crud + search-trash 24/24 (the sidebar-heavy surfaces, verified locally on the branch). Shipped with PR #338. Counts swept: PROJECT_STATUS (new Last-updated row, Overall state, Totals, In flight, Next up, what-works row, section-groups repo-map row, e2e row, commands cheat-sheet — stale since wave 16 at 1243/233), README badge + commands table + Roadmap paragraph, .github/copilot-instructions.md (its e2e line was stale at the wave-18 counts — the wave-19 read-the-prose-in-full lesson applied again), docs/ROADMAP (v1.20 gains the checked section-groups item), docs/test-plans/section-groups.md (new)) |
 | **Last updated** | 2026-11-22 (flatpak extra-data re-pin to the real v1.19.0 AppImage — the #313/#293/#324 precedent: scripts/flatpak-extradata.mjs computed sha256 43100d4b09661baf1dd2eb718847558b188660dbb532e37d85a6ca03c1b97cbd over the downloaded 152,939,000-byte asset, matching the release API's asset digest byte-for-byte; the manifest packaging/flatpak/com.infinitenote.app.json now carries the real v1.19.0 url + sha256 + size; In-flight row → DONE) |
 | **Last updated** | 2026-11-22 (v1.19.0 released — the release train executed per docs/PIPELINE.md "Releases": release prep #333 (version files to 1.19.0 / versionCode 290), release PR #334 develop-to-main as MERGE commit `821928e`, tag v1.19.0 + GitHub Release with hand-written notes under the wave-9 convention (the wave-6 Release workflow verified the tagged commit and preserved the hand-written notes), milestones rotated (v1.19.0 milestone #20 closed, v1.20.0 #21 opened with hardware-blocked #193 moved forward — the v1.15.0-through-v1.19.0 precedent); the flatpak extra-data re-pin to the real v1.19.0 AppImage follows via scripts/flatpak-extradata.mjs once the tag's artifacts exist (the #313/#293/#324 precedent); counts re-measured on the release tip: 1292 unit / 92 files, 247 e2e / 51 files) |
 | **Last updated** | 2026-11-22 (release prep for v1.19.0 — version files bumped to 1.19.0 / versionCode 290 across package.json, tauri.conf.json, Cargo.toml and the bubblewrap TWA manifest; fdroid Builds entry added (1.19.0/290/v1.19.0); flatpak metainfo 1.19.0 release entry (the AppImage extra-data checksum re-pin follows the release via scripts/flatpak-extradata.mjs once the tag's artifacts exist); Current version row → v1.19.0 release-in-flight; the wave-19 counts are already measured and swept on develop `ae06a3b`: 1292 unit / 92 files, 247 e2e / 51 files) |
@@ -44,7 +45,7 @@
 
 | **Phase** | v1.15.0 released (2026-11-18, first live exercise of the wave-6 Release workflow); v1.16.0 released (2026-11-20 — tables #277, file attachments #278, page templates #279); v1.17.0 released (2026-11-21 — internal page links #295, in-page find #301, checklists #302: waves 13-15 of the product-parity direction, plus the e2e flake hardening #309); v1.18.0 released (2026-11-22 — sub-sections #314, section colors #319: waves 16-17); v1.19.0 milestone (#20) open with hardware-blocked #193 carried forward; majors-research waves 1-18 landed (18 = section moves, #325) |
 
-| **Overall state** | 2026-11-22: 1292 unit (92 files) + the 247-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
+| **Overall state** | 2026-11-23: 1310 unit (93 files) + the 252-check E2E suite green, and **four required checks** per PR since 2026-11-18 (lint-typecheck-test + build-smoke + e2e + the promoted size-report; title check + path labeler + unit-coverage report stay non-required/informational); bun audit at 1 documented moderate (upstream-blocked minimatch@10.2.6 — see docs/SECURITY_AUDIT_2026-11-15.md); required checks + CodeQL (0 open alerts) + secret scanning + push protection + Dependabot security updates all on; CI failures on same-repo PRs post an informational summary comment (Joplin's practice, wave 5); `v*` tag pushes are CI-verified with the full build-smoke recipe and the release object is guaranteed to exist with at least auto-generated notes (AppFlowy's practice, wave 6); known issues: 0 |
 
 ## TL;DR
 
@@ -106,6 +107,7 @@ Notes pages.
 | Page tags: add/remove in header, sidebar chips, tag filter view, search | Working | 14 unit tests + 4 E2E checks |
 | Section colors (OneNote "Section Color" parity): per-section override + notebook inheritance, 8-color palette + reset in the section menu, sync/backup-safe | Working | 11 unit tests + 4 E2E checks (section-colors) |
 | Section moves (sub-sections phase 2): drag a section onto another to nest it or onto a notebook for a cross-notebook top-level move; "Move to…" dialog as the keyboard/touch path; whole-subtree moves (pages follow with zero writes, color overrides survive); invalid targets never highlight or accept; id-stable selection | Working | 14 unit tests + 5 E2E checks (section-move) |
+| Section groups (sub-sections phase 3, OneNote "Section Groups" parity): "New section group" on the notebook + section menus lands a folder-glyph group at the notebook top level; groups hold sections, never pages (no page/template/color menu, "Add section" tail button, bulk-move omits them, movePagesToSection rejects them); a group nests only under the top level or another group — the drag and the dialog both enforce it; subtree trash/restore/purge, sync and backup carry it for free | Working | 18 unit tests + 5 E2E checks (section-groups) |
 | Audio blocks (issue #67): import audio files + in-app recording (MediaRecorder), playable `<audio>` players on canvas, draw over clips, persisted via customData payload | Working | 31 unit tests + 7 E2E checks (e2e/audio.spec.ts) |
 | Quick capture: "Quick note" button + Ctrl/Cmd+Alt+N, pinned Today daily page | Working | 17 unit tests + 4 E2E checks |
 | **OS share capture (Web Share Target, issue #247)**: the installed PWA (Android share sheet, desktop share UIs) receives shared title/text/url + files (image/audio/pdf/text); the service worker stashes the POST in a raw-IDB mailbox and the boot drain lands each share as a Quick Notes page — shared title → page title (capped), body = text + url composed, files through the regular import pipeline; URL-only shares fall back to the dated title; a share always produces a page; atomic read+clear drain (two tabs never double-import) | Working | 22 unit tests (composition + fake-indexeddb mailbox + manifest/sw/app cross-pins) + 4 E2E checks (e2e/share-target.spec.ts — real POST through the registered service worker) |
@@ -129,16 +131,12 @@ Notes pages.
 | Flatpak packaging: AppStream metainfo, flatpak-builder manifest (extra-data AppImage), extradata pinning tool, Flathub runbook | Working — recipe pinned by unit tests; checksums pinned after each release by scripts/flatpak-extradata.mjs | packaging-config unit tests, `packaging/flatpak/`, `scripts/flatpak-extradata.mjs`, docs/flathub.md |
 | F-Droid packaging (issue #56): build metadata YAML, versionCode scheme (major×100+minor×10+patch), fdroid-check validator, runbook | Working — metadata + tool verified by 21 unit tests + a real CLI run | fdroid-config unit tests, `packaging/fdroid/`, `scripts/fdroid-check.mjs`, docs/fdroid.md |
 
-**Totals: 1292 unit tests, 247 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
+**Totals: 1310 unit tests, 252 Playwright E2E tests (required in CI), 0 known bugs, 0 TODOs in `src/`.**
 
 ## In flight
 
-- **Flatpak extra-data re-pin** — DONE (PR: the real v1.19.0 AppImage
-  checksum — 152,939,000 bytes, sha256
-  43100d4b09661baf1dd2eb718847558b188660dbb532e37d85a6ca03c1b97cbd —
-  pinned via scripts/flatpak-extradata.mjs, the #313/#293/#324 precedent;
-  the computed digest matches the release API's asset digest
-  byte-for-byte).
+- **Section groups wave 20** — DONE (issue #337 shipped this cycle into the
+  v1.20.0 milestone; see the Last-updated row).
 - **#193** (real-GPU HWR benchmark) hardware-blocked in the v1.20.0
   milestone (carried forward at each release, the v1.15.0/v1.16.0/v1.17.0/
   v1.18.0/v1.19.0 precedent): the measurement needs a real-GPU machine; the
@@ -147,9 +145,8 @@ Notes pages.
 ## Next up — v1.20 (see [docs/ROADMAP.md](docs/ROADMAP.md))
 
 1. #193 real-GPU HWR benchmark — hardware-blocked, carried forward
-2. "Section groups" as a separate row type (the sub-sections phase-3
-   candidate) and further product-parity candidates from a fresh majors
-   evidence pass (evidence-first, wave by wave)
+2. Further product-parity candidates from a fresh majors evidence pass
+   (evidence-first, wave by wave)
 
 ## Repo map (30 seconds)
 
@@ -160,6 +157,7 @@ Notes pages.
 | `src/lib/tree-ops.ts` | OneNote-style selection semantics after delete |
 | `src/lib/section-tree.ts` | Sub-section tree policy: sibling scopes, cycle-safe subtree/ancestor traversal, reparent validation (canReparent), sync sibling key (issues #314/#325) |
 | `src/lib/section-colors.ts` | Section color policy: safe normalization, notebook inheritance vs override (issue #319) |
+| `src/lib/section-groups.ts` | Section group policy: kind normalization, group detection, hand-edit tolerance (issue #337) |
 | `src/lib/ink-shapes.ts` | Ink-to-shape classifier: per-stroke shape recognition (line/ellipse/rectangle/diamond/triangle), fitted skeletons, selection-scoped planner (issue #329) |
 | `src/components/notes/move-section-dialog.tsx` | Move-section picker: "Top level of {notebook}" + nest targets, the moving subtree and current home disabled (issue #325) |
 | `src/lib/search.ts` | Scene text extraction + ranked search |
@@ -181,7 +179,7 @@ Notes pages.
 | `src/components/notes/*` | App UI: sidebar, search, trash, canvas wiring |
 | `src/app/` | Next.js App Router entry + layout |
 | `public/` | PWA manifest, service worker, icons, self-hosted Excalidraw fonts, pdf.js worker |
-| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 247 checks in 51 files, runs in CI (issue #3; measured 2026-11-22) |
+| `e2e/` + `playwright.config.ts` | Playwright E2E suite — 252 checks in 52 files, runs in CI (issue #3; measured 2026-11-23) |
 | `.github/workflows/ci.yml` | CI: lint-typecheck-test + build-smoke + e2e + size-report (all required) |
 | `docs/` | Architecture, roadmap, decisions, pipeline |
 | `.agents/skills/` | Vendored agent-engineering skill set (mattpocock/skills, MIT) — repo tooling for AI-assisted development, not app code |
@@ -191,8 +189,8 @@ Notes pages.
 ```bash
 bun install                            # first-time setup
 bun run dev                          # dev server on :3000
-make test                            # 1243 unit tests
-make e2e                             # 233 E2E tests (Playwright; boots the app if needed)
+make test                            # 1310 unit tests
+make e2e                             # 252 E2E tests (Playwright; boots the app if needed)
 make status                          # quick status snapshot (this file's head + git info)
 ```
 
