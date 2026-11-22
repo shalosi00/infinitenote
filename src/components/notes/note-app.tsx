@@ -82,6 +82,7 @@ import {
   HwrError,
 } from "@/lib/hwr";
 import { hwrConvertSummary } from "@/lib/hwr-convert";
+import { inkShapesSummary } from "@/lib/ink-shapes";
 import {
   addTagWithResult,
   collectTags,
@@ -921,6 +922,8 @@ export default function NoteApp() {
 
   /** True while a handwriting conversion is in flight — disables the menu item. */
   const [hwrConverting, setHwrConverting] = useState(false);
+  /** true while an ink-to-shape run is in flight — disables the menu item. */
+  const [inkConverting, setInkConverting] = useState(false);
 
   /**
    * "Convert handwriting to text" (Phase B, issue #176): reuses the stored
@@ -956,6 +959,42 @@ export default function NoteApp() {
       useAppStore.getState().requestCanvasFocus();
     }
   }, [hwrConverting]);
+  /**
+   * "Ink to shape" (issue #329, OneNote "Ink to Shape" parity): selected
+   * freedraw strokes that classify as a shape are replaced by the perfect
+   * geometry in ONE undo-able scene update; strokes that do not classify
+   * stay ink and are counted for the guidance toast. No selection and no
+   * ink are friendly no-ops — the canvas API returns synchronously, the
+   * async shell matches the other page actions (focus guard + disabling).
+   */
+  const handleConvertInkShapes = useCallback(async () => {
+    if (inkConverting) return;
+    armPageActionsFocusGuard();
+    if (!canvasApi.current) {
+      toast.error("Open a page first, then convert ink to shapes.");
+      return;
+    }
+    setInkConverting(true);
+    try {
+      const result = canvasApi.current.convertInkShapes();
+      if (result.converted === 0) {
+        toast(inkShapesSummary(result));
+      } else {
+        toast.success(inkShapesSummary(result));
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Ink to shape failed.");
+    } finally {
+      setInkConverting(false);
+      // keyboard determinism (issue #231): after converting from the menu,
+      // the canvas is where the user's next keystroke (undo, draw, type)
+      // belongs - request focus through the store's remount-safe path and
+      // let the focus guard counter radix's deferred trigger restore.
+      useAppStore.getState().requestCanvasFocus();
+    }
+  }, [inkConverting]);
+
 
   /* ------------------------------ version history --------------------- */
 
@@ -1575,6 +1614,14 @@ export default function NoteApp() {
                     >
                       <Type />
                       {hwrConverting ? "Converting handwriting…" : "Convert handwriting to text"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="ink-to-shape"
+                      disabled={inkConverting}
+                      onClick={() => void handleConvertInkShapes()}
+                    >
+                      <Shapes />
+                      {inkConverting ? "Converting to shapes…" : "Ink to shape"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

@@ -229,6 +229,24 @@ milestones/issues. This file is the plan; the status file is the reality.
       keyboard/touch path Joplin lacks — share the store action; invalid
       targets never highlight and never accept; the new home auto-expands
       (docs/test-plans/sub-sections.md, phase-2 section)
+- [x] Ink to shape (issue #329, shipped 2026-11-22): OneNote "Ink to Shape"
+      parity — selected freedraw strokes that classify as a shape are
+      replaced by the perfect geometry (line / ellipse / rectangle /
+      diamond / closed-line triangle) in ONE undo-able scene update while
+      unrecognizable strokes stay ink with a guidance toast; the fitted
+      shapes inherit each stroke's own style; the integrity guards of BOTH
+      conversions (handwriting text + ink shapes) now heal only on their
+      own scene via the shared shouldHealConversion
+      (docs/test-plans/ink-shapes.md)
+- [x] Ink to shape (issue #329, shipped 2026-11-22): OneNote "Ink to Shape"
+      parity — selected freedraw strokes that classify as a shape are
+      replaced by the perfect geometry (line / ellipse / rectangle /
+      diamond / closed-line triangle) in ONE undo-able scene update while
+      unrecognizable strokes stay ink with a guidance toast; the fitted
+      shapes inherit each stroke's own style; the integrity guards of BOTH
+      conversions (handwriting text + ink shapes) now heal only on their
+      own scene via the shared shouldHealConversion
+      (docs/test-plans/ink-shapes.md)
 - [ ] Further product-parity candidates from a fresh majors evidence pass
       (evidence-first, wave by wave)
 

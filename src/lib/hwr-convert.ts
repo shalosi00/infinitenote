@@ -249,3 +249,25 @@ export function detectDroppedConversion(
   }
   return createdIds.filter((id) => !known.has(id));
 }
+
+/**
+ * Whether the integrity heal should actually re-apply (the #329 hardening):
+ * a conversion whose created elements went missing is only worth healing
+ * while at least one ORIGINAL ink stroke is still ALIVE in the scene. When
+ * the strokes are gone too — the canvas switched pages (the ~1.5 s guard
+ * then reads whatever scene the api hosts now) or the user deleted the ink —
+ * re-applying would either convert unrelated ink on a foreign page or run a
+ * pointless heal that could only end in the "re-apply found nothing to
+ * convert" error path. Pure so bun unit tests can pin it (IS-P21/P22).
+ */
+export function shouldHealConversion(
+  originalInkIds: readonly string[],
+  sceneElementsIncludingDeleted: readonly { id?: unknown; isDeleted?: unknown; type?: unknown }[],
+): boolean {
+  const aliveInk = new Set(
+    sceneElementsIncludingDeleted
+      .filter((e) => e && e.type === "freedraw" && e.isDeleted !== true && typeof e.id === "string")
+      .map((e) => e.id as string),
+  );
+  return originalInkIds.some((id) => aliveInk.has(id));
+}
