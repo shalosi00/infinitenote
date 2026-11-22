@@ -7,10 +7,12 @@
  */
 import { create } from "zustand";
 import * as db from "./notes-db";
+import type { SectionMoveResult } from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
 import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./last-page";
 import { quickNoteTitle, todayKey } from "./quick-notes";
 import { generatedNames } from "./generated-names";
+import { ancestorSectionIds } from "./section-tree";
 import { parseTemplateContent } from "./page-templates";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
@@ -63,6 +65,18 @@ interface AppStore {
   ) => Promise<void>;
   renameSection: (id: string, name: string) => Promise<void>;
   moveSection: (id: string, dir: -1 | 1) => Promise<void>;
+  /**
+   * Sub-sections phase 2 (issue #325): move a section (subtree included)
+   * under `parentId` (null = top level) of `notebookId` — the drag and
+   * dialog paths share this. On success the new ancestor chain is
+   * expanded so the row is visible at its new home; selection ids are
+   * untouched by the move (id-stable).
+   */
+  moveSectionTo: (
+    id: string,
+    notebookId: string,
+    parentId: string | null
+  ) => Promise<SectionMoveResult>;
   /**
    * OneNote "Section Color" parity (issue #319): null clears the override
    * (the row inherits the notebook's color again).
@@ -288,6 +302,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
   moveSection: async (id, dir) => {
     await db.moveSection(id, dir);
     await get().refresh();
+  },
+  moveSectionTo: async (id, notebookId, parentId) => {
+    const result = await db.moveSectionTo(id, notebookId, parentId);
+    if (result !== "moved") return result;
+    await get().refresh();
+    // reveal the row at its new home: expand the target notebook, the
+    // whole ancestor chain of the target parent, the parent itself and
+    // the moved section (the wave-16 defaultExpandedState pattern)
+    const chain = parentId ? ancestorSectionIds(get().sections, parentId) : [];
+    set((s) => ({
+      expanded: new Set([
+        ...s.expanded,
+        notebookId,
+        ...chain,
+        ...(parentId ? [parentId] : []),
+        id,
+      ]),
+    }));
+    return result;
   },
   setSectionColor: async (id, color) => {
     await db.setSectionColor(id, color);
