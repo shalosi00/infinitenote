@@ -117,6 +117,13 @@ mobile help documents the same capability as "Move to another notebook"
 |---|---|
 | SM-N01 | the "Move to…" dialog moves a section to another notebook's top level (its own notebook's top level is disabled) |
 | SM-N02 | the dialog nests a section under another (itself disabled as a target); the moved row renders INSIDE the target's subtree, auto-expanded |
-| SM-N03 | dragging a section onto another nests it — the target highlights (`data-drop-active`) mid-drag before the drop lands |
-| SM-N04 | dropping a parent onto its own child is rejected — no highlight, structure unchanged |
-| SM-N05 | the moved subtree survives reload and trash/restore as a family in its new notebook |
+| SM-N03 | dragging a fresh "Section 3" onto Getting Started nests it — the target highlights (`data-drop-active`) mid-drag before the drop lands |
+| SM-N04 | dropping a parent onto its own child is rejected — no highlight, structure unchanged (the parent→child pair is built by drag first) |
+| SM-N05 | a moved family (New Section + its new "Section 2" child) survives reload and trash/restore in its new notebook |
+
+Every test is SELF-CONTAINED (resets to the seed and performs its own
+moves) — the wave-18 CI lesson: a stateful serial group is not an atomic
+unit under fullyParallel scheduling with multiple workers + retries (the
+scheduler re-dispatches members, beforeAll re-runs on the new worker, and
+a reload test sees a freshly re-seeded context — observed twice,
+deterministically, on the first CI run of this spec).

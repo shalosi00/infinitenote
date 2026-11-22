@@ -9,6 +9,17 @@ import { attachErrorCollector, resetToSeed } from "./helpers";
  *   Welcome Notebook / Ideas           / "Brainstorm"
  *   My Notebook      / New Section     / "Page 1"   (notebook COLLAPSED)
  *
+ * Every test is SELF-CONTAINED: it resets to the seed and performs its own
+ * moves, so test order never matters. This is deliberate — the wave-18 CI
+ * lesson: a stateful serial group is not an atomic unit under fullyParallel
+ * scheduling with multiple workers + retries (the scheduler re-dispatches
+ * members, beforeAll re-runs on the new worker, and a reload test sees a
+ * freshly re-seeded context). Self-contained tests are immune to that.
+ *
+ * Generated names per fresh seed: "New section" on Welcome Notebook →
+ * "Section 3" (2 existing sections); "New sub-section" on New Section →
+ * "Section 2" (My Notebook holds 1).
+ *
  * The section kebab menus are addressed by their exact aria-label, and the
  * "Move to…" dialog buttons by theirs — the keyboard/touch path (the
  * OneNote "Move or Copy" flow, the path Joplin lacks). The drag gesture is
@@ -17,32 +28,18 @@ import { attachErrorCollector, resetToSeed } from "./helpers";
  * is asserted on the REAL target row.
  */
 
-test.describe.serial("section moves (issue #325)", () => {
-  let page: Page;
-  let consoleErrors: string[];
-
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-    consoleErrors = attachErrorCollector(page);
-    await resetToSeed(page);
-  });
-
-  test.afterAll(async () => {
-    expect(consoleErrors, "browser must stay error-free").toEqual([]);
-    await page.close();
-  });
-
-  const sectionMenu = (name: string) =>
+test.describe("section moves (issue #325)", () => {
+  const sectionMenu = (page: Page, name: string) =>
     page.getByRole("button", { name: `Actions for section ${name}` });
 
-  const notebookMenu = (name: string) =>
+  const notebookMenu = (page: Page, name: string) =>
     page.getByRole("button", { name: `Actions for notebook ${name}` });
 
-  const sidebarText = async (): Promise<string> =>
+  const sidebarText = async (page: Page): Promise<string> =>
     (await page.getByTestId("sidebar").textContent()) ?? "";
 
   /** click a notebook row's toggle only when it is still collapsed */
-  const expandNotebook = async (name: string) => {
+  const expandNotebook = async (page: Page, name: string) => {
     const row = page
       .locator('[data-testid="notebook-row"]')
       .filter({ hasText: name })
@@ -54,7 +51,7 @@ test.describe.serial("section moves (issue #325)", () => {
     await expect(row).toHaveAttribute("data-notebook-id", /.+/);
   };
 
-  const expandSection = async (name: string) => {
+  const expandSection = async (page: Page, name: string) => {
     const row = page
       .locator('[data-testid="section-row"]')
       .filter({ hasText: name })
@@ -65,22 +62,26 @@ test.describe.serial("section moves (issue #325)", () => {
     }
   };
 
-  const sectionRow = (name: string) =>
+  const sectionRow = (page: Page, name: string) =>
     page
       .locator('[data-testid="section-row"]')
       .filter({ hasText: name })
       .first();
 
-  const rowHandle = (name: string) =>
+  const rowHandle = (page: Page, name: string) =>
     page
       .locator('[data-testid="section-row-handle"]')
       .filter({ hasText: name })
       .first();
 
   /** drag one row handle onto another with dnd-kit-friendly mouse steps */
-  const dragHandleToHandle = async (sourceName: string, targetName: string) => {
-    const src = rowHandle(sourceName);
-    const dst = rowHandle(targetName);
+  const dragHandleToHandle = async (
+    page: Page,
+    sourceName: string,
+    targetName: string
+  ) => {
+    const src = rowHandle(page, sourceName);
+    const dst = rowHandle(page, targetName);
     const sb = (await src.boundingBox())!;
     const db = (await dst.boundingBox())!;
     await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
@@ -95,12 +96,22 @@ test.describe.serial("section moves (issue #325)", () => {
     return dst;
   };
 
-  test("SM-N01: the Move to… dialog moves a section to another notebook's top level", async () => {
-    await expandNotebook("My Notebook");
-    await expect(sectionRow("New Section")).toBeVisible();
+  const notebookNode = (page: Page, name: string) =>
+    page
+      .locator('[data-testid="notebook-node"]')
+      .filter({ hasText: name })
+      .first();
+
+  test("SM-N01: the Move to… dialog moves a section to another notebook's top level", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = attachErrorCollector(page);
+    await resetToSeed(page);
+    await expandNotebook(page, "My Notebook");
+    await expect(sectionRow(page, "New Section")).toBeVisible();
 
     // OneNote "Move or Copy" parity: section menu → Move to…
-    await sectionMenu("New Section").click();
+    await sectionMenu(page, "New Section").click();
     await page.getByRole("menuitem", { name: "Move to…", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -113,20 +124,16 @@ test.describe.serial("section moves (issue #325)", () => {
 
     // the section left My Notebook and joined Welcome Notebook
     await expect(page.getByTestId("sidebar")).toContainText("New Section");
-    const mnNode = page
-      .locator('[data-testid="notebook-node"]')
-      .filter({ hasText: "My Notebook" })
-      .first();
-    await expect(mnNode).not.toContainText("New Section");
-    const wnNode = page
-      .locator('[data-testid="notebook-node"]')
-      .filter({ hasText: "Welcome Notebook" })
-      .first();
-    await expect(wnNode).toContainText("New Section");
+    await expect(notebookNode(page, "My Notebook")).not.toContainText("New Section");
+    await expect(notebookNode(page, "Welcome Notebook")).toContainText("New Section");
+    expect(consoleErrors, "browser must stay error-free").toEqual([]);
   });
 
-  test("SM-N02: the dialog nests a section under another section", async () => {
-    await sectionMenu("Ideas").click();
+  test("SM-N02: the dialog nests a section under another section", async ({ page }) => {
+    const consoleErrors: string[] = attachErrorCollector(page);
+    await resetToSeed(page);
+
+    await sectionMenu(page, "Ideas").click();
     await page.getByRole("menuitem", { name: "Move to…", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -145,59 +152,96 @@ test.describe.serial("section moves (issue #325)", () => {
 
     // Ideas now renders INSIDE Getting Started's subtree (row nesting,
     // not just text order), and the store auto-expanded the chain
-    const gsSubtree = sectionRow("Getting Started");
-    await expect(gsSubtree.locator('[data-testid="section-row"]').filter({ hasText: "Ideas" })).toHaveCount(
-      1
-    );
+    const gsSubtree = sectionRow(page, "Getting Started");
+    await expect(
+      gsSubtree.locator('[data-testid="section-row"]').filter({ hasText: "Ideas" })
+    ).toHaveCount(1);
     // the old top-level position is gone: Ideas no longer precedes Getting
     // Started's page in flat order — it lives after "Start here"
-    const text = await sidebarText();
+    const text = await sidebarText(page);
     expect(text.indexOf("Ideas")).toBeGreaterThan(text.indexOf("Start here"));
+    expect(consoleErrors, "browser must stay error-free").toEqual([]);
   });
 
-  test("SM-N03: dragging a section onto another nests it under the target", async () => {
-    // a fresh top-level section to drag (Welcome Notebook holds 3 → "Section 4")
-    await notebookMenu("Welcome Notebook").click();
-    await page.getByRole("menuitem", { name: "New section", exact: true }).click();
-    await expect(sectionRow("Section 4")).toBeVisible();
+  test("SM-N03: dragging a section onto another nests it under the target", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = attachErrorCollector(page);
+    await resetToSeed(page);
 
-    const dst = await dragHandleToHandle("Section 4", "New Section");
+    // a fresh top-level section to drag (Welcome Notebook holds 2 → "Section 3")
+    await notebookMenu(page, "Welcome Notebook").click();
+    await page.getByRole("menuitem", { name: "New section", exact: true }).click();
+    await expect(sectionRow(page, "Section 3")).toBeVisible();
+
+    const dst = await dragHandleToHandle(page, "Section 3", "Getting Started");
     // the REAL dnd-kit pipeline: pointerWithin marks the hovered valid
     // target before the drop lands
     await expect(dst).toHaveAttribute("data-drop-active", "true");
     await page.mouse.up();
 
-    // Section 4 nested under New Section (auto-expanded by the move)
+    // Section 3 nested under Getting Started (auto-expanded by the move)
     await expect(
-      sectionRow("New Section")
+      sectionRow(page, "Getting Started")
         .locator('[data-testid="section-row"]')
-        .filter({ hasText: "Section 4" })
+        .filter({ hasText: "Section 3" })
     ).toHaveCount(1);
-    // the top-level position is gone
-    const wnNode = page
-      .locator('[data-testid="notebook-node"]')
-      .filter({ hasText: "Welcome Notebook" })
-      .first();
-    const text = (await wnNode.textContent()) ?? "";
-    expect(text.indexOf("New Section")).toBeLessThan(text.indexOf("Section 4"));
+    expect(consoleErrors, "browser must stay error-free").toEqual([]);
   });
 
-  test("SM-N04: dropping a parent onto its own child is rejected", async () => {
-    // New Section is Section 4's parent now — the child must never accept
-    const dst = await dragHandleToHandle("New Section", "Section 4");
+  test("SM-N04: dropping a parent onto its own child is rejected", async ({ page }) => {
+    const consoleErrors: string[] = attachErrorCollector(page);
+    await resetToSeed(page);
+
+    // build the parent→child pair by drag first (Section 3 nests under
+    // Getting Started)
+    await notebookMenu(page, "Welcome Notebook").click();
+    await page.getByRole("menuitem", { name: "New section", exact: true }).click();
+    await expect(sectionRow(page, "Section 3")).toBeVisible();
+    await dragHandleToHandle(page, "Section 3", "Getting Started");
+    await page.mouse.up();
+    await expect(
+      sectionRow(page, "Getting Started")
+        .locator('[data-testid="section-row"]')
+        .filter({ hasText: "Section 3" })
+    ).toHaveCount(1);
+
+    // now drag the PARENT onto its own child — the child must never accept
+    const dst = await dragHandleToHandle(page, "Getting Started", "Section 3");
     await page.waitForTimeout(150); // let pointerWithin settle on the row
     expect(await dst.getAttribute("data-drop-active")).toBeNull();
     await page.mouse.up();
 
-    // structure unchanged: Section 4 is still INSIDE New Section's subtree
+    // structure unchanged: Section 3 is still INSIDE Getting Started's subtree
     await expect(
-      sectionRow("New Section")
+      sectionRow(page, "Getting Started")
         .locator('[data-testid="section-row"]')
-        .filter({ hasText: "Section 4" })
+        .filter({ hasText: "Section 3" })
     ).toHaveCount(1);
+    expect(consoleErrors, "browser must stay error-free").toEqual([]);
   });
 
-  test("SM-N05: the moved subtree survives reload and trash/restore as a family", async () => {
+  test("SM-N05: the moved subtree survives reload and trash/restore as a family", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = attachErrorCollector(page);
+    await resetToSeed(page);
+
+    // New Section (My Notebook) gains a child, then the whole family moves
+    // to Welcome Notebook via the dialog
+    await expandNotebook(page, "My Notebook");
+    await sectionMenu(page, "New Section").click();
+    await page.getByRole("menuitem", { name: "New sub-section", exact: true }).click();
+    await expect(page.getByTestId("sidebar")).toContainText("Section 2");
+
+    await sectionMenu(page, "New Section").click();
+    await page.getByRole("menuitem", { name: "Move to…", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Move to top level of Welcome Notebook" })
+      .click();
+    await expect(notebookNode(page, "Welcome Notebook")).toContainText("New Section");
+
     await page.reload();
     // re-verify past the documented ~1.5 s boot drop window
     await expect(page.getByTestId("sidebar")).toContainText("New Section", {
@@ -205,15 +249,15 @@ test.describe.serial("section moves (issue #325)", () => {
     });
 
     // trashing the moved parent still takes the whole subtree (the family
-    // moved to Welcome Notebook together in SM-N01/N03)
-    await sectionMenu("New Section").click();
+    // moved to Welcome Notebook together)
+    await sectionMenu(page, "New Section").click();
     await page.getByRole("menuitem", { name: "Move to trash", exact: true }).click();
     await expect(page.getByTestId("sidebar")).not.toContainText("New Section");
 
     await page.getByRole("button", { name: "Trash", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("New Section (section)");
-    await expect(dialog).toContainText("Section 4 (section)");
+    await expect(dialog).toContainText("Section 2 (section)");
 
     await dialog
       .locator("div.flex.items-center")
@@ -223,18 +267,11 @@ test.describe.serial("section moves (issue #325)", () => {
     await page.keyboard.press("Escape");
 
     await expect(page.getByTestId("sidebar")).toContainText("New Section");
-    await expandSection("New Section");
-    await expect(page.getByTestId("sidebar")).toContainText("Section 4");
+    await expandSection(page, "New Section");
+    await expect(page.getByTestId("sidebar")).toContainText("Section 2");
     // and it stayed in Welcome Notebook, not back in My Notebook
-    const wnNode = page
-      .locator('[data-testid="notebook-node"]')
-      .filter({ hasText: "Welcome Notebook" })
-      .first();
-    await expect(wnNode).toContainText("New Section");
-    const mnNode = page
-      .locator('[data-testid="notebook-node"]')
-      .filter({ hasText: "My Notebook" })
-      .first();
-    await expect(mnNode).not.toContainText("Section 4");
+    await expect(notebookNode(page, "Welcome Notebook")).toContainText("New Section");
+    await expect(notebookNode(page, "My Notebook")).not.toContainText("Section 2");
+    expect(consoleErrors, "browser must stay error-free").toEqual([]);
   });
 });
