@@ -139,3 +139,10 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+
+  - versionName: 1.19.0
+    versionCode: 290
+    commit: v1.19.0
+    subdir: android-twa
+    gradle:
+      - yes
