@@ -220,6 +220,19 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.21.0)
+- [x] Export notebook as PDF (issue #351, shipped 2026-11-24): OneNote
+      "Export notes as a PDF (Notebook)" parity — the phase-2 candidate the
+      v1.21 block named. The notebook menu's "Export as PDF" (A4
+      portrait/landscape) flows every alive section of the notebook into ONE
+      paginated A4 document: each section OPENS ON A DIVIDER SHEET (name,
+      pluralized page count, effective color accent bar, parent group name
+      when nested), then its alive pages continue on fresh sheets through
+      the shared data-driven core; global footer sheet counter, empty
+      sections keep their divider, zero alive sections fail as the typed
+      emptyNotebook error; the pure select-order policy never silently
+      drops pages (orphan sections still export). Read-only — zero
+      data-model change, zero sync surface
+      (docs/test-plans/notebook-pdf-export.md)
 - [ ] Further product-parity candidates from a fresh majors evidence pass
       (evidence-first, wave by wave)
 

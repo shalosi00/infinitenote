@@ -37,7 +37,7 @@ and sync yourself. No account, no telemetry, no lock-in.
 | **Search everything** | `Ctrl+K` full-text search across every page — including text recognized in images (OCR) and in your handwriting. |
 | **On-device intelligence** | "Recognize text in images" (tesseract.js, English + German) and "Recognize handwriting (English)" (TrOCR model, ≈64 MB, downloaded once) run 100% locally. Your ink and images never leave the device. |
 | **Import almost anything** | Images, plain text, Markdown, Word documents, PDF printouts (multi-page, with byte-exact file chips), OneNote-exported HTML, OneNote `.mht` pages, `.excalidraw` scenes and audio files. |
-| **Export and own your data** | PNG, SVG, scene JSON, paginated A4 PDF per page — or a whole section as ONE document (OneNote "Export notes as a PDF (Section)" parity) — with selectable vector text, or a full notebook backup file. File-based sync (folder or ZIP) with page-granular three-way merge, conflict copies and tombstones. |
+| **Export and own your data** | PNG, SVG, scene JSON, paginated A4 PDF per page — or a whole section / whole notebook as ONE document (OneNote "Export notes as a PDF (Section/Notebook)" parity, sections opening on divider sheets) — with selectable vector text, or a full notebook backup file. File-based sync (folder or ZIP) with page-granular three-way merge, conflict copies and tombstones. |
 
 ## Screenshots
 
@@ -105,7 +105,7 @@ and sync yourself. No account, no telemetry, no lock-in.
   the device.
 - **Export** — PNG, SVG, scene JSON, paginated **PDF (A4 portrait/landscape)**
   with selectable vector text — per page or a whole section as one document
-  (the section menu's "Export as PDF") — or a full notebook backup file.
+  (the section menu's "Export as PDF") and a whole notebook as ONE document on section divider sheets (the notebook menu's "Export as PDF") — or a full notebook backup file.
 - **File-based sync (phase 1)** — point the app at a sync folder (or merge via
   ZIP): page-granular three-way merge, conflict copies, tombstones.
 
@@ -262,9 +262,11 @@ python3 scripts/install-readme-shots.py     # resizes + installs into assets/scr
 
 ## Roadmap
 
-Shipped most recently (the product-parity waves): **export section as
-PDF** (OneNote "Export notes as a PDF (Section)" parity — the whole
-section as one paginated document), sub-sections with
+Shipped most recently (the product-parity waves): **export notebook as
+PDF** (OneNote "Export notes as a PDF (Notebook)" parity — every
+section opens on a divider sheet, one document for the whole
+notebook) and **export section as PDF** (the whole section as one paginated
+document), sub-sections with
 drag-to-reparent and cross-notebook section moves, per-section colors,
 **section groups** (OneNote "Section Groups" parity — folder-glyph
 groups that keep sections together and hold no pages), in-page find,
