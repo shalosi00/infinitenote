@@ -137,3 +137,45 @@ export function selectSectionPages(
     .filter((p) => p.sectionId === sectionId && !p.deletedAt)
     .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
 }
+
+/**
+ * The alive plain sections of one notebook, in export order (issue #351,
+ * wave 22): the notebook→sections projection the sidebar implies — a
+ * depth-first walk of the section tree in sibling order (sections inside
+ * section groups export at their sidebar position; group containers are
+ * never entries themselves), trashed rows excluded. Cycle-safe like every
+ * traversal here.
+ *
+ * Orphan tolerance: a plain section whose parent row is missing, trashed or
+ * foreign is invisible in the sidebar but still ALIVE data — an export
+ * never silently drops pages, so such orphans append after the visible
+ * tree in sibling order.
+ */
+export function selectNotebookExportSections(
+  sections: readonly Section[],
+  notebookId: string
+): Section[] {
+  const inNotebook = sections.filter(
+    (s) => s.notebookId === notebookId && !s.deletedAt
+  );
+  const out: Section[] = [];
+  const seen = new Set<string>();
+  const visitChildren = (parentId: string | null) => {
+    for (const child of inNotebook
+      .filter((s) => parentOf(s) === parentId)
+      .sort(byOrder)) {
+      if (seen.has(child.id)) continue; // cycle guard
+      seen.add(child.id);
+      if (!isSectionGroup(child)) out.push(child);
+      visitChildren(child.id); // groups AND sections can hold children
+    }
+  };
+  visitChildren(null);
+  // orphans: alive plain sections the visible tree never reached
+  out.push(
+    ...inNotebook
+      .filter((s) => !isSectionGroup(s) && !seen.has(s.id))
+      .sort(byOrder)
+  );
+  return out;
+}

@@ -25,6 +25,7 @@ import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
 import { isSectionGroup } from "@/lib/section-groups";
 import { exportSectionPdf } from "@/lib/section-pdf";
+import { exportNotebookPdf } from "@/lib/notebook-pdf";
 import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
 import type { PdfOrientation } from "@/lib/pdf-sheet-render";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
@@ -494,6 +495,29 @@ function NotebookNode({
   const del = useAppStore((s) => s.deleteNotebook);
   const move = useAppStore((s) => s.moveNotebook);
 
+  /** OneNote "Export notes as a PDF (Notebook)" parity (issue #351): the
+   *  whole notebook — every alive section on its divider sheet, then its
+   *  alive pages — as one paginated PDF through the shared print core. */
+  const handleExportNotebookPdf = async (
+    id: string,
+    name: string,
+    orientation: PdfOrientation,
+  ) => {
+    try {
+      toast("Exporting notebook to PDF…");
+      const { sheetCount } = await exportNotebookPdf(id, name, orientation);
+      toast.success(`Notebook PDF exported — ${plural(sheetCount, "1 sheet", "# sheets")}.`);
+    } catch (err) {
+      // issue #85 mapping, same as the page/section exports: typed failures
+      // map to their message, everything else stays generic
+      if (err instanceof ExportError) toast.error(EXPORT_ERROR_MESSAGES[err.code]);
+      else {
+        console.error(err);
+        toast.error("Export failed.");
+      }
+    }
+  };
+
   // drop target (issue #325): a section dropped on a notebook joins its
   // top level — cross-notebook allowed, same-notebook is a no-op success
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -611,6 +635,29 @@ function NotebookNode({
                     />
                   ))}
                 </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger data-testid="notebook-export-pdf-submenu">
+                <Printer /> {"Export as PDF"}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {/* OneNote "Export notes as a PDF (Notebook)" parity
+                    (issue #351): every alive section opens on its divider
+                    sheet, then its alive pages — ONE paginated A4 document,
+                    global footer sheet counter */}
+                <DropdownMenuItem
+                  data-testid="notebook-export-pdf-portrait"
+                  onClick={() => void handleExportNotebookPdf(notebook.id, notebook.name, "portrait")}
+                >
+                  {"A4 portrait"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="notebook-export-pdf-landscape"
+                  onClick={() => void handleExportNotebookPdf(notebook.id, notebook.name, "landscape")}
+                >
+                  {"A4 landscape"}
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
