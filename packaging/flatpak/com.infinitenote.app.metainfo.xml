@@ -51,6 +51,17 @@
   </screenshots>
 
   <releases>
+    <release version="1.22.0" date="2026-11-24">
+      <description>
+        <p>Export a whole notebook as one paginated PDF (OneNote's "Export notes
+        as a PDF — Notebook"): the notebook menu gains "Export as PDF" in A4
+        portrait/landscape — every alive section opens on a divider sheet (its
+        name, page count and section color, plus the parent group name when
+        nested), then its alive pages flow on fresh sheets through the shared
+        print engine; one document, a global sheet counter, empty sections keep
+        their divider.</p>
+      </description>
+    </release>
     <release version="1.21.0" date="2026-11-23">
       <description>
         <p>Export a whole section as one paginated PDF (OneNote's "Export notes
