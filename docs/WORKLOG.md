@@ -43,6 +43,75 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-24 — Export notebook as PDF: OneNote "Export notes as a PDF (Notebook)" parity, wave 22 (#351/#352)
+
+- **Task**: wave 22 — the phase-2 candidate the wave-21 docs named
+  ("notebook-level export with section divider sheets — OneNote's third
+  scope"), per the wave-21 pointer and the ROADMAP v1.22 block. Evidence
+  pass (2026-11-24, carried from wave 21 + a refresh search): OneNote's
+  desktop File > Export offers an "Export Current" scope of Page / Section /
+  Notebook as a static snapshot (support.microsoft.com "Export notes from
+  OneNote as a PDF"; learn.microsoft.com's answers thread spells out the
+  three-scope flow; only the desktop app exports beyond a single page), and
+  Joplin prints PDFs per note only — until this wave exporting a notebook
+  here meant exporting its sections one by one. Shipped this cycle, closing
+  #351 into the v1.22.0 milestone.
+- **Design**: the wave-21 data-driven core does all the work — the notebook
+  menu (every notebook row's kebab) gains "Export as PDF" → A4 portrait /
+  landscape. Every ALIVE section exports in SIDEBAR ORDER via the new pure
+  policy `selectNotebookExportSections` (section-tree.ts): depth-first walk
+  in sibling order, sections inside section groups export at the group's
+  sidebar position, group containers are never entries, trashed and
+  foreign-notebook rows excluded, cycle-safe; ORPHAN sections (missing or
+  trashed parent row — invisible in the sidebar but alive data) still
+  export, appended in sibling order, because an export never silently drops
+  pages. Each section OPENS ON A DIVIDER SHEET built by the PURE
+  `buildSectionDivider` (new `notebook-divider.ts`): section name as vector
+  text (footer title), a color accent bar (fill = stroke = the effective
+  section color hex — override or notebook inheritance, issue #319), the
+  pluralized page count, and `in section group {name}` only when the
+  section lives in one. Then the alive pages continue on fresh A4 sheets
+  through `exportNotebookPdf` (new `notebook-pdf.ts`): per-page paper style
+  honored, blank pages as footer-carrying sheets, GLOBAL footer counter
+  1..N with dividers included, empty sections keep their divider, zero
+  alive sections fail as the typed `emptyNotebook` ExportError ("Nothing to
+  export — this notebook has no sections yet." — the EXPORT_ERROR_MESSAGES
+  Record forces total mapping). Read-only — ZERO data-model change, zero
+  sync surface; filename = titleToFilename(notebook name), CJK-safe.
+- **The wave-21 lesson fired again, pre-empted this time**: the first cut
+  put `buildSectionDivider` in notebook-pdf.ts, which imports notes-db —
+  the unit test importing it would poison every db-sharing test file
+  exactly like wave 21's 212-failure incident. The builder moved to a pure
+  `notebook-divider.ts` before the first gate run; the full suite passed
+  first try (1327 / 95 files, +10 pins: select-order with group children,
+  orphan append, parentId-cycle termination, empty policy, divider
+  construction, group line, 8-sheet portrait assembly with global "1 / 8"…
+  "8 / 8" numbering, 13-sheet landscape re-pagination, empty-document
+  error, emptyNotebook code).
+- **E2E (4/4 new + 26/26 neighbors)**: NP-N01 injects the deterministic
+  40-line tall scene and exports Welcome Notebook portrait → 8 sheets
+  (divider + 5 + divider + 1 blank), both dividers' names, the marker text
+  and global numbering inflate out of the streams; NP-N02 My Notebook
+  landscape → 2 sheets; NP-N03 trashes "Brainstorm" → next export is 7
+  sheets, the trashed footer gone while "Ideas" still exports empty ("0
+  pages"); NP-N04 trashes My Notebook's only section → the typed toast and
+  NO download. New locator lesson: a blind toggle click on an ALREADY-
+  EXPANDED sidebar row would COLLAPSE it and hide child rows — the spec's
+  ensureExpanded helper reads aria-expanded first (the guard was needed for
+  Ideas/My Notebook, whose expansion the seed does not guarantee).
+- **PR #352** (squash `08c88c8` on head `51b2dc8`, 9/9 check-runs green incl.
+  CodeQL/size-report/conventional-commit): 13 files (+docs overlays in the
+  feat PR per the wave-21 #345 precedent — PROJECT_STATUS rolling row +
+  TL;DR + Exports row + totals 1327/260, README export bullet + roadmap
+  lead, ROADMAP v1.22 ships #351, copilot-instructions measured counts,
+  docs/test-plans/notebook-pdf-export.md). GitHub auto-close did NOT fire
+  on this squash merge despite the plain `Closes #351` line in both the PR
+  body and the commit message (the wave-21 auto-close was luck, not
+  mechanics) — closed #351 explicitly via the API, the standing hazard
+  stands.
+- **Next**: the v1.22.0 release train, then further majors-evidence parity
+  waves; #193 stays hardware-blocked.
+
 ## 2026-11-23 — Export section as PDF: OneNote "Export notes as a PDF (Section)" parity, wave 21 (#344/#345)
 
 - **Task**: wave 21 — the thirteenth product-parity wave, per the wave-20

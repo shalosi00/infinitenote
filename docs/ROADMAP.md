@@ -216,10 +216,32 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.21 — Parity continues (current)
+## v1.22 — Parity continues (current)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0 through v1.20.0)
+      real GPU hardware (carried forward from v1.15.0 through v1.21.0)
+- [x] Export notebook as PDF (issue #351, shipped 2026-11-24): OneNote
+      "Export notes as a PDF (Notebook)" parity — the phase-2 candidate the
+      v1.21 block named. The notebook menu's "Export as PDF" (A4
+      portrait/landscape) flows every alive section of the notebook into ONE
+      paginated A4 document: each section OPENS ON A DIVIDER SHEET (name,
+      pluralized page count, effective color accent bar, parent group name
+      when nested), then its alive pages continue on fresh sheets through
+      the shared data-driven core; global footer sheet counter, empty
+      sections keep their divider, zero alive sections fail as the typed
+      emptyNotebook error; the pure select-order policy never silently
+      drops pages (orphan sections still export). Read-only — zero
+      data-model change, zero sync surface
+      (docs/test-plans/notebook-pdf-export.md)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.21 — Parity continues (shipped in v1.21.0)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.20.0; the
+      release rotated it to the v1.22.0 milestone, the v1.15.0-to-v1.21.0
+      precedent)
 - [x] Export section as PDF (issue #344, shipped 2026-11-23): OneNote
       "Export notes as a PDF (Section)" parity — the section menu's
       "Export as PDF" (A4 portrait/landscape) flows every alive page of the
@@ -231,8 +253,6 @@ milestones/issues. This file is the plan; the status file is the reality.
       zero sync surface. Phase-2 candidate: notebook-level export with
       section divider sheets (OneNote's third scope)
       (docs/test-plans/section-pdf-export.md)
-- [ ] Further product-parity candidates from a fresh majors evidence pass
-      (evidence-first, wave by wave)
 
 ## v1.20 — Parity continues (shipped in v1.20.0)
 
