@@ -51,6 +51,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.21.0" date="2026-11-23">
+      <description>
+        <p>Export a whole section as one paginated PDF (OneNote's "Export notes
+        as a PDF — Section"): the section menu gains "Export as PDF" in A4
+        portrait/landscape — every alive page of the section flows into one
+        document in sidebar order, pages without ink keep their footer on a
+        blank sheet, and the print engine it shares with the per-page export is
+        now a data-driven core.</p>
+      </description>
+    </release>
     <release version="1.20.0" date="2026-11-23">
       <description>
         <p>Section groups arrive (OneNote's Section Groups): "New section
