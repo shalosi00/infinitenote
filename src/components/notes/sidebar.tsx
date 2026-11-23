@@ -24,6 +24,9 @@ import {
 import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
 import { isSectionGroup } from "@/lib/section-groups";
+import { exportSectionPdf } from "@/lib/section-pdf";
+import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
+import type { PdfOrientation } from "@/lib/pdf-sheet-render";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
 import {
   ArrowDown,
@@ -48,6 +51,7 @@ import {
   Palette,
   Pencil,
   Plus,
+  Printer,
   RotateCcw,
   Search,
   Tag as TagIcon,
@@ -696,6 +700,28 @@ function SectionNode({
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
   const recolor = useAppStore((s) => s.setSectionColor);
+
+  /** OneNote "Export notes as a PDF (Section)" parity (issue #344): the
+   *  whole section as one paginated PDF through the shared print core. */
+  const handleExportSectionPdf = async (
+    id: string,
+    name: string,
+    orientation: PdfOrientation,
+  ) => {
+    try {
+      toast("Exporting section to PDF…");
+      const { sheetCount } = await exportSectionPdf(id, name, orientation);
+      toast.success(`Section PDF exported — ${plural(sheetCount, "1 sheet", "# sheets")}.`);
+    } catch (err) {
+      // issue #85 mapping, same as the page export: typed failures map to
+      // their message, everything else stays generic
+      if (err instanceof ExportError) toast.error(EXPORT_ERROR_MESSAGES[err.code]);
+      else {
+        console.error(err);
+        toast.error("Export failed.");
+      }
+    }
+  };
   // global alive sections (issue #325): the dragged section may come from
   // ANOTHER notebook, so the self/descendant check needs the whole tree,
   // not just this branch's allSections
@@ -880,6 +906,30 @@ function SectionNode({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => void recolor(section.id, null)}>
                     <RotateCcw /> {"Use notebook color"}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            {!group && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid="section-export-pdf-submenu">
+                  <Printer /> {"Export as PDF"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {/* OneNote "Export notes as a PDF (Section)" parity
+                      (issue #344): every alive page of the section, in
+                      sidebar order, as ONE paginated A4 document */}
+                  <DropdownMenuItem
+                    data-testid="section-export-pdf-portrait"
+                    onClick={() => void handleExportSectionPdf(section.id, section.name, "portrait")}
+                  >
+                    {"A4 portrait"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="section-export-pdf-landscape"
+                    onClick={() => void handleExportSectionPdf(section.id, section.name, "landscape")}
+                  >
+                    {"A4 landscape"}
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>

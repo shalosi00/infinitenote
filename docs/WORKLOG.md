@@ -43,6 +43,97 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-23 — Export section as PDF: OneNote "Export notes as a PDF (Section)" parity, wave 21 (#344/#345)
+
+- **Task**: wave 21 — the thirteenth product-parity wave, per the wave-20
+  pointer ("further product-parity candidates from a fresh majors evidence
+  pass — evidence-first, wave by wave"). Evidence pass (2026-11-23): OneNote's
+  help — File > Export, "Under **Export Current**, choose what you want to
+  export. Choose PDF (*.pdf) > Export" — the desktop app's scope enumerates
+  Page / Section / Notebook and a saved PDF is a static snapshot ("Any changes
+  you make later in OneNote won't get changed in the PDF";
+  support.microsoft.com, "Export notes from OneNote as a PDF"; OneNote for the
+  web is page-scoped only), while Joplin prints PDFs per NOTE only and its
+  multi-note export is JEX / Markdown / HTML (joplinapp.org/help/apps/
+  import_export) — the section leg is OneNote-only parity, and until this wave
+  exporting a section here meant exporting its pages one by one. Shipped this
+  cycle, closing #344 into the v1.21.0 milestone.
+- **Design**: the proven issue-#20 print engine refactored into a DATA-DRIVEN
+  core `src/lib/pdf-sheet-render.ts` — `PdfSceneInput {title, background,
+  elements, files}` → `renderPdfDocument(pages, orientation)` → ONE jsPDF
+  document; every input page starts on a fresh A4 sheet with its persisted
+  paper style, pages without ink render as blank sheets carrying their footer
+  (OneNote exports empty pages the same way), and the footer sheet counter is
+  GLOBAL 1..N across the document — which equals the per-page band count for a
+  single-page export, so the issue-#20 behavior stays byte-compatible (pinned
+  by the untouched pdf-export/pdf-wave2 specs). `pdf-export.ts` becomes the
+  thin canvas adapter (same live-scene gather, same typed "Nothing to export"
+  error). New `src/lib/section-pdf.ts`: scenes come from the persisted store
+  via `getPageContent` (no live canvas needed — a section exports without
+  opening its pages), `ExportError` code `emptySection` when the section has
+  no pages at all (EXPORT_ERROR_MESSAGES gained the entry; the Record type
+  forces the toast mapping to stay total); `selectSectionPages` (alive pages
+  in order, ties broken by createdAt) lives in the PURE `section-tree.ts`.
+  The section menu (plain sections only — groups hold no pages) gains
+  "Export as PDF" → A4 portrait / landscape with the issue-#85 error mapping
+  and sonner toasts; filename = titleToFilename(section name). Read-only —
+  ZERO data-model change, zero sync surface. Phase-2 candidate named in the
+  ROADMAP: notebook-level export with section divider sheets.
+- **Lessons (all measured this cycle)**:
+  - **bun's full-suite module registry is shared across test files**: a unit
+    test that imports a module which pulls `notes-db.ts` (Dexie) poisons every
+    db-dependent test file that shares the process — 212 instant failures with
+    `TypeError: undefined is not an object (evaluating
+    '_this._deps.indexedDB.deleteDatabase')` (the Dexie instance constructed
+    without the fake-indexeddb polyfill my file never loaded), while every
+    file passed alone. The fix is structural: pure policy lives in pure
+    modules — `selectSectionPages` moved to section-tree.ts and the test
+    imports ONLY pure modules (pdf-sheet-render, section-tree,
+    export-errors, types).
+  - **jsPDF works headless under bun** (probe before building: page objects
+    print, `node:zlib` inflateSync recovers the vector text verbatim) — the
+    PDF render core is unit-testable with the same inflated-stream pattern
+    the E2E specs use. `doc.output("arraybuffer")` + a hand-made Blob avoids
+    leaning on jsPDF's own Blob environment detection.
+  - **Playwright locator facts measured**: `aria-current="page"` sits on the
+    page row's MAIN button, not the row div; the `Select <title>` label
+    belongs to the select-mode checkbox (not rendered outside select mode) —
+    the kebab's accessible name (`Actions for page <title>`) is the honest
+    way to both click it and learn the title; global page-row COUNTS vary
+    with section expansion (the trash's navigation lands in collapsed
+    notebooks), so a count is never a settle condition — assert the specific
+    row's disappearance instead; a serial run STACKS sonner toasts, so toast
+    assertions must filter by text (strict mode sees 8).
+  - The staging overlay must not carry UNMODIFIED files copied for reading —
+    note-app.tsx/pdf-layout.ts were dropped before ship so the PR stays
+    minimal (13 files, +1425/−601).
+  - The sandbox opened this session with HEAD reverted to a stale develop and
+    the wave-17 staging dir gone (its work had shipped long before) — the
+    fresh staging + apply.sh discipline reproduced the whole gate from
+    staging alone; the Playwright chromium cache had wiped itself again
+    (`bunx playwright install chromium`).
+  - **GitHub auto-closed #344 from the squash commit_message's plain
+    `Closes #344` line at the develop merge** (closed_at == merge instant) —
+    the standing hazard says close explicitly anyway, and the API close was
+    a harmless no-op; keep BOTH.
+- **PR #345** (squash `bf37362` on head `a428355`, 4/4 required checks green):
+  7 new unit tests (SP-P1..P7), 4 new E2E checks (SP-N01..N04), counts swept
+  across PROJECT_STATUS (Last-updated row, TL;DR, what-works Exports row,
+  Overall state, Totals, In flight, repo-map rows, e2e row, commands
+  cheat-sheet), README (badge, commands, Export row/bullet, Roadmap
+  paragraph), .github/copilot-instructions.md, docs/ROADMAP (v1.21 gains the
+  checked export-section item) and docs/test-plans/section-pdf-export.md
+  (new).
+- **Gate**: 1317 unit / 94 files, 0 fail (base 19c378c: 1310/93 — +7 SP-P
+  pins); 256 e2e / 53 files (`playwright --list`); new spec SP-N01..N04 4/4 —
+  the two-page section exports ONE 6-sheet portrait / 12-sheet landscape PDF
+  with both markers verified in the inflated streams (the deterministic
+  5+1/11+1 band math), the trashed page drops out of the next export, the
+  empty section toasts instead of downloading; neighbors pdf-export +
+  pdf-wave2 + export-filename + section-colors + section-groups +
+  sub-sections 22/22 (the print-engine + sidebar surfaces, verified locally
+  on the branch).
+
 ## 2026-11-23 — Section groups: OneNote "Section Groups" parity, wave 20 (#337/#338)
 
 - **Task**: wave 20 — the eleventh product-parity wave and the
