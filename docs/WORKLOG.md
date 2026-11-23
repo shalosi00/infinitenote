@@ -36,6 +36,12 @@
     cherry-pick; nothing pushed is ever truly lost.
   - This file replaced a gitignored local `worklog.md` that was wiped by a
     restore (2026-11-07). Never keep working state in untracked files.
+- Poll-loop discipline (learned 2026-11-24, PR #357): when a check-runs
+  poll loop exhausts its iteration cap while a check is still PENDING, the
+  merge call MUST NOT fire anyway — extend the loop instead. The #357 merge
+  landed on a "still pending" read and only turned out green because the
+  e2e check flipped to success in the seconds between the last poll and the
+  PUT (verified post-merge: 9/9 green on the head sha). Luck is not a gate.
 - The GitHub token lives in the remote URL only; it is never committed.
 - The agent's OUTPUT DISPLAY strips the two-byte sequence 'opening bracket
   + lowercase m' from everything shown back (shell output, file reads,
