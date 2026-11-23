@@ -216,10 +216,21 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.22 — Parity continues (current)
+## v1.23 — Parity continues (current)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0 through v1.21.0)
+      real GPU hardware (carried forward from v1.15.0 through v1.22.0; the
+      release rotated it to the v1.23.0 milestone, the v1.15.0-to-v1.22.0
+      precedent)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.22 — Parity continues (shipped in v1.22.0)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.21.0; the
+      release rotated it to the v1.23.0 milestone, the v1.15.0-to-v1.22.0
+      precedent)
 - [x] Export notebook as PDF (issue #351, shipped 2026-11-24): OneNote
       "Export notes as a PDF (Notebook)" parity — the phase-2 candidate the
       v1.21 block named. The notebook menu's "Export as PDF" (A4
