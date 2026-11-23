@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1310%20unit%20%2B%20252%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1317%20unit%20%2B%20256%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -37,7 +37,7 @@ and sync yourself. No account, no telemetry, no lock-in.
 | **Search everything** | `Ctrl+K` full-text search across every page — including text recognized in images (OCR) and in your handwriting. |
 | **On-device intelligence** | "Recognize text in images" (tesseract.js, English + German) and "Recognize handwriting (English)" (TrOCR model, ≈64 MB, downloaded once) run 100% locally. Your ink and images never leave the device. |
 | **Import almost anything** | Images, plain text, Markdown, Word documents, PDF printouts (multi-page, with byte-exact file chips), OneNote-exported HTML, OneNote `.mht` pages, `.excalidraw` scenes and audio files. |
-| **Export and own your data** | PNG, SVG, scene JSON, paginated A4 PDF with selectable vector text — or a full notebook backup file. File-based sync (folder or ZIP) with page-granular three-way merge, conflict copies and tombstones. |
+| **Export and own your data** | PNG, SVG, scene JSON, paginated A4 PDF per page — or a whole section as ONE document (OneNote "Export notes as a PDF (Section)" parity) — with selectable vector text, or a full notebook backup file. File-based sync (folder or ZIP) with page-granular three-way merge, conflict copies and tombstones. |
 
 ## Screenshots
 
@@ -104,7 +104,8 @@ and sync yourself. No account, no telemetry, no lock-in.
   recognized text searchable — your ink is never modified and nothing leaves
   the device.
 - **Export** — PNG, SVG, scene JSON, paginated **PDF (A4 portrait/landscape)**
-  with selectable vector text, or a full notebook backup file.
+  with selectable vector text — per page or a whole section as one document
+  (the section menu's "Export as PDF") — or a full notebook backup file.
 - **File-based sync (phase 1)** — point the app at a sync folder (or merge via
   ZIP): page-granular three-way merge, conflict copies, tombstones.
 
@@ -227,9 +228,9 @@ bun run dev          # http://localhost:3000
 | Command | Purpose |
 |---|---|
 | `make dev` | Run dev server (`http://localhost:3000`) |
-| `make test` | Unit tests (1310, bun test) |
+| `make test` | Unit tests (1317, bun test) |
 | `make lint` / `make typecheck` | ESLint / TypeScript check |
-| `bunx playwright test` | Playwright E2E suite (252 checks; boots the app automatically) |
+| `bunx playwright test` | Playwright E2E suite (256 checks; boots the app automatically) |
 | `make build` / `make start` | Production build / boot the standalone server |
 | `make status` | Quick "where do things stand" snapshot |
 
@@ -261,7 +262,9 @@ python3 scripts/install-readme-shots.py     # resizes + installs into assets/scr
 
 ## Roadmap
 
-Shipped most recently (the product-parity waves): sub-sections with
+Shipped most recently (the product-parity waves): **export section as
+PDF** (OneNote "Export notes as a PDF (Section)" parity — the whole
+section as one paginated document), sub-sections with
 drag-to-reparent and cross-notebook section moves, per-section colors,
 **section groups** (OneNote "Section Groups" parity — folder-glyph
 groups that keep sections together and hold no pages), in-page find,

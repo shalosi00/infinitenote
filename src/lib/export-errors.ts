@@ -6,11 +6,12 @@
  * pdf-export throws, note-app maps `code` to the user-facing message.
  */
 
-export type ExportErrorCode = "emptyPage";
+export type ExportErrorCode = "emptyPage" | "emptySection";
 
 /** English message per export failure code (surfaced as a toast). */
 export const EXPORT_ERROR_MESSAGES: Record<ExportErrorCode, string> = {
   emptyPage: "Nothing to export — this page is empty.",
+  emptySection: "Nothing to export — this section has no pages yet.",
 };
 
 export class ExportError extends Error {
