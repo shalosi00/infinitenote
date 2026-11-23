@@ -13,7 +13,7 @@
  *
  * Test plan: docs/test-plans/sub-sections.md (ids SB-P1..P12).
  */
-import type { Section } from "./types";
+import type { PageRow, Section } from "./types";
 import { byOrder } from "./types";
 import { isSectionGroup } from "./section-groups";
 
@@ -120,4 +120,20 @@ export function canReparent(
  */
 export function sectionSiblingKey(s: Section): string {
   return `${s.notebookId}|${parentOf(s) ?? ""}`;
+}
+
+/**
+ * The alive pages of one section, in export order (issue #344): the
+ * section→pages projection the sidebar order implies — alive rows only,
+ * sorted by `order`, tie-broken by creation time so equal orders stay
+ * deterministic. Pure so the section-PDF exporter's input assembly is
+ * unit-testable without Dexie.
+ */
+export function selectSectionPages(
+  pages: readonly PageRow[],
+  sectionId: string
+): PageRow[] {
+  return pages
+    .filter((p) => p.sectionId === sectionId && !p.deletedAt)
+    .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
 }

@@ -220,6 +220,17 @@ milestones/issues. This file is the plan; the status file is the reality.
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.20.0)
+- [x] Export section as PDF (issue #344, shipped 2026-11-23): OneNote
+      "Export notes as a PDF (Section)" parity — the section menu's
+      "Export as PDF" (A4 portrait/landscape) flows every alive page of the
+      section, in sidebar order, into ONE paginated A4 document through the
+      print engine's new data-driven core (pdf-sheet-render.ts, shared with
+      the page export); per-page paper style honored, pages without ink
+      render as blank sheets carrying their footer, the footer sheet counter
+      runs 1..N across the document; read-only — zero data-model change,
+      zero sync surface. Phase-2 candidate: notebook-level export with
+      section divider sheets (OneNote's third scope)
+      (docs/test-plans/section-pdf-export.md)
 - [ ] Further product-parity candidates from a fresh majors evidence pass
       (evidence-first, wave by wave)
 
