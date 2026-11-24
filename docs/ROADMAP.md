@@ -216,10 +216,30 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.23 — Parity continues (current)
+## v1.24 — Parity continues (current)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0 through v1.23.0; the
+      real GPU hardware (carried forward from v1.15.0 through v1.24.0; the
+      release rotated it to the v1.24.0 milestone, the v1.15.0-to-v1.23.0
+      precedent)
+- [x] Sub-pages phase 2: drag-to-indent (issue #365, shipped 2026-11-24;
+      issue #359's named phase-2 candidate — the page menu commands shipped
+      in v1.23.0 are the keyboard/touch path; the drag gesture mirrors the
+      section-tab drag shipped in #325): a page dropped on another page
+      indents under it (the OneNote drag-over-page gesture, gated by the
+      same canMakeSubpage policy — same section, cycle-safe, two-tier cap);
+      a page dropped on its own section row promotes one level (the menu
+      Promote command's gesture path); invalid targets never highlight
+      (cycle, depth cap, foreign section, groups) and notebook rows accept
+      section drags only. Read-only — zero data-model change, zero sync
+      surface
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.23 — Parity continues (shipped in v1.23.0)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.22.0; the
       release rotated it to the v1.23.0 milestone, the v1.15.0-to-v1.22.0
       precedent)
 - [x] Sub-pages (issue #359, shipped 2026-11-24): OneNote "Make subpage"

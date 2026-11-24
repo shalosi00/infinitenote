@@ -56,10 +56,10 @@ and sync yourself. No account, no telemetry, no lock-in.
 **Notebook**
 
 - **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder,
-  color, duplicate — pages indent into sub-pages (OneNote's "Make subpage",
-  two tiers) and sections nest inside each other (OneNote's "New Section
-  Group" / Joplin's sub-notebooks): any section can hold pages AND child
-  sections, subtree trash/restore included.
+  color, duplicate — pages indent into sub-pages (OneNote's "Make subpage":
+  menu command and drag-to-indent, two tiers) and sections nest inside each
+  other (OneNote's "New Section Group" / Joplin's sub-notebooks): any section
+  can hold pages AND child sections, subtree trash/restore included.
 - **Page version history** — automatic snapshots every 5 minutes on structural
   change, manual "Save version now", and a safety copy before every restore;
   roll back to any of the last 25 versions per page.
@@ -267,7 +267,8 @@ Shipped most recently (the product-parity waves): **export notebook as
 PDF** (OneNote "Export notes as a PDF (Notebook)" parity — every
 section opens on a divider sheet, one document for the whole
 notebook) and **export section as PDF** (the whole section as one paginated
-document), sub-sections with
+document), **sub-pages with drag-to-indent** (OneNote page hierarchy —
+"Make subpage" as menu command and gesture), sub-sections with
 drag-to-reparent and cross-notebook section moves, per-section colors,
 **section groups** (OneNote "Section Groups" parity — folder-glyph
 groups that keep sections together and hold no pages), in-page find,
@@ -275,7 +276,7 @@ checklists, and **ink to shape** — drawn shapes become
 perfect geometry in one undo step. Next up on the
 [roadmap](docs/ROADMAP.md) /
 [milestones](https://github.com/shalosi00/infinitenote/milestones):
-the v1.22 line — further parity candidates from fresh majors evidence
+the v1.24 line — further parity candidates from fresh majors evidence
 passes, plus the hardware-blocked real-GPU handwriting benchmark.
 
 ## Acknowledgements

@@ -63,3 +63,52 @@ folders stay valid.
 - **SUBP-04** export order: one-line scenes on both pages → a 2-sheet
   portrait PDF, both markers inflate out, global "1 / 2"…"2 / 2", and
   the parent's marker precedes the subpage's marker in the streams
+
+
+## Phase 2 — drag-to-indent (issue #365, shipped 2026-11-24)
+
+The gesture half of the feature (OneNote's desktop page-list operation):
+a page dropped on another page indents under it; a page dropped on its
+OWN section row promotes one level. The gesture reuses the #325 drag
+stack exactly (PointerSensor 6px activation, listeners-only rows,
+pointerWithin, invalid targets never highlight) one level down the tree,
+and flows through one new store action `setPageParent(id, targetParentId)`
+(the #359 db write, already pinned) — the menu commands stay untouched.
+
+| Aspect | Decision |
+|---|---|
+| Drop on page | `canMakeSubpage(st.pages, activeId, overId)` — the SAME pure gate the menu item uses (same section, cycle-safe, two-tier cap for the whole moved subtree); success toast `Made "A" a subpage of "B"` on "moved" |
+| Drop on own section row | `canPromoteWithin` (alive, THAT section, carries a parent) → `promoteTarget` (grandparent id, or null = top) — one level, the menu Promote semantics; groups and foreign sections never accept; a top-level page dropped on its own section is a no-op |
+| Notebook rows | highlight for SECTION drags only (#325 semantics) — a page dragged over a notebook row neither highlights nor drops (pages never re-home by drag; the bulk-move dialog stays the cross-section path) |
+| Highlight | the target row gates its own `data-drop-active` through the pure policy — a cycle, cap, cross-section or group target never highlights, and an unhighlighted drop is an unhandled id (zero writes) |
+| Read-only | zero data-model change, zero sync surface, no Dexie migration |
+
+## Phase-2 unit pins (src/lib/__tests__/page-tree-drag.test.ts)
+
+- **PG-P15** drop-on-page accepts exactly what the menu command accepts:
+  same-section indent, already-a-child → gate passes / db answers noop,
+  self-subtree cycle refusal, cross-section refusal (both directions)
+- **PG-P16** the cap rejects the gesture for oversized subtrees: the
+  height-2 family under a top-level target reads depth 3 → refused;
+  exact-fit and safe directions accepted
+- **PG-P17** drop-on-own-section accepts only subpages of THAT section:
+  subpage → top level (promoteTarget answers the grandparent = null),
+  sub-subpage → the grandparent, top-level page → no-op, foreign section
+  → refused, trashed source → refused, dangling parent still promotes
+  (write-heal)
+
+## Phase-2 E2E (e2e/sub-pages-drag.spec.ts, 5 checks)
+
+- **PGD-N01** drag "Page 2" onto "Start here" with the mid-drag
+  `data-drop-active` assert on the REAL dnd-kit pipeline → visible order
+  `[[Start here, 0], [Page 2, 1]]`
+- **PGD-N02** the subpage dragged onto its section row highlights it and
+  promotes back to the top level
+- **PGD-N03** a two-tier chain built purely by drags
+  (`[[Start here, 0], [Page 2, 1], [Page 3, 2]]`); the root dragged onto
+  its own descendant never highlights and the chain is unchanged
+- **PGD-N04** the cap rejects the height-2 family under a top-level
+  target (no highlight, structure unchanged); a page dragged over the
+  notebook row never highlights it (section-drags-only gate)
+- **PGD-N05** a foreign section's page row rejects the drag (no
+  re-home); the drag-built chain survives a reload

@@ -29,7 +29,14 @@ import { exportNotebookPdf } from "@/lib/notebook-pdf";
 import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
 import type { PdfOrientation } from "@/lib/pdf-sheet-render";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
-import { canPromote, makeSubpageTarget, visiblePageTree } from "@/lib/page-tree";
+import {
+  canMakeSubpage,
+  canPromote,
+  canPromoteWithin,
+  makeSubpageTarget,
+  promoteTarget,
+  visiblePageTree,
+} from "@/lib/page-tree";
 import {
   ArrowDown,
   ArrowUp,
@@ -135,8 +142,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [themesOpen, setThemesOpen] = useState(false);
 
-  /* -------- section moves (issue #325): drag gesture + dialog path -------- */
+  /* -------- section moves (issue #325) + page drag-to-indent (issue #365):
+     one drag gesture + one dialog path each -------- */
   const moveSectionTo = useAppStore((s) => s.moveSectionTo);
+  const setPageParent = useAppStore((s) => s.setPageParent);
   const [moveSectionId, setMoveSectionId] = useState<string | null>(null);
   // 6px activation distance so clicks, double-click renames and menu
   // opens on the same rows never turn into accidental drags
@@ -153,16 +162,53 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     });
   };
 
-  // Drop semantics (the gesture mirror of the dialog): a section dropped
+  // Drop semantics (the gesture mirror of the dialogs): a section dropped
   // on a notebook joins that notebook's top level (cross-notebook
-  // allowed); dropped on another section it nests under it. Invalid
-  // targets never highlight (the nodes gate their own visual state via
-  // canReparent) and end up here as nothing more than an unhandled id.
+  // allowed); dropped on another section it nests under it. A page
+  // dropped on another page indents under it (issue #365 — the OneNote
+  // drag-over-page gesture, gated by the same canMakeSubpage policy the
+  // menu item uses); a page dropped on its OWN section row promotes one
+  // level (the menu Promote command's gesture path). Invalid targets
+  // never highlight (the nodes gate their own visual state) and end up
+  // here as nothing more than an unhandled id.
   const onDragEnd = (e: DragEndEvent) => {
     const activeId = String(e.active.id);
     const overId = e.over?.id != null ? String(e.over.id) : null;
     if (!overId || overId === activeId) return;
     const st = useAppStore.getState();
+
+    if (dragType(e.active.data.current) === "page") {
+      const srcPage = st.pages.find((p) => p.id === activeId && !p.deletedAt);
+      if (!srcPage) return;
+      const targetPage = st.pages.find((p) => p.id === overId && !p.deletedAt);
+      // drop on a page of the SAME section → indent under it
+      if (targetPage && targetPage.sectionId === srcPage.sectionId) {
+        if (canMakeSubpage(st.pages, activeId, overId)) {
+          void setPageParent(activeId, overId).then((r) => {
+            if (r === "moved") {
+              toast.success(`Made "${srcPage.title}" a subpage of "${targetPage.title}"`);
+            }
+          });
+        }
+        return;
+      }
+      // drop on the page's OWN section row → promote one level; groups
+      // hold no pages and foreign sections never accept
+      const targetSection = st.sections.find((s) => s.id === overId);
+      if (
+        targetSection &&
+        !isSectionGroup(targetSection) &&
+        targetSection.id === srcPage.sectionId &&
+        canPromote(st.pages, activeId)
+      ) {
+        const target = promoteTarget(st.pages, activeId); // grandparent, or null = top
+        void setPageParent(activeId, target).then((r) => {
+          if (r === "moved") toast.success(`Promoted "${srcPage.title}"`);
+        });
+      }
+      return;
+    }
+
     const src = st.sections.find((s) => s.id === activeId);
     if (!src) return;
     const targetNotebook = st.notebooks.find((n) => n.id === overId);
@@ -464,6 +510,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 }
 
 /* ------------------------------------------------------------------ */
+/* shared drag helpers (issues #325 + #365)                             */
+/* ------------------------------------------------------------------ */
+
+/** The type tag carried in every draggable's dnd-kit data payload. */
+type DragData = { type?: string; name?: string };
+
+const dragType = (data: unknown): string | undefined =>
+  (data as DragData | undefined)?.type;
+
+/* ------------------------------------------------------------------ */
 /* notebook node                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -522,13 +578,17 @@ function NotebookNode({
   };
 
   // drop target (issue #325): a section dropped on a notebook joins its
-  // top level — cross-notebook allowed, same-notebook is a no-op success
+  // top level — cross-notebook allowed, same-notebook is a no-op success.
+  // Issue #365: the highlight is section-only — a page dragged over a
+  // notebook row neither highlights nor drops (pages never re-home by
+  // drag; the bulk-move dialog stays the cross-section path).
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: notebook.id,
     data: { type: "notebook" },
   });
-  const dragActive = useDndContext().active != null;
-  const dropHighlight = isOver && dragActive;
+  const active = useDndContext().active;
+  const dragActive = active != null;
+  const dropHighlight = isOver && dragActive && dragType(active.data.current) === "section";
   const setRowRef = (el: HTMLDivElement | null) => setDropRef(el);
 
   const isRenaming = renaming === notebook.id;
@@ -791,12 +851,20 @@ function SectionNode({
     id: section.id,
     data: { type: "section" },
   });
-  const activeId = useDndContext().active?.id;
+  const dnd = useDndContext();
+  const activeId = dnd.active?.id;
   const activeSectionId = activeId != null ? String(activeId) : null;
+  // What may drop here (issues #325 + #365): a SECTION nests under this
+  // section (canReparent); a PAGE dropped on a section row promotes one
+  // level — only its OWN section, never a group (groups hold no pages).
+  // Invalid targets never highlight and never accept.
   const dropValid =
     activeSectionId !== null &&
     activeSectionId !== section.id &&
-    canReparent(allTreeSections, activeSectionId, section.id);
+    (dragType(dnd.active?.data.current) === "page"
+      ? canPromoteWithin(allPages, activeSectionId, section.id) &&
+        !isSectionGroup(section)
+      : canReparent(allTreeSections, activeSectionId, section.id));
   const dropHighlight = isOver && dropValid;
   const setRowRef = (el: HTMLDivElement | null) => {
     setDragRef(el);
@@ -1090,6 +1158,37 @@ function PageNode({
   const subpageTarget = makeSubpageTarget(storePages, page.id);
   const promotable = canPromote(storePages, page.id);
 
+  // Drag-to-indent (issue #365, phase 2 of #359): the row is a drag
+  // source AND a drop target — a page dropped on another page indents
+  // under the target (the OneNote drag-over-page gesture), gated by the
+  // same canMakeSubpage policy the menu item uses; invalid targets never
+  // highlight. Listeners only — the full attributes set would give the
+  // row div role="button" (name = all its text) and collide with every
+  // existing getByRole locator; keyboard/touch users keep the menu
+  // commands. Promote-by-drag lives on the SECTION row (the gesture path
+  // of the menu's Promote), not here.
+  const {
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({ id: page.id, data: { type: "page", name: page.title } });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: page.id,
+    data: { type: "page" },
+  });
+  const dnd = useDndContext();
+  const activePageId = dnd.active?.id != null ? String(dnd.active.id) : null;
+  const dropValid =
+    activePageId !== null &&
+    activePageId !== page.id &&
+    dragType(dnd.active?.data.current) === "page" &&
+    canMakeSubpage(storePages, activePageId, page.id);
+  const dropHighlight = isOver && dropValid;
+  const setRowRef = (el: HTMLDivElement | null) => {
+    setDragRef(el);
+    setDropRef(el);
+  };
+
   /** OneNote "Copy Link to Page" (wave 13): copies `infinitenote:page/<id>`;
    *  pasting it on any page inserts a clickable link to this page. */
   const copyPageLink = () => {
@@ -1122,13 +1221,18 @@ function PageNode({
 
   return (
     <div
-      className="group relative flex items-center rounded-md pr-1 hover:bg-sidebar-accent"
+      ref={setRowRef}
+      {...listeners}
+      className={`group relative flex items-center rounded-md pr-1 hover:bg-sidebar-accent ${
+        isDragging ? "opacity-40" : ""
+      } ${dropHighlight ? "bg-accent/60 ring-1 ring-ring" : ""}`}
       data-testid="page-row"
       data-page-id={page.id}
       data-section-id={section.id}
       data-selected={selected}
       data-checked={selectMode && checked}
       data-depth={depth}
+      data-drop-active={dropHighlight || undefined}
       style={depth > 0 ? { marginLeft: depth * 16 } : undefined}
     >
       {selectMode && (
