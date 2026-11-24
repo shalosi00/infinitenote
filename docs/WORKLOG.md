@@ -49,6 +49,79 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-24 — Sub-pages: OneNote page hierarchy "Make subpage" parity, wave 23 (#359/#360)
+
+- **Task**: wave 23 — the fourteenth product-parity wave, per the wave-22
+  pointer ("further majors-evidence parity waves"). Evidence pass
+  (2026-11-24): OneNote indents pages under pages — "You can indent a page
+  underneath a page to create a subpage. In the page list, right-click ...
+  a page that you want to indent, and then click Make subpage"
+  (support.microsoft.com, "Create a subpage in OneNote"; desktop's drag-right
+  gesture is the same operation), depth-capped at TWO subpage tiers
+  (learn.microsoft.com answers + onenotegem FAQ), while Joplin has NO note
+  hierarchy at all — notes are flat inside notebooks, nesting exists only
+  for notebooks (github.com/laurent22/joplin#451, open since 2018) — and
+  our pages were flat: exactly the gap the sub-section machinery
+  (#314/#325/#337) already solved one level up. Shipped this cycle, closing
+  #359 into the v1.23.0 milestone and released the same cycle.
+- **Design**: `Page.parentId?: string | null` — the section-parentId
+  precedent exactly (optional, NOT indexed, no Dexie version bump; top-level
+  rows carry NO field, the pre-#359 shape stays byte-stable). Pure policy
+  `src/lib/page-tree.ts` (no Dexie imports — the wave-21 poisoning lesson):
+  visiblePageTree (the sidebar AND export-order projection; missing/trashed/
+  foreign/cycle parents read as visible roots, over-deep hand edits clamp at
+  the cap without rewriting), canMakeSubpage (same section, cycle-safe,
+  whole-subtree depth fit), makeSubpageTarget/promoteTarget, RAW
+  subtreePageIds (the subtreeSectionIds contract — trashed rows stay
+  reachable so cascades act through separately-trashed intermediates; the
+  first cut filtered trashed rows and the restore/purge/move pins caught
+  the family fragmentation immediately). Sibling-scoped orders everywhere
+  (create/move/duplicate scope to (sectionId, parentId)); setPageParent
+  "moved"/"noop"/"invalid" like moveSectionTo; trashPage/trashPages cascade
+  the alive subtree with one timestamp, restorePage restores same-ts
+  members AND resurrects trashed ancestors, purgePage removes the raw
+  subtree; movePagesToSection carries the mover's whole raw subtree while
+  the root flattens (a selected child whose parent is also moving RIDES);
+  restoreBackup re-attaches page parents through the section two-phase
+  pattern; sync carries parentId ADDITIVELY in the page file
+  (SyncPageFile gains the optional field, written only when set;
+  pagesEqual compares it; normalizeOrders scopes pages by
+  sectionId|parentId — pre-#359 grouping unchanged; a pre-feature device's
+  round cannot flatten the structure: whole-row LWW, local wins ties);
+  selectSectionPages returns the VISIBLE tree order (a subpage exports
+  right after its parent); nextSelectionAfterPageDelete excludes the
+  deleted page's whole subtree and keeps the pinned flat contract for the
+  survivor. The page menu gains "Make subpage" + "Promote"; rows render
+  indented with data-depth, NO collapse state. Drag-to-indent is the named
+  phase-2 candidate (ROADMAP v1.24).
+- **Lessons (measured this cycle)**:
+  - The store's promote action initially conflated "already top level"
+    with "promote target IS the top level" (both `null`) — SUBP-02 caught
+    it live; the guard now reads the page's own parentId first, and null
+    from promoteTarget legitimately means the top level.
+  - The wave-21/22 apply.sh pattern (`git add -A src/ docs/ e2e/`) missed
+    the ROOT docs (PROJECT_STATUS/README/.github) — the first PR head
+    carried 15 files; amended to 18. Future apply scripts stage the root
+    docs explicitly.
+  - The sandbox reverted HEAD between calls TWICE mid-release (once into a
+    wrong-base amend that force-push then replaced, once around the
+    flatpak re-pin) — every recovery came from `git reset --hard
+    origin/<ref>` + the staging dirs; nothing pushed was ever lost.
+  - The fdroid validator (run in the release-prep gate for the first time)
+    flagged the PRE-EXISTING 1.22.0 Builds entry missing its gradle
+    declaration — fixed in #361.
+- **Gate**: 1354 unit / 98 files, 0 fail (base 4efc92a: 1327/95 — +27 pins:
+  15 PG-P pure + 9 PG-D db + 3 PG-S sync); 264 e2e / 55 files; SUBP-01..04
+  4/4; neighbors 53/53. PR #360 (squash `e651f4f`, 9/9 check-runs green on
+  head `c5892ee`); GitHub auto-close did NOT fire despite the plain
+  `Closes #359` line — closed explicitly via API (the standing hazard).
+- **Release train (same cycle, the v1.22.0 precedent)**: release prep #361
+  (version files 1.23.0/330 + fdroid gradle fix + metainfo entry), release
+  PR #362 develop-to-main MERGE `2b5ec81`, tag v1.23.0 + GitHub Release
+  with hand-written notes, milestones rotated (#24 closed, #25 v1.24.0
+  opened, #193 moved forward), flatpak extra-data re-pinned to the real
+  v1.23.0 AppImage (#363 — digest matched byte-for-byte).
+
 ## 2026-11-24 — Export notebook as PDF: OneNote "Export notes as a PDF (Notebook)" parity, wave 22 (#351/#352)
 
 - **Task**: wave 22 — the phase-2 candidate the wave-21 docs named
