@@ -3,6 +3,7 @@
  */
 import type { Notebook, PageMeta, Section } from "./types";
 import { byOrder } from "./types";
+import { subtreePageIds, visiblePageOrder } from "./page-tree";
 
 export interface TreeSnapshot {
   notebooks: Notebook[];
@@ -18,23 +19,29 @@ export interface Selection {
 
 /**
  * After removing the currently open page, pick the next page to open —
- * OneNote behavior: next sibling → previous sibling → first page in
- * section → first page in notebook → first page anywhere → null.
+ * OneNote behavior: next page → previous page → first page in section →
+ * first page in notebook → first page anywhere → null.
  *
- * The page being deleted is excluded from all candidates.
+ * Candidates exclude the page's whole SUBTREE (issue #359): trashing a
+ * parent cascades to its subpages in the same write, so none of them is
+ * ever a valid next selection. Candidates list in the section's VISIBLE
+ * tree order (sibling-scoped orders alone no longer imply the flat
+ * sequence once pages can indent), then keep the pinned flat-order
+ * contract: the first candidate at-or-after the deleted page's `order`
+ * wins — equal-order ties resolve to the tied survivor — and a stale id
+ * (deletedOrder = +Infinity) falls back to the last candidate.
  */
 export function nextSelectionAfterPageDelete(
   tree: TreeSnapshot,
   current: Selection
 ): Selection | null {
+  const doomed = new Set(subtreePageIds(tree.pages, current.pageId)); // self + descendants
   const withoutDeleted: TreeSnapshot = {
     notebooks: tree.notebooks,
     sections: tree.sections,
-    pages: tree.pages.filter((p) => p.id !== current.pageId),
+    pages: tree.pages.filter((p) => !doomed.has(p.id)),
   };
-  const inSection = withoutDeleted.pages
-    .filter((p) => p.sectionId === current.sectionId)
-    .sort(byOrder);
+  const inSection = visiblePageOrder(withoutDeleted.pages, current.sectionId);
   if (inSection.length) {
     const deletedOrder =
       tree.pages.find((orig) => orig.id === current.pageId)?.order ?? Number.POSITIVE_INFINITY;

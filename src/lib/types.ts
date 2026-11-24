@@ -92,6 +92,15 @@ export const isPageBackground = (v: unknown): v is PageBackground =>
 export interface PageRow {
   id: string;
   sectionId: string;
+  /**
+   * Parent page id when this page is a subpage (OneNote "Make subpage"
+   * parity, issue #359). null/absent = top level in the section's page
+   * list (the pre-#359 shape). Optional by design: old rows, old backups
+   * and old sync folders stay valid. NOT indexed — the section parentId
+   * precedent (issue #314): no Dexie version bump. The policy lives in
+   * page-tree.ts; the OneNote depth cap is two tiers of subpages.
+   */
+  parentId?: string | null;
   title: string;
   order: number;
   createdAt: number;

@@ -13,6 +13,7 @@ import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./l
 import { quickNoteTitle, todayKey } from "./quick-notes";
 import { generatedNames } from "./generated-names";
 import { ancestorSectionIds } from "./section-tree";
+import { makeSubpageTarget, promoteTarget } from "./page-tree";
 import { parseTemplateContent } from "./page-templates";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
@@ -102,6 +103,10 @@ interface AppStore {
   createPageFromTemplate: (sectionId: string, templateId: string) => Promise<boolean>;
   renamePage: (id: string, title: string) => Promise<void>;
   movePage: (id: string, dir: -1 | 1) => Promise<void>;
+  /** OneNote "Make subpage" (issue #359): demote under the previous sibling. */
+  makeSubpage: (id: string) => Promise<void>;
+  /** OneNote promote (issue #359): raise the page one level. */
+  promotePage: (id: string) => Promise<void>;
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
 
@@ -479,6 +484,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
   movePage: async (id, dir) => {
     await db.movePage(id, dir);
     await get().refresh();
+  },
+
+  /**
+   * OneNote "Make subpage" (issue #359): demote the page under its
+   * previous sibling in its own scope — the exact support.microsoft.com
+   * command ("right-click a page ... and then click Make subpage"), as
+   * the keyboard/touch path for the drag gesture. The pure policy decides
+   * both availability (depth cap) and the target; a hidden no-op here is
+   * a menu item that never rendered, never a silent mutation.
+   */
+  makeSubpage: async (id) => {
+    const target = makeSubpageTarget(get().pages, id);
+    if (!target) return;
+    const result = await db.setPageParent(id, target.id);
+    if (result === "moved") await get().refresh();
+  },
+
+  /**
+   * OneNote promote (issue #359): raise the page one level — onto the
+   * grandparent (a sub-subpage becomes a subpage), or to the section's
+   * top level (a subpage becomes a plain page). Hidden for top-level
+   * pages. A dangling parent id heals to the top level through the same
+   * write: promoteTarget answers null for it and null IS the top-level
+   * target — the guard above separates "already top level" from
+   * "promoting TO the top level".
+   */
+  promotePage: async (id) => {
+    const pages = get().pages;
+    const current = pages.find((p) => p.id === id);
+    if (!current || (current.parentId ?? null) === null) return; // nothing to promote
+    const target = promoteTarget(pages, id); // grandparent id, or null = top level
+    const result = await db.setPageParent(id, target);
+    if (result === "moved") await get().refresh();
   },
   duplicatePage: async (id) => {
     const copy = await db.duplicatePage(id);

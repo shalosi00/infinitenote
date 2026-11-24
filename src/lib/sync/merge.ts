@@ -167,9 +167,13 @@ function mergeTreeRows<T extends RowLike>(
 function pagesEqual(a: PageRow, b: PageRow): boolean {
   // `order` is deliberately NOT compared: sibling orders are renumbered
   // after the merge, so an order difference is not content divergence.
+  // parentId IS compared (issue #359): a demote/promote is a real edit —
+  // two devices disagreeing about a page's indent must conflict, not
+  // silently collapse.
   return (
     a.title === b.title &&
     a.sectionId === b.sectionId &&
+    (a.parentId ?? null) === (b.parentId ?? null) &&
     a.deletedAt === b.deletedAt &&
     (a.background ?? null) === (b.background ?? null) &&
     (a.tags ?? []).join("\u0000") === (b.tags ?? []).join("\u0000") &&
@@ -346,7 +350,13 @@ export function computeSyncPlan(
   // sub-sections (issue #314): sibling groups are scoped by notebook AND
   // parent, so one parent's renumbering can never interleave with another's
   const sections = normalizeOrders([...secMerged.values()], (s) => `${s.notebookId}|${s.parentId ?? ""}`);
-  const pages = normalizeOrders([...pg.merged.values(), ...conflictCopies], (p) => p.sectionId);
+  const pages = normalizeOrders(
+    [...pg.merged.values(), ...conflictCopies],
+    // sub-pages (issue #359): sibling scopes are (section, parent) — the
+    // sectionSiblingKey precedent. Pre-#359 rows all carry null → the old
+    // per-section grouping is unchanged.
+    (p) => `${p.sectionId}|${p.parentId ?? ""}`
+  );
 
   // ---- summary: what applying this plan changes on this device ----------
   const localNbs = new Map(local.notebooks.map((n) => [n.id, n]));
