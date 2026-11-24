@@ -51,6 +51,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.23.0" date="2026-11-24">
+      <description>
+        <p>Sub-pages (OneNote's "Make subpage" parity): a page now indents
+        under another page of the same section — up to two tiers, OneNote's
+        own cap — via the page menu's "Make subpage" and "Promote"; the
+        sidebar renders the indented tree, trash/restore/purge and bulk
+        moves keep the family together, and a section's PDF export follows
+        the indented order.</p>
+      </description>
+    </release>
     <release version="1.22.0" date="2026-11-24">
       <description>
         <p>Export a whole notebook as one paginated PDF (OneNote's "Export notes
