@@ -38,8 +38,8 @@ app is fully client-side.
 bun install          # restore dependencies
 bun run lint         # ESLint
 bunx tsc --noEmit    # typecheck
-bun test src/lib/__tests__   # 1327 unit tests / 95 files (measured 2026-11-24 on the wave-22 branch, base 4928616)
-bunx playwright test # E2E: 260 checks / 54 files (boots the app if :3000 is free)
+bun test src/lib/__tests__   # 1354 unit tests / 98 files (measured 2026-11-24 on the wave-23 branch, base 4efc92a)
+bunx playwright test # E2E: 264 checks / 55 files (boots the app if :3000 is free)
 ```
 
 If you cannot run the E2E suite, say so — do not claim it passed.

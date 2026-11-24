@@ -29,6 +29,7 @@ import { exportNotebookPdf } from "@/lib/notebook-pdf";
 import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
 import type { PdfOrientation } from "@/lib/pdf-sheet-render";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
+import { canPromote, makeSubpageTarget, visiblePageTree } from "@/lib/page-tree";
 import {
   ArrowDown,
   ArrowUp,
@@ -43,6 +44,8 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSync,
+  IndentDecrease,
+  IndentIncrease,
   Keyboard,
   LayoutGrid,
   LayoutTemplate,
@@ -742,7 +745,6 @@ function SectionNode({
   const addSection = useAppStore((s) => s.addSection);
   const addSectionGroup = useAppStore((s) => s.addSectionGroup);
   const openTemplatesPicker = useAppStore((s) => s.openTemplatesPicker);
-  const ownPages = allPages.filter((p) => p.sectionId === section.id);
   const rename = useAppStore((s) => s.renameSection);
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
@@ -999,21 +1001,25 @@ function SectionNode({
       {expanded && (
         <div className="ml-4 flex flex-col gap-0.5 border-l pl-1">
           {!group &&
-            [...ownPages]
-              .sort(byOrder)
-              .map((page) => (
-                <PageNode
-                  key={page.id}
-                  page={page}
-                  notebook={notebook}
-                  section={section}
-                  selected={selection?.pageId === page.id}
-                  renaming={renaming}
-                  setRenaming={setRenaming}
-                  onNavigate={onNavigate}
-                  selectProps={selectProps}
-                />
-              ))}
+            // Sub-pages (issue #359): the section's pages render in the
+            // section's VISIBLE tree order — every top-level page followed
+            // depth-first by its subpages (OneNote's indented page list).
+            // No collapse state: a parent keeps its pages visible, so a
+            // fresh subpage can never land in a hidden branch.
+            visiblePageTree(allPages, section.id).map(({ page, depth }) => (
+              <PageNode
+                key={page.id}
+                page={page}
+                depth={depth}
+                notebook={notebook}
+                section={section}
+                selected={selection?.pageId === page.id}
+                renaming={renaming}
+                setRenaming={setRenaming}
+                onNavigate={onNavigate}
+                selectProps={selectProps}
+              />
+            ))}
           {childSections(allSections, section.id).map((child) => (
             <SectionNode
               key={child.id}
@@ -1050,6 +1056,7 @@ function SectionNode({
 
 function PageNode({
   page,
+  depth,
   notebook,
   section,
   selected,
@@ -1059,6 +1066,8 @@ function PageNode({
   selectProps,
 }: {
   page: PageMeta;
+  /** visible indent level (0 = top-level page, 1 = subpage, 2 = sub-subpage) */
+  depth: number;
   notebook: Notebook;
   section: Section;
   selected: boolean;
@@ -1071,7 +1080,15 @@ function PageNode({
   const duplicate = useAppStore((s) => s.duplicatePage);
   const del = useAppStore((s) => s.deletePage);
   const move = useAppStore((s) => s.movePage);
+  const makeSubpage = useAppStore((s) => s.makeSubpage);
+  const promotePage = useAppStore((s) => s.promotePage);
   const selectPage = useAppStore((s) => s.selectPage);
+  // Sub-pages (issue #359): the menu's Make-subpage/Promote availability is
+  // the pure policy's call — previous sibling + OneNote's two-tier depth
+  // cap decide, so a hand-edited tree can never offer a corrupting action.
+  const storePages = useAppStore((s) => s.pages);
+  const subpageTarget = makeSubpageTarget(storePages, page.id);
+  const promotable = canPromote(storePages, page.id);
 
   /** OneNote "Copy Link to Page" (wave 13): copies `infinitenote:page/<id>`;
    *  pasting it on any page inserts a clickable link to this page. */
@@ -1111,6 +1128,8 @@ function PageNode({
       data-section-id={section.id}
       data-selected={selected}
       data-checked={selectMode && checked}
+      data-depth={depth}
+      style={depth > 0 ? { marginLeft: depth * 16 } : undefined}
     >
       {selectMode && (
         <button
@@ -1210,6 +1229,22 @@ function PageNode({
           <DropdownMenuItem onClick={() => void move(page.id, 1)}>
             <ArrowDown /> {"Move down"}
           </DropdownMenuItem>
+          {subpageTarget && (
+            <DropdownMenuItem
+              data-testid="page-make-subpage"
+              onClick={() => void makeSubpage(page.id)}
+            >
+              <IndentIncrease /> {"Make subpage"}
+            </DropdownMenuItem>
+          )}
+          {promotable && (
+            <DropdownMenuItem
+              data-testid="page-promote"
+              onClick={() => void promotePage(page.id)}
+            >
+              <IndentDecrease /> {"Promote"}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => void del(page.id)}>
             <Trash2 /> {"Move to trash"}

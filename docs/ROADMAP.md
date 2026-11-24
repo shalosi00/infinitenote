@@ -219,11 +219,22 @@ milestones/issues. This file is the plan; the status file is the reality.
 ## v1.23 — Parity continues (current)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0 through v1.22.0; the
+      real GPU hardware (carried forward from v1.15.0 through v1.23.0; the
       release rotated it to the v1.23.0 milestone, the v1.15.0-to-v1.22.0
       precedent)
-- [ ] Further product-parity candidates from a fresh majors evidence pass
-      (evidence-first, wave by wave)
+- [x] Sub-pages (issue #359, shipped 2026-11-24): OneNote "Make subpage"
+      parity — the wave-23 majors-evidence candidate (support.microsoft.com
+      "Create a subpage"; depth capped at TWO subpage tiers, OneNote's own
+      cap; Joplin has no note hierarchy at all, laurent22/joplin#451). A
+      page indents under the previous sibling of its own scope via the page
+      menu's "Make subpage" (the keyboard/touch path; drag-to-indent is the
+      named phase-2 candidate) and "Promote" raises one level; pages carry
+      the section-parentId precedent field (`parentId?: string | null`,
+      optional, NOT indexed, no Dexie version bump); sibling-scoped orders,
+      subtree trash/restore/purge, bulk-move subtree carry, backup two-phase
+      parent re-attach, additive sync carry in the page file, and the
+      section PDF export follows the indented order
+      (docs/test-plans/sub-pages.md)
 
 ## v1.22 — Parity continues (shipped in v1.22.0)
 
