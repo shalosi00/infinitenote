@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1317%20unit%20%2B%20256%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1357%20unit%20%2B%20269%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -276,7 +276,7 @@ checklists, and **ink to shape** — drawn shapes become
 perfect geometry in one undo step. Next up on the
 [roadmap](docs/ROADMAP.md) /
 [milestones](https://github.com/shalosi00/infinitenote/milestones):
-the v1.24 line — further parity candidates from fresh majors evidence
+the v1.25 line — further parity candidates from fresh majors evidence
 passes, plus the hardware-blocked real-GPU handwriting benchmark.
 
 ## Acknowledgements

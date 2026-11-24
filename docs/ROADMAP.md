@@ -216,10 +216,19 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.24 — Parity continues (current)
+## v1.25 — Parity continues (current)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
-      real GPU hardware (carried forward from v1.15.0 through v1.24.0; the
+      real GPU hardware (carried forward from v1.15.0 through v1.25.0; the
+      release rotated it to the v1.25.0 milestone, the v1.15.0-to-v1.24.0
+      precedent)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.24 — Parity continues (shipped in v1.24.0)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.23.0; the
       release rotated it to the v1.24.0 milestone, the v1.15.0-to-v1.23.0
       precedent)
 - [x] Sub-pages phase 2: drag-to-indent (issue #365, shipped 2026-11-24;
