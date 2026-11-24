@@ -49,6 +49,47 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-25 — Sub-pages phase 2: drag-to-indent, wave 24 (#365/#366) + v1.24.0 release
+
+- **Task**: wave 24 — the issue-#359 named phase-2 candidate the ROADMAP
+  v1.24 block carried: the gesture half of OneNote page hierarchy. The
+  menu commands shipped in v1.23.0 stay the keyboard/touch path.
+- **Evidence**: OneNote's desktop page list makes a page a subpage by
+  dragging it onto the page it should indent under (support.microsoft.com
+  documents the menu command; the drag is the desktop affordance). Joplin
+  has no hierarchy to mirror.
+- **Design**: the #325 drag stack reused exactly one level down —
+  PointerSensor 6px, listeners-only rows, pointerWithin, per-target
+  `data-drop-active` gating through the pure policy (invalid targets
+  never highlight; an unhighlighted drop is an unhandled id, zero
+  writes). Drop-on-page → canMakeSubpage via a new store action
+  setPageParent (the pinned #359 db write re-validates); drop-on-own-
+  section-row → canPromoteWithin (new pure gate) + promoteTarget — one
+  level, the menu Promote semantics. Notebook rows highlight for section
+  drags only. Read-only: zero data-model change, zero sync surface.
+- **Gate**: 1357 unit / 99 files, 0 fail (base b0c0f61: 1354/98 — +3
+  pins PG-P15..P17); 269 e2e / 56 files; PGD-N01..05 5/5; drag + sidebar
+  neighbors 33/33 (sub-pages, section-move, section-groups, sub-sections,
+  multiselect, crud, section-colors, search-trash).
+- **Sandbox lesson (repeat)**: the whole staging dir + tree was wiped by a
+  mid-cycle restore right after the first E2E run — the staging-first
+  pattern paid off: issue #365 (API) and the notes survived; the staging
+  was rebuilt from origin/develop in ~10 minutes. Also: a zombie
+  `next dev` from a killed Playwright run held port 3000 at 88% CPU and
+  silently hung every later run — check `ss -tlnp | grep 3000` before
+  suspecting the spec.
+- **Display lesson (repeat)**: the "[m"-stripping output filter
+  re-triggered — the README "[milestones]" link DISPLAYED as broken and a
+  broken-link fix was drafted before the python probe showed the file
+  byte-intact (chr(91)+chr(109) present). The probe rule held.
+- **Ship**: PR #366 (feature) squash-merged `e5ecc7f`; #365 closed via the
+  API. Release train: prep #367 (`853a405`), release PR #368 as MERGE
+  commit `17c0ba1`, tag v1.24.0 + hand-written GitHub Release, milestones
+  rotated (#25 closed, #26 opened, #193 moved forward). Post-release docs
+  pass: ROADMAP v1.25 block, PROJECT_STATUS rotation, README badge
+  re-pin (was stale at 1317/256 since wave 21 — the badge joins the count
+  sweep checklist), this entry.
+
 ## 2026-11-24 — Sub-pages: OneNote page hierarchy "Make subpage" parity, wave 23 (#359/#360)
 
 - **Task**: wave 23 — the fourteenth product-parity wave, per the wave-22
