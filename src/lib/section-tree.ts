@@ -16,6 +16,7 @@
 import type { PageRow, Section } from "./types";
 import { byOrder } from "./types";
 import { isSectionGroup } from "./section-groups";
+import { visiblePageOrder } from "./page-tree";
 
 /** The effective parent id of a section (absent field = top level). */
 export function parentOf(s: Section): string | null {
@@ -123,19 +124,18 @@ export function sectionSiblingKey(s: Section): string {
 }
 
 /**
- * The alive pages of one section, in export order (issue #344): the
- * section→pages projection the sidebar order implies — alive rows only,
- * sorted by `order`, tie-broken by creation time so equal orders stay
- * deterministic. Pure so the section-PDF exporter's input assembly is
- * unit-testable without Dexie.
+ * The alive pages of one section, in export order (issue #344; generalized
+ * by issue #359): the section→pages projection the sidebar order implies —
+ * alive rows only, in the section's VISIBLE tree order (a top-level page
+ * followed by its subpages depth-first — OneNote exports the indented
+ * order; a subpage lands right after its parent). Pure so the section-PDF
+ * exporter's input assembly is unit-testable without Dexie.
  */
 export function selectSectionPages(
   pages: readonly PageRow[],
   sectionId: string
 ): PageRow[] {
-  return pages
-    .filter((p) => p.sectionId === sectionId && !p.deletedAt)
-    .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+  return visiblePageOrder(pages, sectionId);
 }
 
 /**

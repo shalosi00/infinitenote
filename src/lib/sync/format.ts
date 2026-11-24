@@ -72,6 +72,15 @@ export interface SyncManifest {
 export interface SyncPageFile {
   id: string;
   sectionId: string;
+  /**
+   * Parent page id when the page is a subpage (issue #359). Optional by
+   * design: folders written before sub-pages carry no field and parse as
+   * top level — additive, the section-parentId manifest precedent. Unlike
+   * sections (which ride the manifest via Omit and need no format change),
+   * the page FILE picks explicit fields, so sub-pages need this one field
+   * to survive a sync round.
+   */
+  parentId?: string | null;
   title: string;
   order: number;
   createdAt: number;
@@ -202,6 +211,10 @@ export function buildSyncFolderFiles(
     const file: SyncPageFile = {
       id: page.id,
       sectionId: page.sectionId,
+      // sub-pages (issue #359): written only when set — pre-#359 rows keep
+      // producing the exact old file shape (the plain-section kind
+      // precedent: structured clone drops undefined properties)
+      ...(page.parentId ? { parentId: page.parentId } : {}),
       title: page.title,
       order: page.order,
       createdAt: page.createdAt,
@@ -339,6 +352,9 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
     pages.set(file.id, {
       id: file.id,
       sectionId: file.sectionId,
+      // absent field = top level — an old folder or a hand-stripped page
+      // file degrades to a flat page, never to a broken tree
+      parentId: typeof file.parentId === "string" ? file.parentId : null,
       title: typeof file.title === "string" ? file.title : generatedNames().untitled,
       order: typeof file.order === "number" ? file.order : 0,
       createdAt: typeof file.createdAt === "number" ? file.createdAt : 0,

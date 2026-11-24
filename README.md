@@ -32,7 +32,7 @@ and sync yourself. No account, no telemetry, no lock-in.
 
 | | |
 |---|---|
-| **OneNote-style notebooks** | Notebooks → sections → pages — sections nest into sub-sections (OneNote "New Section Group" / Joplin sub-notebooks style) — with colors, drag order, duplicate, trash with restore, and up to 25 restore-able versions per page. |
+| **OneNote-style notebooks** | Notebooks → sections → pages — pages indent into sub-pages (OneNote "Make subpage" parity, two tiers like OneNote itself) and sections nest into sub-sections (OneNote "New Section Group" / Joplin sub-notebooks style) — with colors, drag order, duplicate, trash with restore, and up to 25 restore-able versions per page. |
 | **Infinite canvas** | Draw, handwrite and type anywhere (Excalidraw engine) — ink overlays text, images, audio players and PDF printouts on the same page. |
 | **Search everything** | `Ctrl+K` full-text search across every page — including text recognized in images (OCR) and in your handwriting. |
 | **On-device intelligence** | "Recognize text in images" (tesseract.js, English + German) and "Recognize handwriting (English)" (TrOCR model, ≈64 MB, downloaded once) run 100% locally. Your ink and images never leave the device. |
@@ -56,9 +56,10 @@ and sync yourself. No account, no telemetry, no lock-in.
 **Notebook**
 
 - **OneNote-style hierarchy** — notebooks, sections and pages; rename, reorder,
-  color, duplicate — and nest sections inside each other (OneNote's
-  "New Section Group" / Joplin's sub-notebooks): any section can hold pages
-  AND child sections, subtree trash/restore included.
+  color, duplicate — pages indent into sub-pages (OneNote's "Make subpage",
+  two tiers) and sections nest inside each other (OneNote's "New Section
+  Group" / Joplin's sub-notebooks): any section can hold pages AND child
+  sections, subtree trash/restore included.
 - **Page version history** — automatic snapshots every 5 minutes on structural
   change, manual "Save version now", and a safety copy before every restore;
   roll back to any of the last 25 versions per page.

@@ -25,6 +25,7 @@ import { byOrder } from "./types";
 import { safeSectionColor } from "./section-colors";
 import { isSectionGroup, normalizeSectionKind } from "./section-groups";
 import { ancestorSectionIds, canReparent, subtreeSectionIds } from "./section-tree";
+import { canMakeSubpage, parentOf as parentPageOf, subtreePageIds } from "./page-tree";
 import {
   buildPageVersion,
   pruneToCapacity,
@@ -521,13 +522,28 @@ export async function findPageByTitle(sectionId: string, title: string): Promise
 export async function createPage(
   sectionId: string,
   title: string,
-  content: string | null = null
+  content: string | null = null,
+  parentId: string | null = null
 ): Promise<PageMeta> {
-  const siblings = await db.pages.where("sectionId").equals(sectionId).toArray();
+  // sub-pages (issue #359): a new subpage's order is scoped to its parent's
+  // sibling scope — top-level pages and children of other pages never
+  // influence it (the createSection convention, issue #314)
+  const all = await db.pages.where("sectionId").equals(sectionId).toArray();
+  if (parentId !== null) {
+    const parent = all.find((p) => p.id === parentId);
+    if (!parent || parent.deletedAt !== null) {
+      throw new Error("a subpage's parent must be an alive page of the same section");
+    }
+  }
+  const siblings = all.filter((p) => parentPageOf(p) === parentId);
   const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
   const page: PageRow = {
     id: newId(),
     sectionId,
+    // top-level pages carry NO parentId field at all — the pre-#359 row
+    // shape (the plain-section kind precedent, issue #337: a conditional
+    // spread, not a null, so structured clones keep the old shape)
+    ...(parentId ? { parentId } : {}),
     title,
     order: maxOrder + 1,
     createdAt: now(),
@@ -557,8 +573,11 @@ export async function setPageTags(id: string, tags: string[]): Promise<void> {
 export async function movePage(id: string, dir: -1 | 1): Promise<void> {
   const page = await db.pages.get(id);
   if (!page) return;
+  // sub-pages (issue #359): up/down moves within the page's OWN sibling
+  // scope (same section, same parent) — the moveSection convention; the
+  // visible neighbor one scope away is never touched
   const siblings = (await db.pages.where("sectionId").equals(page.sectionId).toArray())
-    .filter((p) => p.deletedAt === null)
+    .filter((p) => p.deletedAt === null && parentPageOf(p) === parentPageOf(page))
     .sort(byOrder);
   const idx = siblings.findIndex((p) => p.id === id);
   const target = idx + dir;
@@ -571,16 +590,66 @@ export async function movePage(id: string, dir: -1 | 1): Promise<void> {
   });
 }
 
+/** Result of setPageParent (issue #359). */
+export type PageMoveResult = "moved" | "noop" | "invalid";
+
+/**
+ * Sub-pages (issue #359): re-parent a page — to another page of the same
+ * section (demote: OneNote "Make subpage", or one-level promote onto the
+ * grandparent) or to the section's top level (target null). The page's
+ * whole subtree rides along implicitly: every descendant keeps its own
+ * parentId, so the hierarchy below the mover never rewrites.
+ *
+ * - invalid (zero writes): missing/trashed mover or target, a target in
+ *   another section, a self/descendant target, or a OneNote depth-cap
+ *   violation for the moved subtree (canMakeSubpage)
+ * - noop (zero writes): the page already lives under the target
+ * - moved: the mover lands at the END of the target sibling scope
+ *   (moveSectionTo's convention); a dangling target-parent id heals to
+ *   the top level (the visiblePageTree read-time tolerance, made durable)
+ */
+export async function setPageParent(
+  pageId: string,
+  targetParentId: string | null
+): Promise<PageMoveResult> {
+  const page = await db.pages.get(pageId);
+  if (!page || page.deletedAt !== null) return "invalid";
+  const siblingsAll = await db.pages
+    .where("sectionId")
+    .equals(page.sectionId)
+    .toArray();
+  if (targetParentId !== null) {
+    const target = siblingsAll.find((p) => p.id === targetParentId);
+    if (!target || target.deletedAt !== null) return "invalid";
+    if (!canMakeSubpage(siblingsAll, pageId, targetParentId)) return "invalid";
+  }
+  if (parentPageOf(page) === targetParentId) return "noop";
+
+  const siblings = siblingsAll.filter(
+    (p) => p.deletedAt === null && parentPageOf(p) === targetParentId
+  );
+  const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
+  await db.pages.update(pageId, {
+    parentId: targetParentId,
+    order: maxOrder + 1,
+    updatedAt: now(),
+  });
+  return "moved";
+}
+
 /**
  * Duplicate a page inside its section: fresh row id, title suffixed " (copy)",
  * scene content copied as-is (scenes are self-contained per page — files live
- * inside the content JSON), order placed last among siblings. Returns the new
- * page meta, or null when the source page is missing or trashed.
+ * inside the content JSON), indent level kept (a subpage's copy stays its
+ * parent's child — OneNote duplicates keep the level), order placed last
+ * among its OWN sibling scope. Returns the new page meta, or null when the
+ * source page is missing or trashed.
  */
 export async function duplicatePage(id: string): Promise<PageMeta | null> {
   const page = await db.pages.get(id);
   if (!page || page.deletedAt !== null) return null;
-  const siblings = await db.pages.where("sectionId").equals(page.sectionId).toArray();
+  const all = await db.pages.where("sectionId").equals(page.sectionId).toArray();
+  const siblings = all.filter((p) => parentPageOf(p) === parentPageOf(page));
   const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
   const copy: PageRow = {
     ...page,
@@ -596,8 +665,27 @@ export async function duplicatePage(id: string): Promise<PageMeta | null> {
   return meta;
 }
 
+/**
+ * Soft-delete a page and cascade the same `deletedAt` timestamp to its
+ * alive SUBTREE (issue #359 — the trashSection pattern): a parent page's
+ * subpages go to the trash with it, so the family restores as one. Only
+ * ALIVE members are stamped, so separately-trashed children keep their
+ * own timestamp and are never resurrected by a later restore of the
+ * parent. Cycle-safe (the visitor set).
+ */
 export async function trashPage(id: string): Promise<void> {
-  await db.pages.update(id, { deletedAt: now(), updatedAt: now() });
+  const ts = now();
+  await db.transaction("rw", db.pages, async () => {
+    const all = await db.pages.toArray();
+    for (const pid of subtreePageIds(all, id)) {
+      const row = all.find((p) => p.id === pid);
+      if (!row || row.deletedAt !== null) continue; // already trashed on its own
+      await db.pages.update(pid, {
+        deletedAt: ts,
+        ...(pid === id ? { updatedAt: ts } : {}),
+      });
+    }
+  });
 }
 
 /**
@@ -609,11 +697,17 @@ export async function trashPage(id: string): Promise<void> {
 
 /**
  * Move the given pages into a target section, appending them after its
- * existing pages while preserving their sidebar-visible order (notebook →
- * section → page). Pages already in the target (and trashed/unknown ids) are
- * skipped. Returns how many pages actually moved; 0 also when the target
- * section is missing, trashed, or a section group (groups hold no pages,
- * issue #337).
+ * existing top-level pages while preserving their sidebar-visible order
+ * (notebook → section → page). Sub-pages (issue #359) mirror the
+ * moveSectionTo subtree rule: a moved page's WHOLE subtree follows it
+ * (descendants keep their own parentId/order — alive and trashed alike,
+ * so the hierarchy and the trash stay restorable), and the moved root
+ * itself lands at the target's TOP level (parentId cleared). A selected
+ * page whose parent row is also being moved simply rides along — it is
+ * never ripped out of the moving subtree. Pages already in the target
+ * (and trashed/unknown ids) are skipped. Returns how many pages actually
+ * moved (roots only); 0 also when the target section is missing, trashed,
+ * or a section group (groups hold no pages, issue #337).
  */
 export async function movePagesToSection(
   pageIds: readonly string[],
@@ -628,8 +722,9 @@ export async function movePagesToSection(
   const ids = [...new Set(pageIds)];
   if (ids.length === 0) return 0;
 
-  // `order` is a sibling index within one section, so the batch's visible
-  // order must be derived from the whole tree (read outside the write tx)
+  // `order` is a sibling index within one parent scope, so the batch's
+  // visible order must be derived from the whole tree (read outside the
+  // write tx)
   const [allSections, allNotebooks] = await Promise.all([
     db.sections.toArray(),
     db.notebooks.toArray(),
@@ -648,29 +743,66 @@ export async function movePagesToSection(
 
   let moved = 0;
   await db.transaction("rw", db.pages, async () => {
-    const rows = await db.pages.bulkGet(ids);
-    const toMove = rows.filter(
-      (p): p is PageRow => !!p && p.deletedAt === null && p.sectionId !== targetSectionId
+    const allRows = await db.pages.toArray();
+    const selected = new Set(ids);
+    const movers = allRows.filter(
+      (p) =>
+        selected.has(p.id) &&
+        p.deletedAt === null &&
+        p.sectionId !== targetSectionId &&
+        // a page whose parent row is also moving rides along — the root
+        // write would rip it out of the moving subtree
+        !(
+          parentPageOf(p) !== null &&
+          allRows.some(
+            (m) =>
+              m.id === parentPageOf(p) &&
+              selected.has(m.id) &&
+              m.deletedAt === null &&
+              m.sectionId !== targetSectionId
+          )
+        )
     );
-    if (toMove.length === 0) return;
-    const siblings = await db.pages.where("sectionId").equals(targetSectionId).toArray();
-    const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
-    toMove.sort(byTreeKey);
-    for (const [i, p] of toMove.entries()) {
+    if (movers.length === 0) return;
+    // every mover's whole RAW subtree follows (moveSectionTo's rule): alive
+    // AND trashed descendants carry over with deletedAt stamps untouched, so
+    // the family stays together and restorable in its new section — the raw
+    // walk reaches through separately-trashed intermediates (the
+    // subtreeSectionIds contract; callers filter by deletedAt as needed)
+    const followers = new Set<string>();
+    for (const m of movers) {
+      for (const sid of subtreePageIds(allRows, m.id)) {
+        if (sid !== m.id) followers.add(sid);
+      }
+    }
+    const topSiblings = await db.pages
+      .where("sectionId")
+      .equals(targetSectionId)
+      .toArray()
+      .then((rows) => rows.filter((p) => parentPageOf(p) === null));
+    const maxOrder = Math.max(0, ...topSiblings.map((p) => p.order));
+    movers.sort(byTreeKey);
+    for (const [i, p] of movers.entries()) {
       await db.pages.update(p.id, {
         sectionId: targetSectionId,
+        parentId: null,
         order: maxOrder + 1 + i,
         updatedAt: now(),
       });
     }
-    moved = toMove.length;
+    for (const sid of followers) {
+      await db.pages.update(sid, { sectionId: targetSectionId, updatedAt: now() });
+    }
+    moved = movers.length;
   });
   return moved;
 }
 
 /**
  * Soft-delete many pages with one shared timestamp (single undo epoch, each
- * row individually restorable). Returns how many pages were trashed.
+ * row individually restorable). Each selected page's alive subtree cascades
+ * with it (issue #359), so a batch that selects a parent and a child still
+ * stamps every affected row once. Returns how many rows were trashed.
  */
 export async function trashPages(pageIds: readonly string[]): Promise<number> {
   const ids = [...new Set(pageIds)];
@@ -678,10 +810,18 @@ export async function trashPages(pageIds: readonly string[]): Promise<number> {
   const ts = now();
   let trashed = 0;
   await db.transaction("rw", db.pages, async () => {
-    const rows = await db.pages.bulkGet(ids);
-    for (const p of rows) {
-      if (!p || p.deletedAt !== null) continue;
-      await db.pages.update(p.id, { deletedAt: ts, updatedAt: ts });
+    const all = await db.pages.toArray();
+    const cascade = new Set<string>();
+    for (const id of ids) {
+      for (const pid of subtreePageIds(all, id)) cascade.add(pid);
+    }
+    for (const pid of cascade) {
+      const row = all.find((p) => p.id === pid);
+      if (!row || row.deletedAt !== null) continue;
+      await db.pages.update(pid, {
+        deletedAt: ts,
+        updatedAt: ids.includes(pid) ? ts : row.updatedAt,
+      });
       trashed += 1;
     }
   });
@@ -691,9 +831,31 @@ export async function trashPages(pageIds: readonly string[]): Promise<number> {
 export async function restorePage(id: string): Promise<void> {
   const page = await db.pages.get(id);
   if (!page?.deletedAt) return;
+  const ts = page.deletedAt;
   await db.transaction("rw", [db.pages, db.sections, db.notebooks], async () => {
-    await db.pages.update(id, { deletedAt: null, updatedAt: now() });
-    // bring back ancestors so the page is reachable (OneNote-like)
+    // subtree members trashed together with the restored page (same ts)
+    // come back with it (issue #359 — the restoreSection pattern);
+    // separately-trashed children keep their own timestamp and stay put
+    const all = await db.pages.toArray();
+    for (const pid of subtreePageIds(all, id)) {
+      const row = all.find((p) => p.id === pid);
+      if (row && row.deletedAt === ts) await db.pages.update(pid, { deletedAt: null });
+    }
+    // trashed ANCESTOR pages come back too (OneNote-like: the family
+    // restores, restoreSection's ancestor resurrection one level up)
+    const byId = new Map(all.map((p) => [p.id, p] as const));
+    let cur = parentPageOf(page);
+    const seenAncestors = new Set<string>([id]);
+    while (cur !== null && !seenAncestors.has(cur)) {
+      const row = byId.get(cur);
+      if (!row) break; // dangling parent id — the chain ends here
+      if (row.deletedAt !== null) await db.pages.update(cur, { deletedAt: null });
+      seenAncestors.add(cur);
+      cur = parentPageOf(row);
+    }
+    await db.pages.update(id, { updatedAt: now() });
+    // bring back section/notebook ancestors so the page is reachable
+    // (OneNote-like)
     const sec = await db.sections.get(page.sectionId);
     if (sec?.deletedAt) {
       await db.sections.update(sec.id, { deletedAt: null });
@@ -705,11 +867,15 @@ export async function restorePage(id: string): Promise<void> {
 
 export async function purgePage(id: string): Promise<void> {
   await db.transaction("rw", [db.pages, db.tombstones, db.pageVersions], async () => {
-    const page = await db.pages.get(id);
-    if (page) {
+    // the whole subtree dies (issue #359 — the purgeSection pattern): every
+    // descendant page, its version snapshots, one tombstone per row
+    const all = await db.pages.toArray();
+    for (const pid of subtreePageIds(all, id)) {
+      const page = all.find((p) => p.id === pid);
+      if (!page) continue;
       await db.tombstones.put({ id: page.id, kind: "page", at: now(), title: page.title });
-      await db.pageVersions.where("pageId").equals(id).delete();
-      await db.pages.delete(id);
+      await db.pageVersions.where("pageId").equals(pid).delete();
+      await db.pages.delete(pid);
     }
   });
 }
@@ -996,6 +1162,8 @@ export async function restoreBackup(json: string): Promise<number> {
         kind?: unknown;
         name?: string;
         pages?: Array<{
+        id?: string;
+        parentId?: string | null;
         title?: string;
         content?: string | null;
         background?: PageRow["background"];
@@ -1073,12 +1241,17 @@ export async function restoreBackup(json: string): Promise<number> {
           await db.sections.update(row.newId, { parentId: mapped, updatedAt: ts });
         }
       }
-      // phase 3 — pages, index-aligned with the section creation order
+      // phase 3 — pages, index-aligned with the section creation order;
+      // sub-pages (issue #359) restore through the same two-phase re-attach
+      // the sections use: fresh ids first, original archive parent ids
+      // remembered, re-attached in phase 4 — anything dangling (parent row
+      // missing, or pointing outside its own section) restores as top level
       let sectionIndex = 0;
       for (const sec of nb.sections ?? []) {
         const secId = createdSections[sectionIndex]?.newId;
         sectionIndex += 1;
         let pageOrder = 0;
+        const createdPages: Array<{ newId: string; oldParentId: string | null }> = [];
         for (const page of sec.pages ?? []) {
           pageOrder += 1;
           pageCount += 1;
@@ -1087,8 +1260,9 @@ export async function restoreBackup(json: string): Promise<number> {
           // than crash the sidebar/search later (same contract as
           // parseSyncFolder on the sync side).
           const tags = safeTags(page.tags);
+          const rowId = newId();
           await db.pages.add({
-            id: newId(),
+            id: rowId,
             sectionId: secId,
             title: page.title?.trim() || generatedNames().restoredPage,
             order: pageOrder,
@@ -1099,6 +1273,26 @@ export async function restoreBackup(json: string): Promise<number> {
             background: page.background,
             tags: tags.length ? tags : undefined,
           });
+          createdPages.push({
+            newId: rowId,
+            oldParentId: typeof page.parentId === "string" ? page.parentId : null,
+          });
+        }
+        // phase 4 — re-attach page parents within the same section: only
+        // when the archive parent id maps to a page created from THIS
+        // section's archive rows; anything else restores as top level
+        const pageIdMap = new Map<string, string>();
+        const archivePages = sec.pages ?? [];
+        createdPages.forEach((row, i) => {
+          const oldId = archivePages[i]?.id;
+          if (typeof oldId === "string") pageIdMap.set(oldId, row.newId);
+        });
+        for (const row of createdPages) {
+          if (!row.oldParentId) continue;
+          const mapped = pageIdMap.get(row.oldParentId);
+          if (mapped) {
+            await db.pages.update(row.newId, { parentId: mapped, updatedAt: ts });
+          }
         }
       }
     }
