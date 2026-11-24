@@ -51,6 +51,15 @@
   </screenshots>
 
   <releases>
+    <release version="1.24.0" date="2026-11-25">
+      <description>
+        <p>Sub-pages phase 2 — drag-to-indent: a page dropped on another
+        page now indents under it (OneNote's drag-over-page gesture, the
+        same gate as the "Make subpage" command), and dropping a subpage
+        on its own section row promotes it one level. Invalid targets
+        never highlight and never write.</p>
+      </description>
+    </release>
     <release version="1.23.0" date="2026-11-24">
       <description>
         <p>Sub-pages (OneNote's "Make subpage" parity): a page now indents
