@@ -21,7 +21,8 @@
  * sidebar projection are unit-testable without Dexie — the wave-21
  * lesson: a test that pulls notes-db poisons every db-sharing test file.
  *
- * Test plan: docs/test-plans/sub-pages.md (ids PG-P1..PG-P14).
+ * Test plan: docs/test-plans/sub-pages.md (ids PG-P1..PG-P14, phase-2
+ * drag gates PG-P15..PG-P17).
  */
 import type { PageMeta, PageRow } from "./types";
 import { byOrder } from "./types";
@@ -305,4 +306,22 @@ export function promoteTarget(
   if (pid === null) return null;
   const parent = pages.find((p) => p.id === pid && !p.deletedAt);
   return parent ? parentOf(parent) : null;
+}
+
+/**
+ * Whether dropping `pageId` on `sectionId`'s row may promote it — the
+ * drag-to-indent gesture's other half (issue #365, phase 2 of #359):
+ * the page must be alive, IN that section, and carry a parent (a
+ * top-level page dropped on its own section row is a no-op, never a
+ * write; foreign sections and section groups never accept pages). The
+ * promote itself is one level — the menu command's exact semantics —
+ * through the same setPageParent write.
+ */
+export function canPromoteWithin(
+  pages: readonly TreePage[],
+  pageId: string,
+  sectionId: string
+): boolean {
+  const self = pages.find((p) => p.id === pageId && !p.deletedAt);
+  return !!self && self.sectionId === sectionId && parentOf(self) !== null;
 }

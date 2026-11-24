@@ -7,7 +7,7 @@
  */
 import { create } from "zustand";
 import * as db from "./notes-db";
-import type { SectionMoveResult } from "./notes-db";
+import type { PageMoveResult, SectionMoveResult } from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
 import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./last-page";
 import { quickNoteTitle, todayKey } from "./quick-notes";
@@ -107,6 +107,13 @@ interface AppStore {
   makeSubpage: (id: string) => Promise<void>;
   /** OneNote promote (issue #359): raise the page one level. */
   promotePage: (id: string) => Promise<void>;
+  /**
+   * Re-parent a page (issue #365, drag-to-indent phase 2): the general
+   * write behind the two menu commands — the gesture computes its own
+   * target (drop-on-page → that page; drop-on-own-section → the promote
+   * target) and flows through the same validated db write.
+   */
+  setPageParent: (id: string, targetParentId: string | null) => Promise<PageMoveResult>;
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
 
@@ -517,6 +524,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const target = promoteTarget(pages, id); // grandparent id, or null = top level
     const result = await db.setPageParent(id, target);
     if (result === "moved") await get().refresh();
+  },
+  /**
+   * Sub-pages phase 2 (issue #365): the drag gesture's write path —
+   * re-parent the page to an explicit target (a page id to indent under,
+   * or null for the section's top level). The db layer re-validates
+   * everything the UI gated on (alive rows, same section, cycle-safe,
+   * depth cap) — "invalid" and "noop" write nothing; the store refreshes
+   * only on "moved".
+   */
+  setPageParent: async (id, targetParentId) => {
+    const result = await db.setPageParent(id, targetParentId);
+    if (result === "moved") await get().refresh();
+    return result;
   },
   duplicatePage: async (id) => {
     const copy = await db.duplicatePage(id);
