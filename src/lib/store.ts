@@ -7,7 +7,11 @@
  */
 import { create } from "zustand";
 import * as db from "./notes-db";
-import type { PageMoveResult, SectionMoveResult } from "./notes-db";
+import type {
+  PageMoveResult,
+  SectionMoveResult,
+  SectionProtectionResult,
+} from "./notes-db";
 import { defaultExpandedState, firstPageSelection, nextSelectionAfterPageDelete, type Selection } from "./tree-ops";
 import { loadLastSelection, pickRestoredSelection, saveLastSelection } from "./last-page";
 import { quickNoteTitle, todayKey } from "./quick-notes";
@@ -15,10 +19,14 @@ import { generatedNames } from "./generated-names";
 import { ancestorSectionIds } from "./section-tree";
 import { makeSubpageTarget, promoteTarget } from "./page-tree";
 import { parseTemplateContent } from "./page-templates";
+import { unlockedSectionIdList } from "./section-protection";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
 
 export type SaveIndicator = "idle" | "saving" | "saved" | "error";
+
+/** The "Password protection" dialog modes (issue #371). */
+export type ProtectionDialogMode = "set" | "change" | "remove";
 
 interface AppStore {
   loaded: boolean;
@@ -125,6 +133,36 @@ interface AppStore {
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
 
+  /**
+   * Section protection (issue #371 — OneNote "Password Protection" parity).
+   * The unlock cache lives in section-protection.ts (memory only, cleared
+   * by a reload); this mirror array drives the reactive UI (lock badges,
+   * the unlock card in place of the canvas). Results follow the db layer:
+   * "done" | "invalid" (wrong password / already-protected target) |
+   * "invalid-section" (missing, trashed, group, or not protected).
+   */
+  unlockedSectionIds: string[];
+  protectionDialog: { mode: ProtectionDialogMode; sectionId: string } | null;
+  openProtectionDialog: (mode: ProtectionDialogMode, sectionId: string) => void;
+  closeProtectionDialog: () => void;
+  protectSection: (
+    sectionId: string,
+    password: string,
+    hint?: string | null,
+  ) => Promise<SectionProtectionResult>;
+  unlockSection: (sectionId: string, password: string) => Promise<SectionProtectionResult>;
+  lockSection: (sectionId: string) => Promise<void>;
+  changeSectionPassword: (
+    sectionId: string,
+    currentPassword: string,
+    newPassword: string,
+    hint?: string | null,
+  ) => Promise<SectionProtectionResult>;
+  removeSectionPassword: (
+    sectionId: string,
+    password: string,
+  ) => Promise<SectionProtectionResult>;
+
   /** OneNote-style quick capture (issue #19); opts.title names the page
    * (Web Share Target captures, issue #247) instead of the dated default. */
   createQuickNote: (opts?: { title?: string }) => Promise<void>;
@@ -197,6 +235,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   saveTemplateName: "",
   tagFilter: null,
   canvasFocus: 0,
+  unlockedSectionIds: [],
+  protectionDialog: null,
 
   load: () => {
     if (!initialLoadPromise) {
@@ -364,6 +404,43 @@ export const useAppStore = create<AppStore>((set, get) => ({
   deleteSection: async (id) => {
     await db.trashSection(id);
     await get().refresh();
+  },
+
+  /* ----------------------------------------------------------------
+   * Section protection (issue #371). Every mutation re-mirrors the
+   * db-layer unlock cache into `unlockedSectionIds` so the sidebar
+   * badges, the unlock card and the guards re-render.
+   * ---------------------------------------------------------------- */
+  openProtectionDialog: (mode, sectionId) => set({ protectionDialog: { mode, sectionId } }),
+  closeProtectionDialog: () => set({ protectionDialog: null }),
+  protectSection: async (sectionId, password, hint) => {
+    const result = await db.setSectionPassword(sectionId, password, hint);
+    if (result === "done") await get().refresh();
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+    return result;
+  },
+  unlockSection: async (sectionId, password) => {
+    const result = await db.unlockSection(sectionId, password);
+    // the cache is set on success (memory only); the mirror re-renders the
+    // canvas in place of the unlock card — no refresh needed (content
+    // never lived in the store)
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+    return result;
+  },
+  lockSection: async (sectionId) => {
+    await db.lockSection(sectionId);
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+  },
+  changeSectionPassword: async (sectionId, currentPassword, newPassword, hint) => {
+    const result = await db.changeSectionPassword(sectionId, currentPassword, newPassword, hint);
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+    return result;
+  },
+  removeSectionPassword: async (sectionId, password) => {
+    const result = await db.removeSectionPassword(sectionId, password);
+    if (result === "done") await get().refresh();
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+    return result;
   },
 
   addPage: async (sectionId, title) => {

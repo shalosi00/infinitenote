@@ -26,6 +26,7 @@ import type {
 import { byOrder } from "../types";
 import { generatedNames } from "../generated-names";
 import { safeTags } from "../tags";
+import { isEncryptedContent } from "../section-protection";
 
 export const MANIFEST_PATH = "manifest.json";
 export const TRASH_PATH = "trash.jsonl";
@@ -88,6 +89,18 @@ export interface SyncPageFile {
   background?: PageBackground;
   tags?: string[];
   scene: ScenePayload | null;
+  /**
+   * The raw at-rest content string carried VERBATIM for pages of
+   * password-protected sections (issue #371) — an `enc1.<iv>.<ct>`
+   * marker that the sync engine never parses, decrypts or re-encrypts;
+   * whole-row LWW compares the marker strings. Written ONLY when the
+   * content is a marker (pre-#371 files and unprotected pages keep the
+   * exact old shape). The section's protection block rides the manifest
+   * (Omit<Section, "deletedAt">), so a receiving device holds everything
+   * needed to unlock. The marker namespace cannot collide with scene JSON
+   * (scenes always start with `{` or `[`).
+   */
+  enc?: string;
 }
 
 /** A whole folder as text files: path → UTF-8 content. */
@@ -200,6 +213,29 @@ export function buildSyncFolderFiles(
   };
   for (const page of snapshot.pages) {
     if (page.deletedAt !== null) continue;
+    // protection (issue #371): an encrypted content marker rides VERBATIM
+    // in `enc` — JSON.parsing it would fail and export an EMPTY scene,
+    // silently destroying the page on the next merge round
+    const sealedContent = page.content;
+    if (sealedContent !== null && sealedContent !== undefined && isEncryptedContent(sealedContent)) {
+      const file: SyncPageFile = {
+        id: page.id,
+        sectionId: page.sectionId,
+        // sub-pages (issue #359): written only when set — pre-#359 rows
+        // keep producing the exact old file shape
+        ...(page.parentId ? { parentId: page.parentId } : {}),
+        title: page.title,
+        order: page.order,
+        createdAt: page.createdAt,
+        updatedAt: page.updatedAt,
+        background: page.background,
+        tags: page.tags,
+        scene: null,
+        enc: sealedContent,
+      };
+      files[pageFilePath(page.id)] = JSON.stringify(file);
+      continue;
+    }
     let scene: ScenePayload | null = null;
     if (page.content) {
       try {
@@ -349,6 +385,10 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
     // instead of failing the whole sync — unlike scene content, nothing of
     // substance is lost.
     const tags = safeTags(file.tags);
+    // protection (issue #371): the `enc` marker rides verbatim; a
+    // hand-edited marker-shaped-garbage field degrades to empty content
+    // (the corrupt-legacy contract — never garbage in the canvas)
+    const enc = typeof file.enc === "string" && isEncryptedContent(file.enc) ? file.enc : null;
     pages.set(file.id, {
       id: file.id,
       sectionId: file.sectionId,
@@ -362,7 +402,7 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
       deletedAt: null,
       background: file.background,
       tags: tags.length ? tags : undefined,
-      content: file.scene ? JSON.stringify(file.scene) : null,
+      content: enc ?? (file.scene ? JSON.stringify(file.scene) : null),
     });
   }
 

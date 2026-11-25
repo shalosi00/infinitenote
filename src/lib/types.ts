@@ -74,11 +74,39 @@ export interface Section {
    * policy lives in section-groups.ts.
    */
   kind?: "group" | null;
+  /**
+   * OneNote "Password Protection" parity (issue #371, phase 1): the
+   * additive at-rest encryption envelope for the section's pages. Absent/
+   * null = unprotected (the pre-#371 shape — old rows, old backups and
+   * old sync folders stay byte-stable). Additive and NOT indexed — the
+   * parentId/color/kind precedent: no Dexie version bump. The policy and
+   * the crypto envelope live in section-protection.ts.
+   */
+  protection?: SectionProtection | null;
   name: string;
   order: number;
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;
+}
+
+/**
+ * The at-rest protection envelope (issue #371). A random per-section data
+ * key is wrapped with a PBKDF2-derived key; the shape is validated by
+ * safeProtection (hand-edited archives degrade to "unprotected", never
+ * throw) and carried by whole-row LWW in sync manifests and backups.
+ */
+export interface SectionProtection {
+  /** base64url PBKDF2 salt (fresh random per set / change) */
+  salt: string;
+  /** PBKDF2-HMAC-SHA256 iteration count (pinned; recorded per row) */
+  iterations: number;
+  /** base64url AES-GCM-encrypted raw data key (the wrap) */
+  wrappedKey: string;
+  /** base64url GCM IV of the wrap */
+  wrapIv: string;
+  /** optional user hint shown on the unlock card (OneNote's hint) */
+  hint?: string | null;
 }
 
 /** Paper style of a page (OneNote-style ruled/grid backgrounds). */

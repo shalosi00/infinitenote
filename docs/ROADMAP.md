@@ -222,8 +222,25 @@ milestones/issues. This file is the plan; the status file is the reality.
       real GPU hardware (carried forward from v1.15.0 through v1.25.0; the
       release rotated it to the v1.25.0 milestone, the v1.15.0-to-v1.24.0
       precedent)
-- [ ] Further product-parity candidates from a fresh majors evidence pass
-      (evidence-first, wave by wave)
+- [x] Password-protected sections, phase 1 (issue #371, shipped 2026-11-25):
+      OneNote "Password Protection" parity — the wave-25 majors-evidence
+      candidate (support.microsoft.com "Protect notes with a password in
+      OneNote"; locked sections cannot be opened, exported, or searched;
+      a forgotten password cannot be recovered; Joplin has no per-container
+      lock — only whole-vault E2EE). A section locks via the section menu's
+      "Password protection" submenu (Set / Change / Remove password with an
+      optional hint, Lock now); pages and version snapshots are AES-GCM
+      sealed at rest under a random per-section key wrapped with
+      PBKDF2-SHA256 (600k iterations); the unlock cache is memory-only — a
+      reload locks again (OneNote locks on close); the canvas swaps for an
+      unlock card (hint + inline error) while locked; search skips locked
+      content and re-includes unlocked sections; section/notebook PDF
+      exports refuse locked sections (typed sectionLocked); sync carries
+      the ciphertext verbatim in the additive SyncPageFile.enc field and
+      backups carry envelope + ciphertext (hand-edited envelopes restore
+      unprotected). Additive `Section.protection` — no Dexie migration.
+      Phase-2 candidates: auto-lock after inactivity, lock-all menu
+      (docs/test-plans/section-protection.md)
 
 ## v1.24 — Parity continues (shipped in v1.24.0)
 
