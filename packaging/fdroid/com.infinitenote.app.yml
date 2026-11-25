@@ -177,3 +177,9 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+  - versionName: 1.25.0
+    versionCode: 350
+    commit: v1.25.0
+    subdir: android-twa
+    gradle:
+      - yes
