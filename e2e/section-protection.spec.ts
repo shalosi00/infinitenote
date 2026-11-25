@@ -80,11 +80,23 @@ test.describe.serial("password-protected sections (issue #371)", () => {
 
   /** Expand a collapsible sidebar row only when it is folded (a blind
       toggle click would COLLAPSE an already-expanded row — the wave-22
-      locator lesson). */
+      locator lesson). The poll RE-CLICKS on every iteration: a click that
+      lands during boot hydration (post-reload, slow CI runner) is
+      swallowed by the not-yet-attached handler, so the first attempt
+      alone is not trustworthy — retry until the row really expanded. */
   const ensureExpanded = async (name: string): Promise<void> => {
     const toggle = page.getByRole("button", { name, exact: true }).first();
-    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect
+      .poll(
+        async () => {
+          if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+            await toggle.click();
+          }
+          return toggle.getAttribute("aria-expanded");
+        },
+        { timeout: 20_000, intervals: [250, 500, 1000] },
+      )
+      .toBe("true");
   };
 
   /** Reveal the test section's page rows (My Notebook folds in the seed). */
