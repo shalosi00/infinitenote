@@ -216,7 +216,20 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.25 — Parity continues (current)
+## v1.25 — Parity continues (shipped in v1.25.0)
+
+## v1.26 — Parity continues (current)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.26.0; the
+      release rotated it to the v1.26.0 milestone, the v1.15.0-to-v1.25.0
+      precedent)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave) — the password-protection phase-2
+      candidates (#371 named them: auto-lock after inactivity, "Lock All
+      Protected Sections") are in the pool
+
+## v1.25 — Parity continues (shipped in v1.25.0)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.25.0; the
