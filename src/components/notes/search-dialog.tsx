@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/command";
 import { useAppStore } from "@/lib/store";
 import { buildSearchIndex, searchIndex } from "@/lib/search";
-import { db } from "@/lib/notes-db";
+import { db, getSearchableContent } from "@/lib/notes-db";
 
 export function SearchDialog() {
   const open = useAppStore((s) => s.searchOpen);
@@ -39,8 +39,12 @@ export function SearchDialog() {
     let cancelled = false;
     void (async () => {
       const rows = await db.pages.toArray();
+      // issue #371: unlocked protected sections decrypt through the key
+      // cache (OneNote re-includes a section in search while it is
+      // unlocked); locked sections keep the ciphertext marker, which the
+      // defensive extract contract reads as nothing — search skips them
       const map: Record<string, string | null> = {};
-      for (const row of rows) map[row.id] = row.content ?? null;
+      for (const row of rows) map[row.id] = await getSearchableContent(row);
       if (!cancelled) setContents(map);
     })();
     return () => {

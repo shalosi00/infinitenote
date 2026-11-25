@@ -41,7 +41,7 @@ import {
   type PdfRenderResult,
   type PdfSceneInput,
 } from "./pdf-sheet-render";
-import { getPageContent, listNotebooks, listPages, listSections } from "./notes-db";
+import { assertSectionsExportable, getPageContent, listNotebooks, listPages, listSections } from "./notes-db";
 import { isPageBackground, type Notebook } from "./types";
 import { sectionColorHex } from "./section-colors";
 import { isSectionGroup } from "./section-groups";
@@ -55,6 +55,8 @@ import { buildSectionDivider } from "./notebook-divider";
  * ExportError (code "emptyNotebook") when the notebook has no alive
  * sections at all; sections WITHOUT pages still open on their divider
  * sheet (OneNote exports empty sections too — the footer keeps the name).
+ * Any protected-and-LOCKED section in the notebook refuses first
+ * (issue #371 — OneNote cannot export locked sections; "sectionLocked").
  */
 export async function exportNotebookPdf(
   notebookId: string,
@@ -74,6 +76,9 @@ export async function exportNotebookPdf(
       "emptyNotebook",
     );
   }
+  // issue #371: every section the document would touch must be unlocked —
+  // a locked protected section anywhere in the export scope refuses
+  await assertSectionsExportable(rows.map((s) => s.id));
   const colorSource: Pick<Notebook, "color"> = notebook ?? { color: "violet" };
   const inputs: PdfSceneInput[] = [];
   for (const section of rows) {

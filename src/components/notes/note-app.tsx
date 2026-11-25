@@ -99,9 +99,15 @@ import { ShortcutsDialog } from "./shortcuts-dialog";
 import { HistoryDialog } from "./history-dialog";
 import { SaveTemplateDialog } from "./save-template-dialog";
 import { TemplatesDialog } from "./templates-dialog";
+import {
+  SectionProtectionDialog,
+  SectionUnlockCard,
+  PROTECTION_TOASTS,
+} from "./section-protection-dialog";
 import { PageLinkPickerDialog } from "./page-link-picker-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
+import { isSectionProtected } from "@/lib/section-protection";
 import { usePWA } from "./use-pwa";
 import { runSync } from "@/lib/sync/db";
 import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
@@ -381,6 +387,21 @@ export default function NoteApp() {
   const currentPage = useAppStore((s) =>
     s.selection ? s.pages.find((p) => p.id === s.selection!.pageId) ?? null : null
   );
+  // issue #371: the selected page's section lock state decides whether the
+  // canvas or the unlock card renders (OneNote: locked sections cannot be
+  // opened). The mirror of the memory-only key cache is reactive.
+  const currentPageSection = useAppStore((s) =>
+    currentPage ? s.sections.find((sec) => sec.id === currentPage.sectionId) ?? null : null,
+  );
+  const unlockedSectionIds = useAppStore((s) => s.unlockedSectionIds);
+  const currentSectionLocked =
+    currentPageSection !== null &&
+    isSectionProtected(currentPageSection) &&
+    !unlockedSectionIds.includes(currentPageSection.id);
+  const currentSectionHint =
+    currentPageSection?.protection?.hint != null && typeof currentPageSection.protection.hint === "string"
+      ? currentPageSection.protection.hint
+      : null;
 
   const pages = useAppStore((s) => s.pages);
   const allTags = useMemo(() => collectTags(pages), [pages]);
@@ -1033,6 +1054,19 @@ export default function NoteApp() {
   const handleRestoreVersion = useCallback(async (versionId: string) => {
     const pageId = useAppStore.getState().selection?.pageId;
     if (!pageId) return;
+    // issue #371: a locked section's snapshots are ciphertext — the dialog
+    // guard should have refused; the store mirror is the truth here
+    const state = useAppStore.getState();
+    const page = state.pages.find((p) => p.id === pageId);
+    const section = page ? state.sections.find((s) => s.id === page.sectionId) : undefined;
+    if (
+      section &&
+      isSectionProtected(section) &&
+      !state.unlockedSectionIds.includes(section.id)
+    ) {
+      toast.error("Unlock the section to work with its versions.");
+      return;
+    }
     try {
       await canvasApi.current?.flushSave();
       const current = await db.getPageContent(pageId);
@@ -1066,6 +1100,19 @@ export default function NoteApp() {
   const handleSaveAsTemplate = useCallback(async (rawName: string): Promise<boolean> => {
     const pageId = useAppStore.getState().selection?.pageId;
     if (!pageId) return false;
+    // issue #371: a locked section's pages cannot be read — the dialog
+    // should not even open from a locked canvas; the guard stays honest
+    const state = useAppStore.getState();
+    const page = state.pages.find((p) => p.id === pageId);
+    const section = page ? state.sections.find((s) => s.id === page.sectionId) : undefined;
+    if (
+      section &&
+      isSectionProtected(section) &&
+      !state.unlockedSectionIds.includes(section.id)
+    ) {
+      toast.error("Unlock the section to save its pages as templates.");
+      return false;
+    }
     try {
       await canvasApi.current?.flushSave();
       const content = (await db.getPageContent(pageId)) ?? { elements: [], files: {} };
@@ -1700,20 +1747,29 @@ export default function NoteApp() {
                 </span>
               </div>
 
-              {/* canvas */}
+              {/* canvas — or the unlock card while the page's section is
+                  locked (issue #371, OneNote's locked state) */}
               <div className="relative min-h-0 flex-1">
-                <CanvasEditor
-                  key={`${currentPage.id}:${sceneEpoch}`}
-                  pageId={currentPage.id}
-                  title={currentPage.title}
-                  theme={theme}
-                  background={(currentPage.background ?? "plain") as PageBackground}
-                  onApiReady={handleApiReady}
-                  onSaveIndicator={handleSaveIndicator}
-                  onToast={showToast}
-                  onPageLinkOpen={handlePageLinkOpen}
-                  onPageLinkPaste={handlePageLinkPaste}
-                />
+                {currentSectionLocked && currentPageSection ? (
+                  <SectionUnlockCard
+                    sectionId={currentPageSection.id}
+                    sectionName={currentPageSection.name}
+                    hint={currentSectionHint}
+                  />
+                ) : (
+                  <CanvasEditor
+                    key={`${currentPage.id}:${sceneEpoch}`}
+                    pageId={currentPage.id}
+                    title={currentPage.title}
+                    theme={theme}
+                    background={(currentPage.background ?? "plain") as PageBackground}
+                    onApiReady={handleApiReady}
+                    onSaveIndicator={handleSaveIndicator}
+                    onToast={showToast}
+                    onPageLinkOpen={handlePageLinkOpen}
+                    onPageLinkPaste={handlePageLinkPaste}
+                  />
+                )}
                 {/* issue #301 (wave 14): in-page find — a floating,
                     non-modal bar over the canvas. Mounted ONLY while
                     findOpen: closing unmounts it (fresh state on reopen)
@@ -1748,6 +1804,7 @@ export default function NoteApp() {
         onRestore={handleRestoreVersion}
       />
       <SaveTemplateDialog onSave={handleSaveAsTemplate} />
+      <SectionProtectionDialog />
       <TemplatesDialog />
       <PageLinkPickerDialog
         open={pageLinkOpen}

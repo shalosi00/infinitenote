@@ -19,6 +19,7 @@
  */
 import Dexie, { type Table } from "dexie";
 import { generatedNames } from "./generated-names";
+import { ExportError } from "./export-errors";
 import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
@@ -26,6 +27,23 @@ import { safeSectionColor } from "./section-colors";
 import { isSectionGroup, normalizeSectionKind } from "./section-groups";
 import { ancestorSectionIds, canReparent, subtreeSectionIds } from "./section-tree";
 import { canMakeSubpage, parentOf as parentPageOf, subtreePageIds } from "./page-tree";
+import {
+  PBKDF2_ITERATIONS,
+  SectionLockedError,
+  buildProtection,
+  cacheUnlockedKey,
+  decryptContent,
+  dropAllUnlockedKeys,
+  dropUnlockedKey,
+  encryptContent,
+  isEncryptedContent,
+  isSectionUnlocked,
+  safeProtection,
+  sealContent,
+  unlockedKey,
+  unlockedSectionIdList,
+  verifyPassword,
+} from "./section-protection";
 import {
   buildPageVersion,
   pruneToCapacity,
@@ -537,6 +555,17 @@ export async function createPage(
   }
   const siblings = all.filter((p) => parentPageOf(p) === parentId);
   const maxOrder = Math.max(0, ...siblings.map((p) => p.order));
+  // protection (issue #371): content landing in a protected section is
+  // sealed on write — a protected-but-locked target throws
+  // SectionLockedError (the store guards this path first, the data layer
+  // never trusts the caller). Pages created WITHOUT content (the common
+  // "+ Page" path) skip the section read entirely — no extra await on the
+  // hot path, byte-identical async shape to the pre-#371 createPage.
+  let sealed = content;
+  if (content !== null) {
+    const section = await db.sections.get(sectionId);
+    sealed = await sealContent(section, content);
+  }
   const page: PageRow = {
     id: newId(),
     sectionId,
@@ -549,7 +578,7 @@ export async function createPage(
     createdAt: now(),
     updatedAt: now(),
     deletedAt: null,
-    content,
+    content: sealed,
   };
   await db.pages.add(page);
   const { content: _c, ...meta } = page;
@@ -741,59 +770,115 @@ export async function movePagesToSection(
     return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2] || byOrder(a, b);
   };
 
-  let moved = 0;
-  await db.transaction("rw", db.pages, async () => {
-    const allRows = await db.pages.toArray();
-    const selected = new Set(ids);
-    const movers = allRows.filter(
-      (p) =>
-        selected.has(p.id) &&
-        p.deletedAt === null &&
-        p.sectionId !== targetSectionId &&
-        // a page whose parent row is also moving rides along — the root
-        // write would rip it out of the moving subtree
-        !(
-          parentPageOf(p) !== null &&
-          allRows.some(
-            (m) =>
-              m.id === parentPageOf(p) &&
-              selected.has(m.id) &&
-              m.deletedAt === null &&
-              m.sectionId !== targetSectionId
-          )
-        )
-    );
-    if (movers.length === 0) return;
-    // every mover's whole RAW subtree follows (moveSectionTo's rule): alive
-    // AND trashed descendants carry over with deletedAt stamps untouched, so
-    // the family stays together and restorable in its new section — the raw
-    // walk reaches through separately-trashed intermediates (the
-    // subtreeSectionIds contract; callers filter by deletedAt as needed)
-    const followers = new Set<string>();
-    for (const m of movers) {
-      for (const sid of subtreePageIds(allRows, m.id)) {
-        if (sid !== m.id) followers.add(sid);
-      }
+  // protection (issue #371): pages crossing a protection boundary must be
+  // re-sealed — content leaving a protected section is decrypted, content
+  // entering one is encrypted with the target's key. Both sides must be
+  // UNLOCKED: a locked source or target throws SectionLockedError with
+  // zero writes (the bulk-move dialog is the only path here).
+  const targetProtection = safeProtection(target.protection);
+  if (targetProtection && !isSectionUnlocked(targetSectionId)) {
+    throw new SectionLockedError(targetSectionId);
+  }
+  const sourceIds = new Set<string>();
+  for (const id of ids) {
+    const row = await db.pages.get(id);
+    if (row) sourceIds.add(row.sectionId);
+  }
+  for (const sid of sourceIds) {
+    const source = await db.sections.get(sid);
+    if (source && safeProtection(source.protection) && !isSectionUnlocked(sid)) {
+      throw new SectionLockedError(sid);
     }
+  }
+  const resolveCrossContent = async (
+    fromSectionId: string,
+    content: string | null,
+  ): Promise<string | null> => {
+    if (content === null) return null;
+    const from = await db.sections.get(fromSectionId);
+    const fromProtected = safeProtection(from?.protection) !== null;
+    const toProtected = targetProtection !== null;
+    // step 1 — to plaintext (leave the source's envelope behind)
+    let plain = content;
+    if (fromProtected) {
+      const dek = unlockedKey(fromSectionId);
+      if (!dek) throw new SectionLockedError(fromSectionId);
+      plain = isEncryptedContent(content) ? ((await decryptContent(dek, content)) ?? content) : content;
+    }
+    // step 2 — to the target's envelope
+    if (toProtected) {
+      const dek = unlockedKey(targetSectionId);
+      if (!dek) throw new SectionLockedError(targetSectionId);
+      return encryptContent(dek, plain);
+    }
+    return plain;
+  };
+
+  let moved = 0;
+  // protection content re-sealing happens OUTSIDE the write transaction:
+  // WebCrypto promises are not Dexie-tracked, so awaiting them inside the
+  // tx would commit it early (PrematureCommitError). The writes below are
+  // Dexie-only; the contents are resolved beforehand.
+  const allRowsPre = await db.pages.toArray();
+  const selectedPre = new Set(ids);
+  const moversPre = allRowsPre.filter(
+    (p) =>
+      selectedPre.has(p.id) &&
+      p.deletedAt === null &&
+      p.sectionId !== targetSectionId &&
+      // a page whose parent row is also moving rides along — the root
+      // write would rip it out of the moving subtree
+      !(
+        parentPageOf(p) !== null &&
+        allRowsPre.some(
+          (m) =>
+            m.id === parentPageOf(p) &&
+            selectedPre.has(m.id) &&
+            m.deletedAt === null &&
+            m.sectionId !== targetSectionId,
+        )
+      ),
+  );
+  const followerIds = new Set<string>();
+  for (const m of moversPre) {
+    for (const sid of subtreePageIds(allRowsPre, m.id)) {
+      if (sid !== m.id) followerIds.add(sid);
+    }
+  }
+  const contentUpdates = new Map<string, string | null>();
+  for (const p of moversPre) {
+    contentUpdates.set(p.id, await resolveCrossContent(p.sectionId, p.content ?? null));
+  }
+  for (const sid of followerIds) {
+    const row = allRowsPre.find((r) => r.id === sid);
+    if (row) contentUpdates.set(sid, await resolveCrossContent(row.sectionId, row.content ?? null));
+  }
+  await db.transaction("rw", db.pages, async () => {
     const topSiblings = await db.pages
       .where("sectionId")
       .equals(targetSectionId)
       .toArray()
       .then((rows) => rows.filter((p) => parentPageOf(p) === null));
     const maxOrder = Math.max(0, ...topSiblings.map((p) => p.order));
-    movers.sort(byTreeKey);
-    for (const [i, p] of movers.entries()) {
+    moversPre.sort(byTreeKey);
+    for (const [i, p] of moversPre.entries()) {
       await db.pages.update(p.id, {
         sectionId: targetSectionId,
         parentId: null,
         order: maxOrder + 1 + i,
         updatedAt: now(),
+        content: contentUpdates.get(p.id) ?? undefined,
       });
     }
-    for (const sid of followers) {
-      await db.pages.update(sid, { sectionId: targetSectionId, updatedAt: now() });
+    for (const sid of followerIds) {
+      const c = contentUpdates.get(sid);
+      await db.pages.update(sid, {
+        sectionId: targetSectionId,
+        updatedAt: now(),
+        ...(c !== undefined ? { content: c } : {}),
+      });
     }
-    moved = movers.length;
+    moved = moversPre.length;
   });
   return moved;
 }
@@ -887,6 +972,20 @@ export async function purgePage(id: string): Promise<void> {
 export async function getPageContent(id: string): Promise<ScenePayload | null> {
   const page = await db.pages.get(id);
   if (!page?.content) return null;
+  // protection (issue #371): an encrypted marker needs the section's key —
+  // unlocked decrypts transparently, locked (or wrong-context hand edit)
+  // reads as empty content, the same defensive shape as a corrupt scene
+  if (isEncryptedContent(page.content)) {
+    const dek = unlockedKey(page.sectionId);
+    if (!dek) return null;
+    const plain = await decryptContent(dek, page.content);
+    if (!plain) return null;
+    try {
+      return JSON.parse(plain) as ScenePayload;
+    } catch {
+      return null;
+    }
+  }
   try {
     return JSON.parse(page.content) as ScenePayload;
   } catch {
@@ -894,9 +993,33 @@ export async function getPageContent(id: string): Promise<ScenePayload | null> {
   }
 }
 
+/**
+ * The raw content string the SEARCH index should see for this page
+ * (issue #371): unlocked protected sections decrypt (search includes them
+ * again — OneNote re-includes a section while it is unlocked), locked
+ * protected sections keep the marker (the defensive extract contract
+ * yields nothing for unparseable payloads — search skips locked content).
+ */
+export async function getSearchableContent(page: PageRow): Promise<string | null> {
+  if (!page.content || !isEncryptedContent(page.content)) return page.content ?? null;
+  const dek = unlockedKey(page.sectionId);
+  if (!dek) return page.content; // locked — the marker parses as nothing
+  return (await decryptContent(dek, page.content)) ?? page.content;
+}
+
 export async function savePageContent(id: string, payload: ScenePayload): Promise<void> {
+  const page = await db.pages.get(id);
+  if (!page) {
+    throw new Error(`savePageContent: page row "${id}" no longer exists`);
+  }
+  // protection (issue #371): an autosave into a protected section is
+  // sealed on write — the canvas only exists when the section is unlocked,
+  // so the key is in the cache; the data layer still refuses to trust it
+  const section = await db.sections.get(page.sectionId);
+  const serialized = JSON.stringify(payload);
+  const sealed = await sealContent(section, serialized);
   const updated = await db.pages.update(id, {
-    content: JSON.stringify(payload),
+    content: sealed,
     updatedAt: now(),
   });
   // Dexie's update() is a silent no-op when the key is missing (issue #78):
@@ -905,6 +1028,236 @@ export async function savePageContent(id: string, payload: ScenePayload): Promis
   // so the autosave indicator shows the error instead of "Saved".
   if (updated === 0) {
     throw new Error(`savePageContent: page row "${id}" no longer exists`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* section protection (issue #371 — OneNote "Password Protection")      */
+/* ------------------------------------------------------------------ */
+
+/** Result of the section-protection mutations. */
+export type SectionProtectionResult = "done" | "invalid" | "invalid-section";
+
+/**
+ * Protect a section with a password (OneNote: right-click section tab →
+ * "Password Protection" → every page's scene + version snapshots of the
+ * whole section (alive AND trashed rows — restores need them) are sealed
+ * under a fresh data key wrapped with the password. The section stays
+ * UNLOCKED right after (OneNote semantics — it locks on close/reload or
+ * via lockSection). "invalid" for a missing/trashed/group target or a
+ * section already carrying protection (use changeSectionPassword); zero
+ * writes either way.
+ */
+export async function setSectionPassword(
+  sectionId: string,
+  password: string,
+  hint?: string | null,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<SectionProtectionResult> {
+  const section = await db.sections.get(sectionId);
+  if (!section || section.deletedAt !== null || isSectionGroup(section)) return "invalid-section";
+  if (safeProtection(section.protection)) return "invalid";
+  const { protection, dek } = await buildProtection(password, hint, iterations);
+  await sealWholeSection(sectionId, protection, dek);
+  return "done";
+}
+
+/**
+ * Verify a password and cache the unwrapped key for this session (memory
+ * only — a reload locks the section again). A successful unlock also runs
+ * the re-seal pass: any plaintext content row that drifted into the
+ * protected section (offline sync merges that won LWW before the
+ * protection landed) is sealed now, closing the drift window.
+ */
+export async function unlockSection(
+  sectionId: string,
+  password: string,
+): Promise<SectionProtectionResult> {
+  const section = await db.sections.get(sectionId);
+  const protection = safeProtection(section?.protection);
+  if (!section || !protection) return "invalid-section";
+  const dek = await verifyPassword(protection, password);
+  if (!dek) return "invalid";
+  cacheUnlockedKey(sectionId, dek);
+  await sealProtectedSection(sectionId);
+  return "done";
+}
+
+/** Drop the session's cached key — the section is locked again. */
+export async function lockSection(sectionId: string): Promise<void> {
+  dropUnlockedKey(sectionId);
+}
+
+/** Lock every unlocked protected section at once ("lock all" primitive). */
+export async function lockAllProtectedSections(): Promise<number> {
+  const ids = unlockedSectionIdList();
+  for (const id of ids) dropUnlockedKey(id);
+  return ids.length;
+}
+
+/**
+ * Replace the password (OneNote "Change Password"): verify the current
+ * one, then re-wrap a FRESH data key under a fresh salt and re-seal every
+ * content row with it — the old password is dead afterwards.
+ */
+export async function changeSectionPassword(
+  sectionId: string,
+  currentPassword: string,
+  newPassword: string,
+  hint?: string | null,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<SectionProtectionResult> {
+  const section = await db.sections.get(sectionId);
+  const protection = safeProtection(section?.protection);
+  if (!section || !protection) return "invalid-section";
+  const dek = await verifyPassword(protection, currentPassword);
+  if (!dek) return "invalid";
+  const { protection: next, dek: fresh } = await buildProtection(newPassword, hint, iterations);
+  await sealWholeSection(sectionId, next, fresh, dek);
+  return "done";
+}
+
+/**
+ * Remove the protection (OneNote "Remove Password"): verify, decrypt
+ * every content row back to plaintext scene JSON, strip the block, drop
+ * the cached key. Unprotected sections keep the exact legacy byte shape.
+ */
+export async function removeSectionPassword(
+  sectionId: string,
+  password: string,
+): Promise<SectionProtectionResult> {
+  const section = await db.sections.get(sectionId);
+  const protection = safeProtection(section?.protection);
+  if (!section || !protection) return "invalid-section";
+  const dek = await verifyPassword(protection, password);
+  if (!dek) return "invalid";
+  const pages = await db.pages.where("sectionId").equals(sectionId).toArray();
+  const pageIds = new Set(pages.map((p) => p.id));
+  const versions = (await db.pageVersions.toArray()).filter((v) => pageIds.has(v.pageId));
+  // crypto OUTSIDE the transaction (WebCrypto promises are not Dexie-tracked)
+  const pageUpdates: Array<{ id: string; content: string }> = [];
+  for (const p of pages) {
+    if (p.content && isEncryptedContent(p.content)) {
+      const plain = await decryptContent(dek, p.content);
+      if (plain !== null) pageUpdates.push({ id: p.id, content: plain });
+    }
+  }
+  const versionUpdates: Array<{ id: string; content: string }> = [];
+  for (const v of versions) {
+    if (isEncryptedContent(v.content)) {
+      const plain = await decryptContent(dek, v.content);
+      if (plain !== null) versionUpdates.push({ id: v.id, content: plain });
+    }
+  }
+  await db.transaction("rw", [db.sections, db.pages, db.pageVersions], async () => {
+    for (const u of pageUpdates) {
+      await db.pages.update(u.id, { content: u.content });
+    }
+    for (const u of versionUpdates) {
+      await db.pageVersions.update(u.id, { content: u.content });
+    }
+    await db.sections.update(sectionId, {
+      protection: null,
+      updatedAt: now(),
+    });
+  });
+  dropUnlockedKey(sectionId);
+  return "done";
+}
+
+/**
+ * Re-seal a protected section's plaintext drift rows under the cached key
+ * (the unlock-time pass; a no-op when the section is not unlocked).
+ * Crypto runs OUTSIDE the write transaction (WebCrypto promises are not
+ * Dexie-tracked — PrematureCommitError).
+ */
+async function sealProtectedSection(sectionId: string): Promise<void> {
+  const section = await db.sections.get(sectionId);
+  if (!section || !safeProtection(section.protection)) return;
+  const dek = unlockedKey(sectionId);
+  if (!dek) return;
+  const pages = await db.pages.where("sectionId").equals(sectionId).toArray();
+  const drifted = pages.filter((p) => p.content && !isEncryptedContent(p.content));
+  if (drifted.length === 0) return;
+  const updates: Array<{ id: string; content: string }> = [];
+  for (const p of drifted) {
+    updates.push({ id: p.id, content: await encryptContent(dek, p.content!) });
+  }
+  await db.transaction("rw", db.pages, async () => {
+    for (const u of updates) {
+      await db.pages.update(u.id, { content: u.content });
+    }
+  });
+}
+
+/** One protection write: seal the whole section's content + stamp the row. */
+async function sealWholeSection(
+  sectionId: string,
+  protection: Section["protection"],
+  dek: CryptoKey,
+  oldDek?: CryptoKey,
+): Promise<void> {
+  const pages = await db.pages.where("sectionId").equals(sectionId).toArray();
+  const pageIds = new Set(pages.map((p) => p.id));
+  const versions = (await db.pageVersions.toArray()).filter((v) => pageIds.has(v.pageId));
+  // crypto OUTSIDE the transaction (WebCrypto promises are not Dexie-tracked)
+  // oldDek: a change-password re-seal — rows sealed under the OLD key are
+  // decrypted with it first, then re-sealed under the new one (skipping
+  // them would leave rows the new password can never open)
+  const pageUpdates: Array<{ id: string; content: string }> = [];
+  for (const p of pages) {
+    if (!p.content) continue;
+    if (isEncryptedContent(p.content)) {
+      if (!oldDek) continue;
+      const plain = await decryptContent(oldDek, p.content);
+      if (plain !== null) {
+        pageUpdates.push({ id: p.id, content: await encryptContent(dek, plain) });
+      }
+    } else {
+      pageUpdates.push({ id: p.id, content: await encryptContent(dek, p.content) });
+    }
+  }
+  const versionUpdates: Array<{ id: string; content: string }> = [];
+  for (const v of versions) {
+    if (isEncryptedContent(v.content)) {
+      if (!oldDek) continue;
+      const plain = await decryptContent(oldDek, v.content);
+      if (plain !== null) {
+        versionUpdates.push({ id: v.id, content: await encryptContent(dek, plain) });
+      }
+    } else {
+      versionUpdates.push({ id: v.id, content: await encryptContent(dek, v.content) });
+    }
+  }
+  await db.transaction("rw", [db.sections, db.pages, db.pageVersions], async () => {
+    for (const u of pageUpdates) {
+      await db.pages.update(u.id, { content: u.content });
+    }
+    for (const u of versionUpdates) {
+      await db.pageVersions.update(u.id, { content: u.content });
+    }
+    await db.sections.update(sectionId, { protection: protection ?? null, updatedAt: now() });
+  });
+  cacheUnlockedKey(sectionId, dek);
+}
+
+/**
+ * Export guard (issue #371): OneNote cannot export a locked section —
+ * the page/section/notebook PDF exporters call this before gathering and
+ * the typed ExportError maps to the explicit toast.
+ */
+export async function assertSectionsExportable(sectionIds: readonly string[]): Promise<void> {
+  const sections = await db.sections.bulkGet([...sectionIds]);
+  const locked = sections.filter(
+    (s) => s && s.deletedAt === null && safeProtection(s.protection) && !isSectionUnlocked(s.id),
+  );
+  if (locked.length > 0) {
+    throw new ExportError(
+      locked.length === 1
+        ? `Unlock "${locked[0]!.name}" to export it — locked sections cannot be exported.`
+        : `Unlock ${locked.length} protected sections to export — locked sections cannot be exported.`,
+      "sectionLocked",
+    );
   }
 }
 
@@ -919,14 +1272,21 @@ export async function recordPageVersion(
   source: PageVersionSource,
   at: number = now(),
 ): Promise<PageVersionSummary> {
+  const page = await db.pages.get(pageId);
+  const section = page ? await db.sections.get(page.sectionId) : undefined;
+  // protection (issue #371): snapshots of a protected section's pages are
+  // sealed like the page rows themselves — a version that stored plaintext
+  // would defeat the at-rest envelope it belongs to
+  const sealed = await sealContent(section, JSON.stringify(payload));
   const row = buildPageVersion(pageId, payload, source, at);
+  const stored = { ...row, content: sealed ?? row.content, byteSize: (sealed ?? row.content).length };
   await db.transaction("rw", db.pageVersions, async () => {
-    await db.pageVersions.add(row);
+    await db.pageVersions.add(stored);
     const all = await db.pageVersions.where("pageId").equals(pageId).toArray();
     const doomed = pruneToCapacity(all);
     if (doomed.length > 0) await db.pageVersions.bulkDelete(doomed);
   });
-  const { content: _content, ...summary } = row;
+  const { content: _content, ...summary } = stored;
   return summary;
 }
 
@@ -953,7 +1313,18 @@ export async function maybeRecordAutoVersion(
   payload: ScenePayload,
 ): Promise<boolean> {
   const last = await lastPageVersionRow(pageId);
-  if (!shouldAutoSnapshot(last, payload, Date.now())) return false;
+  // protection (issue #371): the throttle compares STRUCTURES, so the
+  // newest version's ciphertext must be decrypted through the cache when
+  // the section is unlocked (locked canvas is unreachable, and an
+  // undecryptable previous version already snapshots defensively)
+  let lastForPolicy = last;
+  if (last && isEncryptedContent(last.content)) {
+    const page = await db.pages.get(pageId);
+    const dek = page ? unlockedKey(page.sectionId) : undefined;
+    const plain = dek ? await decryptContent(dek, last.content) : null;
+    lastForPolicy = plain ? { ...last, content: plain } : last;
+  }
+  if (!shouldAutoSnapshot(lastForPolicy, payload, Date.now())) return false;
   await recordPageVersion(pageId, payload, "auto");
   return true;
 }
@@ -969,6 +1340,21 @@ export async function getPageVersionContent(
 ): Promise<ScenePayload | null> {
   const row = await db.pageVersions.get(versionId);
   if (!row || row.pageId !== pageId) return null;
+  // protection (issue #371): encrypted snapshots decrypt through the
+  // cache; a locked section's versions read as nothing (the dialog guard
+  // refuses before this, the data layer stays defensive)
+  if (isEncryptedContent(row.content)) {
+    const page = await db.pages.get(pageId);
+    const dek = page ? unlockedKey(page.sectionId) : undefined;
+    if (!dek) return null;
+    const plain = await decryptContent(dek, row.content);
+    if (!plain) return null;
+    try {
+      return JSON.parse(plain) as ScenePayload;
+    } catch {
+      return null;
+    }
+  }
   try {
     return JSON.parse(row.content) as ScenePayload;
   } catch {
@@ -1160,6 +1546,7 @@ export async function restoreBackup(json: string): Promise<number> {
         parentId?: string | null;
         color?: NotebookColor;
         kind?: unknown;
+        protection?: unknown;
         name?: string;
         pages?: Array<{
         id?: string;
@@ -1220,6 +1607,10 @@ export async function restoreBackup(json: string): Promise<number> {
           // a hand-edited archive kind restores as a plain section, not a
           // crash (the same tolerance contract, issue #337)
           kind: normalizeSectionKind(sec.kind) ?? undefined,
+          // protection (issue #371): a hand-edited archive envelope restores
+          // as unprotected — its content rows then read as whatever the
+          // archive carried (markers read as empty, plaintext stays open)
+          protection: safeProtection(sec.protection) ?? undefined,
           order: secOrder,
           createdAt: ts,
           updatedAt: ts,

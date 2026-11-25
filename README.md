@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1357%20unit%20%2B%20269%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1382%20unit%20%2B%20274%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -60,6 +60,11 @@ and sync yourself. No account, no telemetry, no lock-in.
   menu command and drag-to-indent, two tiers) and sections nest inside each
   other (OneNote's "New Section Group" / Joplin's sub-notebooks): any section
   can hold pages AND child sections, subtree trash/restore included.
+- **Password-protected sections** — OneNote's "Password Protection" parity:
+  lock a whole section with a password (optional hint shown on the unlock
+  card); pages and version snapshots are AES-GCM encrypted at rest under a
+  PBKDF2-wrapped key, the unlock lives in memory only (a reload locks
+  again), and locked sections cannot be searched or exported.
 - **Page version history** — automatic snapshots every 5 minutes on structural
   change, manual "Save version now", and a safety copy before every restore;
   roll back to any of the last 25 versions per page.
@@ -263,8 +268,10 @@ python3 scripts/install-readme-shots.py     # resizes + installs into assets/scr
 
 ## Roadmap
 
-Shipped most recently (the product-parity waves): **export notebook as
-PDF** (OneNote "Export notes as a PDF (Notebook)" parity — every
+Shipped most recently (the product-parity waves): **password-protected
+sections** (OneNote "Password Protection" parity — a section locks with a
+password, its pages are encrypted at rest and unreadable until unlocked),
+**export notebook as PDF** (OneNote "Export notes as a PDF (Notebook)" parity — every
 section opens on a divider sheet, one document for the whole
 notebook) and **export section as PDF** (the whole section as one paginated
 document), **sub-pages with drag-to-indent** (OneNote page hierarchy —

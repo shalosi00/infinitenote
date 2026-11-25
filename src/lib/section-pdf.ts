@@ -25,7 +25,7 @@
 import { downloadBlob, titleToFilename } from "./excalidraw-utils";
 import { ExportError } from "./export-errors";
 import { renderPdfDocument, type PdfOrientation, type PdfRenderResult } from "./pdf-sheet-render";
-import { getPageContent, listPages } from "./notes-db";
+import { assertSectionsExportable, getPageContent, listPages } from "./notes-db";
 import { isPageBackground } from "./types";
 import { selectSectionPages } from "./section-tree";
 
@@ -34,12 +34,15 @@ import { selectSectionPages } from "./section-tree";
  * it as `<section name>.pdf`. Throws ExportError (code "emptySection") when
  * the section has no pages at all; pages WITHOUT ink render as blank
  * sheets (OneNote exports empty pages too — the footer keeps the title).
+ * A protected-and-LOCKED section refuses first (issue #371 — OneNote
+ * cannot export locked sections; code "sectionLocked").
  */
 export async function exportSectionPdf(
   sectionId: string,
   sectionName: string,
   orientation: PdfOrientation,
 ): Promise<PdfRenderResult> {
+  await assertSectionsExportable([sectionId]);
   const rows = selectSectionPages(await listPages(), sectionId);
   if (!rows.length) {
     throw new ExportError("Nothing to export — this section has no pages yet.", "emptySection");
