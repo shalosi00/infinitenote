@@ -51,6 +51,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.25.0" date="2026-11-26">
+      <description>
+        <p>Password-protected sections: lock a whole section with a
+        password (OneNote "Password Protection" parity) — pages and version
+        snapshots are AES-GCM encrypted at rest under a PBKDF2-wrapped key,
+        the unlock lives in memory only (a reload locks again), locked
+        sections cannot be searched or exported, and sync folders plus
+        backups carry the ciphertext verbatim.</p>
+      </description>
+    </release>
     <release version="1.24.0" date="2026-11-25">
       <description>
         <p>Sub-pages phase 2 — drag-to-indent: a page dropped on another

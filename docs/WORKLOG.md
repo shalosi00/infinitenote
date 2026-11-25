@@ -49,6 +49,131 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-25 — Password-protected sections: OneNote "Password Protection" parity, wave 25 (#371/#372) + v1.25.0 release
+
+- **Task**: wave 25 — the fifteenth product-parity wave, per the wave-24
+  pointer ("further majors-evidence parity waves"). Evidence pass
+  (2026-11-25): the hierarchy waves 16-24 completed OneNote's structural
+  surface (sub-sections, section groups, sub-pages with drag); the largest
+  remaining OneNote major neither we nor Joplin carry is the privacy layer —
+  OneNote protects an entire SECTION with a password ("right-click a
+  section tab → Password Protection"; locked sections cannot be opened,
+  exported, or searched; a forgotten password cannot be recovered —
+  support.microsoft.com), while Joplin offers only whole-vault E2EE
+  (joplinapp.org) — per-section privacy on a shared device was the gap.
+  Shipped this cycle, closing #371 into the v1.25.0 milestone.
+- **Design**: `Section.protection?: SectionProtection | null` — the
+  parentId/color/kind precedent exactly (additive, NOT indexed, no Dexie
+  version bump, old rows / backups / sync folders byte-stable). Pure policy
+  + crypto + memory-only unlock cache in `src/lib/section-protection.ts`
+  (no Dexie imports — the wave-21 lesson). Pages of a protected section AND
+  their version snapshots are AES-GCM sealed at rest under a random
+  per-section data key wrapped with PBKDF2-HMAC-SHA256 (600 000 iterations,
+  the OWASP budget, pinned PP-P5); content carries the
+  `enc1.<iv>.<ct>` marker (scene JSON starts with `{`/`[` — no namespace
+  collision). The unlock cache never persists — a reload locks every
+  protected section (OneNote locks on close); unlock runs a re-seal pass
+  that closes the sync-drift window. Search skips locked content (the
+  defensive extract contract reads markers as nothing) and re-includes
+  unlocked sections through a decrypt-aware index. Section/notebook PDF
+  exports refuse locked sections via assertSectionsExportable → typed
+  `sectionLocked` ExportError. The DESTRUCTIVE sync hazard caught in
+  design: the folder builder JSON.parses every content — a marker would
+  parse-fail into an EMPTY scene and silently destroy the page on the next
+  merge round; SyncPageFile gained the additive `enc` field (markers only,
+  pre-#371 files byte-stable) and the parser restores it verbatim.
+  Backups carry ciphertext + envelope (hand-edited envelopes restore
+  unprotected via safeProtection).
+- **Lessons (all measured this cycle)**:
+  - **WebCrypto promises are not Dexie-tracked**: awaiting
+    encryptContent/decryptContent INSIDE a db.transaction commits it early
+    (PrematureCommitError) — every sealing path now computes crypto OUTSIDE
+    the transaction and writes inside it (Dexie-only).
+  - **The createPage hot path must keep its async shape**: an extra
+    `db.sections.get()` on the content-less "+ Page" path flipped a
+    fake-indexeddb transaction race in the sub-sections suite (SB-P15b hung
+    — sometimes for minutes — whenever the protection tests ran alongside);
+    createPage now skips the section read entirely when content is null,
+    and the db-level protection tests derive with a reduced PBKDF2 budget
+    (the shipped default stays pinned at 600k, PP-P5) so bun's
+    concurrently-run test files never stall each other behind a 600k
+    native derive.
+  - **An aria-label on a row-internal icon pollutes the row button's
+    accessible name** — the lock badge broke every
+    `getByRole("button", { name: "New Section" })` locator in the E2E spec
+    (the wave-24 listeners-only lesson, one level deeper). The badge is
+    decorative (aria-hidden) and state rides `data-lock-state`.
+  - **A post-reload single click is not trustworthy on a slow runner**:
+    ensureExpanded's one click landed before the app's handlers re-attached
+    (CI evidence on the release-prep PR's first e2e run) — it now polls and
+    re-clicks until the row really expanded (the wave-22 never-collapse rule
+    kept by the pre-click check).
+  - **Both check re-run APIs (job rerun + check-suite rerun) answer 404 for
+    this token** — the standing "rerun-failed-jobs" recovery for the
+    documented FA-E15/TB-E01 CI flake family is unavailable; when the merge
+    gate cannot go green on an exact head, the content moves to a fresh
+    branch (new head → new CI run). The empty-payload merge PUT that
+    started this detour fell back to GitHub's default MERGE method — the
+    #373 squash intent was lost and both commits landed on develop
+    (content identical; history shape deviates). Lesson: build the JSON
+    payload in a file and `curl -d @file` — never inline `$(python -c …)`
+    payloads whose failure the pipeline cannot detect.
+- **Gate**: 1382 unit / 100 files, 0 fail (base `b90e1ff`: 1357/99 — +25
+  pins: 9 PP-P pure + 13 PP-D db + 3 PP-S sync); 274 e2e / 57 files
+  (`playwright --list`); new spec PWP-N01..05 5/5; neighbors sub-pages +
+  section-move + section-groups + sub-sections 19/19 and search-trash +
+  multiselect + crud + section-colors + export-filename 16/16 and pdf-export
+  + section-pdf-export + notebook-pdf-export 11/11.
+- **Ship**: PR #372 (feature) squash-merged `fba2f6a`; #371 closed via the
+  API. Release train: prep #373 (version files 1.25.0/350 + fdroid entry +
+  metainfo entry + the spec heal), release PR develop-to-main as MERGE
+  commit, tag v1.25.0 + GitHub Release with hand-written notes, milestones
+  rotated (#26 closed, #27 opened, #193 moved forward), flatpak extra-data
+  re-pinned to the real v1.25.0 AppImage (#313/#293/#324/#336/#343/#350/
+  #363/#370 precedent), post-release docs pass (ROADMAP v1.26 block, Next up
+  rotation), this entry.
+
+## 2026-11-25 — Sub-pages phase 2: drag-to-indent, wave 24 (#365/#366) + v1.24.0 release
+
+- **Task**: wave 24 — the issue-#359 named phase-2 candidate the ROADMAP
+  v1.24 block carried: the gesture half of OneNote page hierarchy. The
+  menu commands shipped in v1.23.0 stay the keyboard/touch path.
+- **Evidence**: OneNote's desktop page list makes a page a subpage by
+  dragging it onto the page it should indent under (support.microsoft.com
+  documents the menu command; the drag is the desktop affordance). Joplin
+  has no hierarchy to mirror.
+- **Design**: the #325 drag stack reused exactly one level down —
+  PointerSensor 6px, listeners-only rows, pointerWithin, per-target
+  `data-drop-active` gating through the pure policy (invalid targets
+  never highlight; an unhighlighted drop is an unhandled id, zero
+  writes). Drop-on-page → canMakeSubpage via a new store action
+  setPageParent (the pinned #359 db write re-validates); drop-on-own-
+  section-row → canPromoteWithin (new pure gate) + promoteTarget — one
+  level, the menu Promote semantics. Notebook rows highlight for section
+  drags only. Read-only: zero data-model change, zero sync surface.
+- **Gate**: 1357 unit / 99 files, 0 fail (base b0c0f61: 1354/98 — +3
+  pins PG-P15..P17); 269 e2e / 56 files; PGD-N01..05 5/5; drag + sidebar
+  neighbors 33/33 (sub-pages, section-move, section-groups, sub-sections,
+  multiselect, crud, section-colors, search-trash).
+- **Sandbox lesson (repeat)**: the whole staging dir + tree was wiped by a
+  mid-cycle restore right after the first E2E run — the staging-first
+  pattern paid off: issue #365 (API) and the notes survived; the staging
+  was rebuilt from origin/develop in ~10 minutes. Also: a zombie
+  `next dev` from a killed Playwright run held port 3000 at 88% CPU and
+  silently hung every later run — check `ss -tlnp | grep 3000` before
+  suspecting the spec.
+- **Display lesson (repeat)**: the "[m"-stripping output filter
+  re-triggered — the README "[milestones]" link DISPLAYED as broken and a
+  broken-link fix was drafted before the python probe showed the file
+  byte-intact (chr(91)+chr(109) present). The probe rule held.
+- **Ship**: PR #366 (feature) squash-merged `e5ecc7f`; #365 closed via the
+  API. Release train: prep #367 (`853a405`), release PR #368 as MERGE
+  commit `17c0ba1`, tag v1.24.0 + hand-written GitHub Release, milestones
+  rotated (#25 closed, #26 opened, #193 moved forward). Post-release docs
+  pass: ROADMAP v1.25 block, PROJECT_STATUS rotation, README badge
+  re-pin (was stale at 1317/256 since wave 21 — the badge joins the count
+  sweep checklist), this entry.
+
 ## 2026-11-24 — Sub-pages: OneNote page hierarchy "Make subpage" parity, wave 23 (#359/#360)
 
 - **Task**: wave 23 — the fourteenth product-parity wave, per the wave-22

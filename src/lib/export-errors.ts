@@ -6,13 +6,15 @@
  * pdf-export throws, note-app maps `code` to the user-facing message.
  */
 
-export type ExportErrorCode = "emptyPage" | "emptySection" | "emptyNotebook";
+export type ExportErrorCode = "emptyPage" | "emptySection" | "emptyNotebook" | "sectionLocked";
 
 /** English message per export failure code (surfaced as a toast). */
 export const EXPORT_ERROR_MESSAGES: Record<ExportErrorCode, string> = {
   emptyPage: "Nothing to export — this page is empty.",
   emptySection: "Nothing to export — this section has no pages yet.",
   emptyNotebook: "Nothing to export — this notebook has no sections yet.",
+  sectionLocked:
+    "Locked sections cannot be exported — unlock the protected section first.",
 };
 
 export class ExportError extends Error {

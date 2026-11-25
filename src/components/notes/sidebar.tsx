@@ -24,11 +24,13 @@ import {
 import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
 import { isSectionGroup } from "@/lib/section-groups";
+import { isSectionProtected } from "@/lib/section-protection";
 import { exportSectionPdf } from "@/lib/section-pdf";
 import { exportNotebookPdf } from "@/lib/notebook-pdf";
 import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
 import type { PdfOrientation } from "@/lib/pdf-sheet-render";
 import { canReparent, childSections, topLevelSections } from "@/lib/section-tree";
+import { SectionLockedError } from "@/lib/section-protection";
 import {
   canMakeSubpage,
   canPromote,
@@ -58,6 +60,8 @@ import {
   LayoutTemplate,
   Link2,
   ListChecks,
+  Lock,
+  LockOpen,
   MoreHorizontal,
   Palette,
   Pencil,
@@ -265,7 +269,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const onBulkMove = (targetSectionId: string) => {
     setMoveOpen(false);
-    void bulkMovePages([...selected], targetSectionId).then(() => exitSelectMode());
+    void bulkMovePages([...selected], targetSectionId)
+      .catch((err: unknown) => {
+        // issue #371: pages cannot cross a protection boundary while either
+        // side is locked — the typed error maps to the explicit toast
+        if (err instanceof SectionLockedError) {
+          toast.error("Unlock both sections to move pages between them.");
+        } else {
+          console.error(err);
+          toast.error("Could not move the selected pages.");
+        }
+      })
+      .then(() => exitSelectMode());
   };
 
   const onBulkDelete = () => {
@@ -809,6 +824,11 @@ function SectionNode({
   const del = useAppStore((s) => s.deleteSection);
   const move = useAppStore((s) => s.moveSection);
   const recolor = useAppStore((s) => s.setSectionColor);
+  // issue #371: the protection dialog opener + "Lock now" action, and the
+  // reactive unlock mirror that decides the badge (closed = locked)
+  const openProtectionDialog = useAppStore((s) => s.openProtectionDialog);
+  const lockNow = useAppStore((s) => s.lockSection);
+  const unlockedIds = useAppStore((s) => s.unlockedSectionIds);
 
   /** OneNote "Export notes as a PDF (Section)" parity (issue #344): the
    *  whole section as one paginated PDF through the shared print core. */
@@ -876,6 +896,11 @@ function SectionNode({
   // it holds sections, never pages, so its menu and its expanded body
   // render the group affordances instead of the page ones.
   const group = isSectionGroup(section);
+
+  // issue #371: the lock badge reads the additive envelope + the reactive
+  // unlock mirror (closed = locked, open = unlocked in this session)
+  const protectedRow = !group && isSectionProtected(section);
+  const rowLocked = protectedRow && !unlockedIds.includes(section.id);
 
   return (
     <div data-testid="section-row" data-section-id={section.id}>
@@ -946,6 +971,28 @@ function SectionNode({
               {section.name}
             </span>
           )}
+          {/* issue #371: the OneNote lock badge — closed padlock while the
+              section is protected-and-locked, open while unlocked in this
+              session (the key cache is memory-only). Decorative on purpose:
+              an aria-label would pollute the row button's accessible name
+              and break every getByRole("button", { name }) locator (the
+              wave-24 listeners-only lesson, one level deeper). */}
+          {protectedRow &&
+            (rowLocked ? (
+              <Lock
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                data-testid="section-lock-badge"
+                data-lock-state="locked"
+                aria-hidden
+              />
+            ) : (
+              <LockOpen
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                data-testid="section-lock-badge"
+                data-lock-state="unlocked"
+                aria-hidden
+              />
+            ))}
         </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1048,6 +1095,52 @@ function SectionNode({
                   >
                     {"A4 landscape"}
                   </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            {!group && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid="section-protection-submenu">
+                  <Lock /> {"Password protection"}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-52">
+                  {/* issue #371 — OneNote: right-click section tab →
+                      "Password Protection" → Change/Remove Password. The
+                      section carries the at-rest envelope; the items render
+                      per state (set only when unprotected, change/remove
+                      only when protected, lock only while unlocked) */}
+                  {!protectedRow && (
+                    <DropdownMenuItem
+                      data-testid="section-protection-set"
+                      onClick={() => openProtectionDialog("set", section.id)}
+                    >
+                      {"Set password…"}
+                    </DropdownMenuItem>
+                  )}
+                  {protectedRow && (
+                    <DropdownMenuItem
+                      data-testid="section-protection-change"
+                      onClick={() => openProtectionDialog("change", section.id)}
+                    >
+                      {"Change password…"}
+                    </DropdownMenuItem>
+                  )}
+                  {protectedRow && (
+                    <DropdownMenuItem
+                      data-testid="section-protection-remove"
+                      onClick={() => openProtectionDialog("remove", section.id)}
+                    >
+                      {"Remove password…"}
+                    </DropdownMenuItem>
+                  )}
+                  {protectedRow && !rowLocked && (
+                    <DropdownMenuItem
+                      data-testid="section-protection-lock-now"
+                      onClick={() => void lockNow(section.id)}
+                    >
+                      <Lock /> {"Lock now"}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}
