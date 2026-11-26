@@ -44,9 +44,9 @@
         {
           "type": "extra-data",
           "filename": "InfiniteNote.AppImage",
-          "url": "https://github.com/shalosi00/infinitenote/releases/download/v1.26.0/InfiniteNote_1.26.0_amd64.AppImage",
-          "sha256": "728ce2a103894e8d89c51a0ab37bd7c5bb4b263af9d878ec687e96a5ca7cd9f6",
-          "size": 152947192
+          "url": "https://github.com/shalosi00/infinitenote/releases/download/v1.27.0/InfiniteNote_1.27.0_amd64.AppImage",
+          "sha256": "805e614413c53c849b3866465afc34bbf5c75b81ad815cc7acc30037f6eb8452",
+          "size": 152943096
         }
       ],
       "build-commands": [
