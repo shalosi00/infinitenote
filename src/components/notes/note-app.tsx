@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural } from "@/lib/plural";
+import { PAGE_COLOR_HEX } from "@/lib/page-colors";
+import { PAGE_COLORS } from "@/lib/types";
 import { useTheme } from "next-themes";
 import {
   Download,
@@ -24,6 +26,7 @@ import {
   MoreHorizontal,
   NotebookPen,
   PackageOpen,
+  Palette,
   Paperclip,
   PenLine,
   Printer,
@@ -60,7 +63,7 @@ import { useAppStore } from "@/lib/store";
 import { pageLinkMissingToast, pageLinkTargetOf } from "@/lib/page-links";
 import type { CanvasApi, SaveState } from "@/lib/excalidraw-utils";
 import { downloadBlob } from "@/lib/excalidraw-utils";
-import type { PageBackground, PageMeta } from "@/lib/types";
+import type { PageBackground, PageColor, PageMeta } from "@/lib/types";
 import * as db from "@/lib/notes-db";
 import { ExportError, EXPORT_ERROR_MESSAGES } from "@/lib/export-errors";
 import { RestoreError, RESTORE_ERROR_MESSAGES } from "@/lib/restore-error";
@@ -153,6 +156,18 @@ const PAPER_STYLE_LABELS: Record<PageBackground, string> = {
   grid: "Grid",
 };
 
+/** English labels for the page color menu (issue #385) — capitalize the ids. */
+const PAGE_COLOR_LABELS: Record<PageColor, string> = {
+  violet: "Violet",
+  rose: "Rose",
+  orange: "Orange",
+  amber: "Amber",
+  emerald: "Emerald",
+  teal: "Teal",
+  cyan: "Cyan",
+  pink: "Pink",
+};
+
 /**
  * Share-target drain runs exactly once per app session (issue #247) —
  * StrictMode double-mounts and tree refreshes must not re-drain; a reload
@@ -219,6 +234,7 @@ export default function NoteApp() {
     addNotebook,
     renamePage,
     setPageBackground,
+    setPageColor,
     setPageTags,
     restoreBackupArchive,
   } = useAppStore();
@@ -1153,7 +1169,7 @@ export default function NoteApp() {
       await canvasApi.current?.flushSave();
       const content = (await db.getPageContent(pageId)) ?? { elements: [], files: {} };
       const page = useAppStore.getState().pages.find((p) => p.id === pageId);
-      await db.saveTemplate(rawName, content, page?.background);
+      await db.saveTemplate(rawName, content, page?.background, page?.pageColor);
       toast.success("Template saved.");
       return true;
     } catch (err) {
@@ -1767,6 +1783,57 @@ export default function NoteApp() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                {/* OneNote "Page Color" parity (issue #385): the whole page
+                    surface takes a pale tint — View-tab pattern next to the
+                    paper-style picker. null = none (white paper). */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground"
+                      aria-label={"Page color"}
+                      data-testid="page-color-picker"
+                    >
+                      <Palette className="h-4 w-4" />
+                      <span className="hidden sm:inline">
+                        {currentPage.pageColor ? PAGE_COLOR_LABELS[currentPage.pageColor] : "Page color"}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" data-testid="page-color-menu">
+                    <DropdownMenuLabel>{"Page color"}</DropdownMenuLabel>
+                    <div className="grid grid-cols-4 gap-1.5 p-2">
+                      {PAGE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={(currentPage.pageColor ?? null) === c}
+                          aria-label={`Set page color ${c}`}
+                          data-testid={`page-color-${c}`}
+                          className="h-6 w-6 rounded-md border-2 ring-offset-2 transition-transform hover:scale-110 data-[active]:ring-2"
+                          data-active={(currentPage.pageColor ?? null) === c}
+                          style={{
+                            backgroundColor: PAGE_COLOR_HEX[c],
+                            borderColor: (currentPage.pageColor ?? null) === c ? "var(--foreground)" : "transparent",
+                          }}
+                          onClick={() => void setPageColor(currentPage.id, c)}
+                        />
+                      ))}
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      role="menuitemradio"
+                      aria-checked={!currentPage.pageColor}
+                      data-testid="page-color-none"
+                      onClick={() => void setPageColor(currentPage.id, null)}
+                    >
+                      {"None (white paper)"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <span
                   className="flex items-center gap-1.5 text-xs text-muted-foreground"
                   data-testid="save-indicator"
@@ -1799,6 +1866,7 @@ export default function NoteApp() {
                     title={currentPage.title}
                     theme={theme}
                     background={(currentPage.background ?? "plain") as PageBackground}
+                    pageColor={currentPage.pageColor ?? null}
                     onApiReady={handleApiReady}
                     onSaveIndicator={handleSaveIndicator}
                     onToast={showToast}

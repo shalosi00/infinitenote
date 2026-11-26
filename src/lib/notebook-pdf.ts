@@ -42,6 +42,7 @@ import {
   type PdfSceneInput,
 } from "./pdf-sheet-render";
 import { assertSectionsExportable, getPageContent, listNotebooks, listPages, listSections } from "./notes-db";
+import { safePageColor } from "./page-colors";
 import { isPageBackground, type Notebook } from "./types";
 import { sectionColorHex } from "./section-colors";
 import { isSectionGroup } from "./section-groups";
@@ -100,6 +101,7 @@ export async function exportNotebookPdf(
       inputs.push({
         title: secPages[i].title,
         background: isPageBackground(bg) ? bg : "plain",
+        pageColor: safePageColor(secPages[i].pageColor),
         elements: contents[i]?.elements ?? [],
         files: contents[i]?.files ?? null,
       });
