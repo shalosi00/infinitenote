@@ -183,3 +183,9 @@ Builds:
     subdir: android-twa
     gradle:
       - yes
+  - versionName: 1.26.0
+    versionCode: 360
+    commit: v1.26.0
+    subdir: android-twa
+    gradle:
+      - yes
