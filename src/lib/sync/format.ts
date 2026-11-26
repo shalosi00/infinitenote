@@ -19,6 +19,7 @@
 import type {
   Notebook,
   PageBackground,
+  PageColor,
   PageRow,
   ScenePayload,
   Section,
@@ -26,6 +27,7 @@ import type {
 import { byOrder } from "../types";
 import { generatedNames } from "../generated-names";
 import { safeTags } from "../tags";
+import { safePageColor } from "../page-colors";
 import { isEncryptedContent } from "../section-protection";
 
 export const MANIFEST_PATH = "manifest.json";
@@ -87,6 +89,8 @@ export interface SyncPageFile {
   createdAt: number;
   updatedAt: number;
   background?: PageBackground;
+  /** issue #385 — rides next to background/tags; malformed degrades to none */
+  pageColor?: PageColor | null;
   tags?: string[];
   scene: ScenePayload | null;
   /**
@@ -229,6 +233,7 @@ export function buildSyncFolderFiles(
         createdAt: page.createdAt,
         updatedAt: page.updatedAt,
         background: page.background,
+        pageColor: safePageColor(page.pageColor) ?? undefined,
         tags: page.tags,
         scene: null,
         enc: sealedContent,
@@ -256,6 +261,7 @@ export function buildSyncFolderFiles(
       createdAt: page.createdAt,
       updatedAt: page.updatedAt,
       background: page.background,
+      pageColor: safePageColor(page.pageColor) ?? undefined,
       tags: page.tags?.length ? page.tags : undefined,
       scene,
     };
@@ -401,6 +407,7 @@ export function parseSyncFolder(files: SyncFolderFiles): ParsedSyncFolder {
       updatedAt: typeof file.updatedAt === "number" ? file.updatedAt : 0,
       deletedAt: null,
       background: file.background,
+      pageColor: safePageColor(file.pageColor) ?? undefined,
       tags: tags.length ? tags : undefined,
       content: enc ?? (file.scene ? JSON.stringify(file.scene) : null),
     });

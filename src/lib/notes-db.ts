@@ -23,6 +23,7 @@ import { ExportError } from "./export-errors";
 import { RestoreError } from "./restore-error";
 import { safeTags } from "./tags";
 import { byOrder } from "./types";
+import { safePageColor } from "./page-colors";
 import { safeSectionColor } from "./section-colors";
 import { isSectionGroup, normalizeSectionKind } from "./section-groups";
 import { ancestorSectionIds, canReparent, subtreeSectionIds } from "./section-tree";
@@ -60,6 +61,7 @@ import type {
   PageRow,
   ScenePayload,
   Section,
+  PageColor,
 } from "./types";
 import {
   MAX_TEMPLATE_BYTES,
@@ -592,6 +594,17 @@ export async function renamePage(id: string, title: string): Promise<void> {
 /** Set the paper style of a page (plain / ruled / grid). */
 export async function setPageBackground(id: string, background: PageRow["background"]): Promise<void> {
   await db.pages.update(id, { background, updatedAt: now() });
+}
+
+/**
+ * Set the page's tint (OneNote "Page Color", issue #385) — null = none
+ * (white paper). Metadata-only: the scene is untouched, so the same
+ * function is safe for pages of protected sections in any lock state.
+ * An invalid runtime id passes through the safe parse on the next read
+ * (safePageColor), matching the section-color tolerance contract.
+ */
+export async function setPageColor(id: string, color: PageColor | null): Promise<void> {
+  await db.pages.update(id, { pageColor: color, updatedAt: now() });
 }
 
 /** Replace a page's tag list (caller normalizes via lib/tags). */
@@ -1376,9 +1389,10 @@ export async function saveTemplate(
   rawName: string,
   payload: ScenePayload,
   background?: PageRow["background"],
+  pageColor?: PageColor | null,
 ): Promise<TemplateSummary> {
   const name = validateTemplateName(rawName);
-  const row = buildTemplateRow(name, payload, background, now());
+  const row = buildTemplateRow(name, payload, background, now(), pageColor);
   if (row.byteSize > MAX_TEMPLATE_BYTES) throw new TemplateError("too-large");
   await db.templates.add(row);
   const { content: _content, ...summary } = row;
@@ -1500,6 +1514,7 @@ export async function buildBackup(): Promise<string> {
       elementCount: t.elementCount,
       byteSize: t.byteSize,
       background: t.background,
+      pageColor: safePageColor(t.pageColor) ?? undefined,
       content: t.content,
     })),
   };
@@ -1554,6 +1569,7 @@ export async function restoreBackup(json: string): Promise<number> {
         title?: string;
         content?: string | null;
         background?: PageRow["background"];
+        pageColor?: unknown;
         tags?: string[];
       }>;
       }>;
@@ -1562,6 +1578,7 @@ export async function restoreBackup(json: string): Promise<number> {
       name?: string;
       content?: string | null;
       background?: PageRow["background"];
+      pageColor?: unknown;
     }>;
   };
   if (parsed?.app !== "infinitenote" || !Array.isArray(parsed.notebooks)) {
@@ -1662,6 +1679,7 @@ export async function restoreBackup(json: string): Promise<number> {
             deletedAt: null,
             content: typeof page.content === "string" ? page.content : null,
             background: page.background,
+            pageColor: safePageColor(page.pageColor) ?? undefined,
             tags: tags.length ? tags : undefined,
           });
           createdPages.push({
@@ -1701,6 +1719,7 @@ export async function restoreBackup(json: string): Promise<number> {
         payload,
         tpl.background,
         ts,
+        safePageColor(tpl.pageColor) ?? undefined,
       );
       if (row.byteSize > MAX_TEMPLATE_BYTES) continue;
       await db.templates.add(row);

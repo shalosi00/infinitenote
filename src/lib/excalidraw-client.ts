@@ -1554,15 +1554,20 @@ export function getScenePayload(api: ExcalidrawImperativeAPI): ScenePayload {
 /* exports                                                             */
 /* ------------------------------------------------------------------ */
 
-function exportAppState(api: ExcalidrawImperativeAPI) {
+/**
+ * Export app state: always the light-authored look (exportWithDarkMode:
+ * false). `color` carries the page tint (issue #385) — exports render the
+ * same paper the light-mode canvas paints; undefined keeps white paper.
+ */
+function exportAppState(api: ExcalidrawImperativeAPI, color?: string | null) {
   const { offsetTop: _t, offsetLeft: _l, ...appState } = api.getAppState();
-  return { ...appState, exportBackground: true, exportWithDarkMode: false, viewBackgroundColor: "#ffffff" };
+  return { ...appState, exportBackground: true, exportWithDarkMode: false, viewBackgroundColor: color || "#ffffff" };
 }
 
-export async function exportPng(api: ExcalidrawImperativeAPI, title: string): Promise<void> {
+export async function exportPng(api: ExcalidrawImperativeAPI, title: string, color?: string | null): Promise<void> {
   const blob = await exportToBlob({
     elements: api.getSceneElements(),
-    appState: exportAppState(api),
+    appState: exportAppState(api, color),
     files: api.getFiles(),
     mimeType: MIME_TYPES.png,
     getDimensions: (w, h) => ({ width: w * 2, height: h * 2, scale: 2 }),
@@ -1570,20 +1575,20 @@ export async function exportPng(api: ExcalidrawImperativeAPI, title: string): Pr
   downloadBlob(blob, titleToFilename(title, "png"));
 }
 
-export async function exportSvg(api: ExcalidrawImperativeAPI, title: string): Promise<void> {
+export async function exportSvg(api: ExcalidrawImperativeAPI, title: string, color?: string | null): Promise<void> {
   const svg = await exportToSvg({
     elements: api.getSceneElements(),
-    appState: exportAppState(api),
+    appState: exportAppState(api, color),
     files: api.getFiles(),
   });
   const xml = new XMLSerializer().serializeToString(svg);
   downloadBlob(new Blob([xml], { type: MIME_TYPES.svg }), titleToFilename(title, "svg"));
 }
 
-export async function exportSceneFile(api: ExcalidrawImperativeAPI, title: string): Promise<void> {
+export async function exportSceneFile(api: ExcalidrawImperativeAPI, title: string, color?: string | null): Promise<void> {
   const json = serializeAsJSON(
     api.getSceneElements(),
-    { viewBackgroundColor: "#ffffff" },
+    { viewBackgroundColor: color || "#ffffff" },
     api.getFiles(),
     "local"
   );

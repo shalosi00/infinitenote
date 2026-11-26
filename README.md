@@ -11,7 +11,7 @@ for Linux and Android.**
 [![Desktop](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml/badge.svg)](https://github.com/shalosi00/infinitenote/actions/workflows/desktop.yml)
 [![Release](https://img.shields.io/github/v/release/shalosi00/infinitenote)](https://github.com/shalosi00/infinitenote/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1382%20unit%20%2B%20274%20E2E-brightgreen)](PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-1405%20unit%20%2B%20283%20E2E-brightgreen)](PROJECT_STATUS.md)
 
 **Infinite canvas · notebooks, sections, pages · handwriting & OCR search —
 all on-device · no account, no cloud, no lock-in**
@@ -60,6 +60,11 @@ and sync yourself. No account, no telemetry, no lock-in.
   menu command and drag-to-indent, two tiers) and sections nest inside each
   other (OneNote's "New Section Group" / Joplin's sub-notebooks): any section
   can hold pages AND child sections, subtree trash/restore included.
+- **Page color** — OneNote's "View > Page Color" parity: the whole page
+  surface takes a pale tint (eight pastel swatches keyed by the app's hue
+  families, or None for white paper); the tint paints in both themes (dark
+  mode dims it, the same contract as the paper-white), rides sync folders,
+  backups, templates and duplicate, and lands in every PDF/PNG/SVG export.
 - **Password-protected sections** — OneNote's "Password Protection" parity:
   lock a whole section with a password (optional hint shown on the unlock
   card); pages and version snapshots are AES-GCM encrypted at rest under a

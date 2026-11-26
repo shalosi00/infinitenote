@@ -49,7 +49,7 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
-## 2026-11-26 — Password-protection phase 2: auto-lock + lock-all, wave 26 (#378)
+## 2026-11-26 — Password-protection phase 2: auto-lock + lock-all, wave 26 (#378) + v1.26.0 release
 
 Re-baselined from git first: the cycle's injected state text (v1.3.0) was stale
 for the fourth consecutive time — origin/develop had v1.25.0 released (#373
@@ -105,6 +105,19 @@ from staging each run, so staging is the only source that must stay sane.
 **Drive-by docs repair**: the #376 release-docs PR shipped a stray duplicate
 "## v1.25" header (empty block) in docs/ROADMAP.md right above the v1.26
 block — removed on this branch.
+
+**v1.26.0 release train**: prep #380 (version files 1.26.0 / versionCode 360
+— package.json, tauri.conf.json, Cargo.toml, TWA gradle + bubblewrap manifest,
+fdroid Builds entry, flatpak metainfo 1.26.0 release entry, Current version
+row), release PR #382 develop-to-main as MERGE commit `f59e74a` — the first
+attempt #381 (head = develop directly) reported dirty: main carried the
+wave-25 worklog entry (#372 merged to main only post-release) develop never
+received, so branch `release-1.26.0` merged main back in and resolved the
+single docs/WORKLOG.md conflict keeping BOTH entries newest-first; tag
+v1.26.0 + GitHub Release with hand-written notes; milestones rotated (#27
+closed, #28 v1.27.0 opened, #193 moved forward). The flatpak extra-data
+re-pin to the real v1.26.0 AppImage follows once the Desktop workflow
+attaches the artifacts.
 
 ## 2026-11-25 — Password-protected sections: OneNote "Password Protection" parity, wave 25 (#371/#372) + v1.25.0 release
 
@@ -189,7 +202,6 @@ block — removed on this branch.
   re-pinned to the real v1.25.0 AppImage (#313/#293/#324/#336/#343/#350/
   #363/#370 precedent), post-release docs pass (ROADMAP v1.26 block, Next up
   rotation), this entry.
-
 ## 2026-11-25 — Sub-pages phase 2: drag-to-indent, wave 24 (#365/#366) + v1.24.0 release
 
 - **Task**: wave 24 — the issue-#359 named phase-2 candidate the ROADMAP

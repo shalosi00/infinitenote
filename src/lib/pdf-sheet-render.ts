@@ -36,6 +36,7 @@ import {
   type PageSpec,
 } from "./pdf-layout";
 import type { PageBackground } from "./types";
+import { PAGE_COLOR_HEX, safePageColor } from "./page-colors";
 import { ExportError } from "./export-errors";
 
 export type PdfOrientation = "portrait" | "landscape";
@@ -47,6 +48,8 @@ export type PdfFiles = Record<string, { id: string; dataURL: string }>;
 export interface PdfSceneInput {
   title: string;
   background: PageBackground;
+  /** OneNote "Page Color" tint (issue #385) — the sheet fills with it first */
+  pageColor?: import("./types").PageColor | null;
   elements: readonly unknown[];
   files: PdfFiles | null;
 }
@@ -119,6 +122,16 @@ export function filterInkElements(elements: readonly unknown[]): LooseElement[] 
 /* ------------------------------------------------------------------ */
 /* small helpers                                                       */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Resolve a page's tint to its PDF paint hex (issue #385). PDFs are light
+ * artifacts: the palette hex is used verbatim; no tint → undefined (white
+ * sheet, the pre-#385 behavior).
+ */
+function paperColorHex(color: unknown): string | undefined {
+  const c = safePageColor(color);
+  return c ? PAGE_COLOR_HEX[c] : undefined;
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex?.trim() ?? "");
@@ -415,7 +428,20 @@ function drawSliceElement(doc: Doc, el: LooseElement, mx: PageMapping): void {
 /* paper + footer                                                      */
 /* ------------------------------------------------------------------ */
 
-function drawPaper(doc: Doc, page: PageSpec, background: PageBackground, margin: number): void {
+function drawPaper(
+  doc: Doc,
+  page: PageSpec,
+  background: PageBackground,
+  margin: number,
+  colorHex?: string,
+): void {
+  // issue #385: the tint fills the whole sheet first — PDFs are light
+  // artifacts, so they always use the palette hex (never a dark transform)
+  if (colorHex) {
+    const [r, g, b] = hexToRgb(colorHex);
+    doc.setFillColor(r, g, b);
+    doc.rect(0, 0, page.w, page.h, "F");
+  }
   if (background !== "ruled" && background !== "grid") return;
   doc.setDrawColor(215, 220, 228);
   doc.setLineWidth(0.5);
@@ -541,10 +567,12 @@ export async function renderPdfDocument(
       }
     }
 
+    const colorHex = paperColorHex(p.input.pageColor);
+
     /* ---- blank sheet: no ink — paper + footer only ---- */
     if (!p.bands) {
       if (sheetIndex > 0) doc.addPage("a4", orientation);
-      drawPaper(doc, page, p.input.background, margin);
+      drawPaper(doc, page, p.input.background, margin, colorHex);
       drawFooter(doc, page, p.input.title, footerTitleImage, sheetIndex, totalSheets);
       sheetIndex += 1;
       continue;
@@ -566,7 +594,9 @@ export async function renderPdfDocument(
           elements: [el as unknown as LooseElement],
           appState: {
             exportBackground: true,
-            viewBackgroundColor: "#ffffff",
+            // the tint, so a snippet blends into the colored sheet (issue #385);
+            // white when the page has no tint — today's behavior
+            viewBackgroundColor: colorHex ?? "#ffffff",
             exportWithDarkMode: false,
           },
           files: (p.input.files ?? {}) as Parameters<typeof xr.exportToBlob>[0]["files"],
@@ -602,7 +632,7 @@ export async function renderPdfDocument(
         margin,
       };
 
-      drawPaper(doc, page, p.input.background, margin);
+      drawPaper(doc, page, p.input.background, margin, colorHex);
 
       /* ---- slice elements: stamped on every band they touch, clipped ---- */
       for (const el of p.elements) {

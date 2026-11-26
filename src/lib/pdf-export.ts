@@ -29,7 +29,8 @@ export async function exportPagePdf(
   api: ExcalidrawImperativeAPI,
   title: string,
   orientation: import("./pdf-sheet-render").PdfOrientation,
-  background: PageBackground
+  background: PageBackground,
+  pageColor?: import("./types").PageColor | null
 ): Promise<void> {
   const elements = filterInkElements(api.getSceneElements());
   if (!elements.length) {
@@ -38,7 +39,7 @@ export async function exportPagePdf(
 
   const files = api.getFiles();
   const { blob } = await renderPdfDocument(
-    [{ title, background, elements, files: files as unknown as PdfFiles }],
+    [{ title, background, pageColor: pageColor ?? null, elements, files: files as unknown as PdfFiles }],
     orientation,
   );
   downloadBlob(blob, titleToFilename(title, "pdf"));

@@ -217,7 +217,26 @@ milestones/issues. This file is the plan; the status file is the reality.
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
 
-## v1.26 — Parity continues (current)
+## v1.27 — Parity continues (current)
+
+- [x] Page color (issue #385): OneNote "View > Page Color" parity — the
+      whole page surface takes a pale tint from the header's "Page color"
+      dropdown (8 swatches keyed by the app's hue families + None = white);
+      additive `pageColor` (NOT indexed, no Dexie bump), the canvas paints
+      the light-authored tint in BOTH themes (the v1.13 dark-filter
+      contract: dark dims it like the paper-white and the ink), every
+      export carries it (PNG/SVG/scene JSON, page/section/notebook PDFs —
+      sheets fill first, raster snippets blend), sync files / backups /
+      templates / duplicate ride the metadata surfaces
+      (docs/test-plans/page-color.md)
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.27.0; the
+      release rotated it to the v1.27.0 milestone, the v1.15.0-to-v1.26.0
+      precedent)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.26 — Parity continues (shipped in v1.26.0)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.26.0; the
