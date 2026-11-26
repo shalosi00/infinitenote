@@ -49,6 +49,85 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-26 — Page color: OneNote "View > Page Color" parity, wave 27 (#385) + v1.27.0 release
+
+Re-baselined from git first — the injected state text was stale for the fifth
+consecutive cycle (still announcing v1.3.0); origin/develop carried v1.26.0
+released (#382, `f59e74a`) with the wave-26 auto-lock + lock-all shipped and
+milestone #28 (v1.27.0) holding only the hardware-blocked #193. The ROADMAP
+v1.27 block named a fresh majors evidence pass. Re-ran it: OneNote's View tab
+carries **Page Color** — the whole page surface takes a pastel tint
+(support.microsoft.com, "Change the background color of a page in OneNote");
+Joplin has only a long-open note-colors feature request and
+Excalidraw/Logseq/AFFiNE/Standard Notes have no per-page pastel surface, so
+the leg is OneNote-only among the five — the third level of the color
+hierarchy (notebooks v1.0, sections #319, now pages).
+
+**Built** (branch `page-color`, issue #385 under milestone #28):
+
+- `page-colors.ts` (pure): the palette = the app's eight hue families as
+  Tailwind-100 pale tints keyed by the SAME ids as NotebookColor +
+  `safePageColor` (external-input matrix, the SC-P1 contract) +
+  `canvasColorFor` (the paint contract); ink-readable pinned at relative
+  luminance ≥ 0.8 (PC-P1).
+- Additive `PageRow.pageColor` (NOT indexed — the section-color precedent,
+  no Dexie bump, null = none = white paper), `setPageColor` db + store
+  actions, duplicate copies the row whole.
+- Header "Page color" dropdown next to the paper-style picker: 8 swatches +
+  "None (white paper)", menuitemradio aria-checked (OneNote's View-tab
+  pattern), swatch grid like the notebook/section menus.
+- Canvas paints the tint through `viewBackgroundColor` in BOTH themes — the
+  v1.13 dark-mode contract generalized: the scene stays AUTHORED in light
+  colors, dark dims the tint through the standard
+  `invert(93%) hue-rotate(180deg)` filter exactly like the paper-white and
+  the ink. NO color math, NO filter fighting; exports (always light) stay
+  identical to what the light canvas paints.
+- Every export carries the tint: PNG/SVG/scene JSON pass the palette hex;
+  page/section/notebook PDFs fill the sheet first (`drawPaper` gains the
+  fill) and raster snippets take the tint background so they blend into the
+  colored sheet (white-blending preserved when untinted).
+- Metadata surfaces ride for free: sync page files carry `pageColor` next
+  to background/tags (malformed degrades to none — the cosmetic tags
+  contract, plain AND sealed `enc` builder branches), backups + templates
+  save/restore it, template apply re-applies it.
+
+**Gate (actual runs)**: lint + tsc clean; 1405 unit / 101 files, 0 fail
+(base 586a674: 1389/100 — +16 pins PC-P1..P6 / PC-D1..D6 / PC-S1..S4); 283
+e2e / 59 files (--list); new spec PC-N01..N05 5/5. E2E lessons: the paint
+assertions run as `expect.poll` (a single read races the store action's
+async refresh); the reload flows scope row clicks to the page-row testid —
+the auto-reopened page makes the header title button a strict-mode second
+match; the swatch grid is not Radix menu items so the modal menu stays open
+and must be Escape-closed before touching the header. jsPDF color output
+verified empirically during development: `setFillColor(254, 243, 199)` lands
+as the normalized `1. 0.95 0.78 rg` (2-decimal) — the PC-N05 assertion greps
+exactly that. Neighbors 94 checks green across 19 spec files (theme-mobile,
+all PDF exports, pdf-attachment, protection 1+2, section-colors,
+page-templates, sub-sections, sub-pages-drag, section-groups, section-move,
+search-trash, page-find, background, export-filename, boot, crud,
+persistence, save-indicator-calm, sync). Chromium re-installed (sandbox
+wiped the headless-shell cache again).
+
+**Sandbox-restore round three**: a staging patch (the canvas effect deps
+gaining `pageColor`) was observed reverted in the staging dir itself while
+every other staged file kept its patches — the file was re-patched and a
+marker-check script now verifies every staged hunk before each gate run.
+
+**v1.27.0 release train**: prep #387 (version files 1.27.0 / versionCode
+370 — package.json, tauri.conf.json, Cargo.toml, TWA gradle + bubblewrap
+manifest, fdroid Builds entry, flatpak metainfo 1.27.0 release entry,
+Current version row), release PR #389 develop-to-main as MERGE commit
+`6dbe947` — the first attempt #388 (head = develop directly) reported dirty
+again (main STILL carries the wave-25 worklog entry develop never received),
+so branch `release-1.27.0` merged main back in and resolved the single
+docs/WORKLOG.md conflict keeping BOTH entries newest-first; retargeting the
+PR head via PATCH silently failed (API accepted, head never moved) — the
+release PR was re-created with the right head; tag v1.27.0 + GitHub Release
+459440285 with hand-written notes; milestones rotated (#28 closed, #29
+v1.28.0 opened, #193 moved forward). The flatpak extra-data re-pin to the
+real v1.27.0 AppImage follows once the Desktop workflow attaches the
+artifacts.
+
 ## 2026-11-26 — Password-protection phase 2: auto-lock + lock-all, wave 26 (#378) + v1.26.0 release
 
 Re-baselined from git first: the cycle's injected state text (v1.3.0) was stale
