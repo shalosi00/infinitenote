@@ -64,7 +64,10 @@ and sync yourself. No account, no telemetry, no lock-in.
   lock a whole section with a password (optional hint shown on the unlock
   card); pages and version snapshots are AES-GCM encrypted at rest under a
   PBKDF2-wrapped key, the unlock lives in memory only (a reload locks
-  again), and locked sections cannot be searched or exported.
+  again), and locked sections cannot be searched or exported. Auto-lock
+  re-locks everything after configurable inactivity (OneNote desktop's
+  timeout, default 10 minutes), and "Lock all protected sections" does the
+  global one-click lock.
 - **Page version history** — automatic snapshots every 5 minutes on structural
   change, manual "Save version now", and a safety copy before every restore;
   roll back to any of the last 25 versions per page.
@@ -268,10 +271,13 @@ python3 scripts/install-readme-shots.py     # resizes + installs into assets/scr
 
 ## Roadmap
 
-Shipped most recently (the product-parity waves): **password-protected
-sections** (OneNote "Password Protection" parity — a section locks with a
-password, its pages are encrypted at rest and unreadable until unlocked),
-**export notebook as PDF** (OneNote "Export notes as a PDF (Notebook)" parity — every
+Shipped most recently (the product-parity waves): **password-protection
+phase 2** (auto-lock after inactivity — OneNote desktop's configurable
+timeout, default 10 minutes — plus "Lock all protected sections"),
+**password-protected sections** (OneNote "Password Protection" parity — a
+section locks with a password, its pages are encrypted at rest and
+unreadable until unlocked), **export notebook as PDF** (OneNote "Export
+notes as a PDF (Notebook)" parity — every
 section opens on a divider sheet, one document for the whole
 notebook) and **export section as PDF** (the whole section as one paginated
 document), **sub-pages with drag-to-indent** (OneNote page hierarchy —

@@ -32,6 +32,18 @@
  * section reads as unprotected; its orphaned `enc1.` content rows (if a
  * hand edit stripped the block) parse as corrupt scenes and read as empty
  * content, never as garbage in the canvas.
+ *
+ * Phase 2 (issue #378) adds the two candidates #371 named, both OneNote
+ * desktop parity:
+ * - Auto-lock after inactivity: OneNote desktop re-locks protected
+ *   sections after configurable inactivity — the default keeps them
+ *   unlocked 10 minutes past the last work (File > Options > Password;
+ *   the UWP/web builds fix it at 5, Mac at a few minutes). The minutes
+ *   setting is per-device UX state in localStorage (the themes /
+ *   last-page precedent — not note data, never synced); the deadline
+ *   math here is pure and the note-app effect drives it.
+ * - Lock all: OneNote's right-click > Password Protection > "Lock
+ *   Protected Sections" locks ALL protected sections at once.
  */
 
 import type { Section } from "./types";
@@ -174,6 +186,91 @@ export function dropAllUnlockedKeys(): void {
 /** Test + store-mirror helper: the ids currently holding cached keys. */
 export function unlockedSectionIdList(): string[] {
   return [...unlockedKeys.keys()];
+}
+
+/* ------------------------------------------------------------------ */
+/* auto-lock after inactivity (issue #378, OneNote desktop parity)     */
+/* ------------------------------------------------------------------ */
+
+/** localStorage key for the auto-lock minutes setting (per-device UX state). */
+export const AUTO_LOCK_STORAGE_KEY = "infinitenote.protection.autolock";
+
+/**
+ * OneNote desktop's default: a protected section stays unlocked 10
+ * minutes past the last work in it (customguide OneNote password guide:
+ * "the default is to have a section stay unlocked for ten minutes after
+ * you're done working in it").
+ */
+export const DEFAULT_AUTO_LOCK_MINUTES = 10;
+
+/** The configurable range mirrors OneNote's minutes spinner: 1–720 (12 h). */
+export const MIN_AUTO_LOCK_MINUTES = 1;
+export const MAX_AUTO_LOCK_MINUTES = 720;
+
+/**
+ * Parse + sanitize the stored auto-lock minutes. Valid values are `0`
+ * (auto-lock off) and the integer range 1–720; everything else — absent,
+ * malformed, fractional, out of range — degrades to the default 10 (the
+ * last-page.ts contract: a hand-edited storage value never throws).
+ */
+export function parseAutoLockMinutes(raw: string | null | undefined): number {
+  if (raw === null || raw === undefined || raw === "") return DEFAULT_AUTO_LOCK_MINUTES;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) return DEFAULT_AUTO_LOCK_MINUTES;
+  if (n === 0) return 0;
+  if (n < MIN_AUTO_LOCK_MINUTES || n > MAX_AUTO_LOCK_MINUTES) return DEFAULT_AUTO_LOCK_MINUTES;
+  return n;
+}
+
+/** SSR-safe read of the auto-lock setting (no localStorage → the default). */
+export function readAutoLockMinutes(): number {
+  if (typeof localStorage === "undefined") return DEFAULT_AUTO_LOCK_MINUTES;
+  try {
+    return parseAutoLockMinutes(localStorage.getItem(AUTO_LOCK_STORAGE_KEY));
+  } catch {
+    return DEFAULT_AUTO_LOCK_MINUTES;
+  }
+}
+
+/** Persist the auto-lock setting (SSR-safe; the value is re-sanitized). */
+export function writeAutoLockMinutes(minutes: number): void {
+  if (typeof localStorage === "undefined") return;
+  const valid = parseAutoLockMinutes(String(minutes));
+  try {
+    localStorage.setItem(AUTO_LOCK_STORAGE_KEY, String(valid));
+  } catch {
+    /* storage full / blocked — the in-memory store value still applies */
+  }
+}
+
+/**
+ * Strict validation for the auto-lock dialog draft: an integer 0–720
+ * returns the value (0 = off); anything else — empty, fractional,
+ * negative, over the cap — returns null so the dialog can show an inline
+ * error instead of silently rewriting the user's input (unlike
+ * parseAutoLockMinutes, which repairs stored values to the default).
+ */
+export function validateAutoLockMinutesDraft(draft: string): number | null {
+  const t = draft.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  if (n > MAX_AUTO_LOCK_MINUTES) return null;
+  return n;
+}
+
+/** How often the note-app effect polls the idle deadline. */
+export const AUTO_LOCK_CHECK_INTERVAL_MS = 15_000;
+
+/**
+ * The pure deadline check: true when `nowMs` is at or past the idle
+ * deadline (`lastActivityMs + minutes` minutes). `minutes <= 0` means
+ * auto-lock is off — never due. The exact boundary counts (OneNote locks
+ * AT the configured timeout, not strictly after).
+ */
+export function autoLockDue(lastActivityMs: number, minutes: number, nowMs: number): boolean {
+  if (!Number.isFinite(lastActivityMs) || !Number.isFinite(nowMs)) return false;
+  if (!Number.isFinite(minutes) || minutes <= 0) return false;
+  return nowMs - lastActivityMs >= minutes * 60_000;
 }
 
 /* ------------------------------------------------------------------ */

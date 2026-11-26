@@ -216,7 +216,6 @@ milestones/issues. This file is the plan; the status file is the reality.
       Color submenu + "Use notebook color" reset; sync carries the whole
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
-## v1.25 — Parity continues (shipped in v1.25.0)
 
 ## v1.26 — Parity continues (current)
 
@@ -224,10 +223,22 @@ milestones/issues. This file is the plan; the status file is the reality.
       real GPU hardware (carried forward from v1.15.0 through v1.26.0; the
       release rotated it to the v1.26.0 milestone, the v1.15.0-to-v1.25.0
       precedent)
+- [x] Password-protected sections, phase 2 (issue #378, shipped 2026-11-26):
+      the two candidates #371 named, both OneNote desktop parity —
+      auto-lock after inactivity (protected sections re-lock after
+      configurable inactivity, default 10 minutes — OneNote desktop's File
+      > Options > Password timeout; UWP/web fixes it at 5, Mac at a few
+      minutes; 0 = off, 1–720 valid, malformed reads degrade to the
+      default; the setting is per-device localStorage, the themes /
+      last-page precedent) and "Lock all protected sections" (OneNote's
+      right-click > Password Protection > "Lock Protected Sections" — the
+      global command locks every open section at once, toast reports the
+      count). Both live in the section menu's "Password protection"
+      submenu; firing the auto-lock swaps an open canvas for its unlock
+      card through the reactive mirror
+      (docs/test-plans/section-protection.md)
 - [ ] Further product-parity candidates from a fresh majors evidence pass
-      (evidence-first, wave by wave) — the password-protection phase-2
-      candidates (#371 named them: auto-lock after inactivity, "Lock All
-      Protected Sections") are in the pool
+      (evidence-first, wave by wave)
 
 ## v1.25 — Parity continues (shipped in v1.25.0)
 

@@ -25,6 +25,7 @@ import { plural } from "@/lib/plural";
 import { effectiveSectionColor, sectionColorHex } from "@/lib/section-colors";
 import { isSectionGroup } from "@/lib/section-groups";
 import { isSectionProtected } from "@/lib/section-protection";
+import { PROTECTION_TOASTS } from "./section-protection-dialog";
 import { exportSectionPdf } from "@/lib/section-pdf";
 import { exportNotebookPdf } from "@/lib/notebook-pdf";
 import { EXPORT_ERROR_MESSAGES, ExportError } from "@/lib/export-errors";
@@ -70,6 +71,7 @@ import {
   RotateCcw,
   Search,
   Tag as TagIcon,
+  Timer,
   Trash2,
   X,
   Zap,
@@ -901,6 +903,15 @@ function SectionNode({
   // unlock mirror (closed = locked, open = unlocked in this session)
   const protectedRow = !group && isSectionProtected(section);
   const rowLocked = protectedRow && !unlockedIds.includes(section.id);
+  // issue #378 (phase 2): the app-global "Lock all protected sections"
+  // command — OneNote's right-click > Password Protection > "Lock
+  // Protected Sections" locks ALL of them at once. Rendered from the
+  // whole-tree count (every notebook, groups excluded), not this row's.
+  const allSectionsEverywhere = useAppStore((s) => s.sections);
+  const lockAllSections = useAppStore((s) => s.lockAllSections);
+  const protectedCount = allSectionsEverywhere.filter(
+    (s) => s.deletedAt === null && s.kind !== "group" && isSectionProtected(s),
+  ).length;
 
   return (
     <div data-testid="section-row" data-section-id={section.id}>
@@ -1141,6 +1152,32 @@ function SectionNode({
                       <Lock /> {"Lock now"}
                     </DropdownMenuItem>
                   )}
+                  {/* issue #378 — OneNote's global lock command: locks every
+                      unlocked protected section in every notebook; the toast
+                      confirms the count. Rendered when anything is protected
+                      (this row may itself be unprotected or locked). */}
+                  {protectedCount > 0 && (
+                    <DropdownMenuItem
+                      data-testid="section-protection-lock-all"
+                      onClick={() =>
+                        void lockAllSections().then((n) => {
+                          if (n > 0) toast(PROTECTION_TOASTS.lockedAll(n));
+                        })
+                      }
+                    >
+                      <Lock /> {"Lock all protected sections"}
+                    </DropdownMenuItem>
+                  )}
+                  {/* issue #378 — the app-global auto-lock setting (OneNote
+                      desktop: File > Options > Password, default 10 minutes).
+                      Lives with the protection family; the dialog ignores the
+                      sectionId (the mode is app-scoped). */}
+                  <DropdownMenuItem
+                    data-testid="section-protection-autolock"
+                    onClick={() => openProtectionDialog("autolock", section.id)}
+                  >
+                    <Timer /> {"Auto-lock after inactivity…"}
+                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}
