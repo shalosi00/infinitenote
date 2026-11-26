@@ -106,6 +106,90 @@ from staging each run, so staging is the only source that must stay sane.
 "## v1.25" header (empty block) in docs/ROADMAP.md right above the v1.26
 block — removed on this branch.
 
+## 2026-11-25 — Password-protected sections: OneNote "Password Protection" parity, wave 25 (#371/#372) + v1.25.0 release
+
+- **Task**: wave 25 — the fifteenth product-parity wave, per the wave-24
+  pointer ("further majors-evidence parity waves"). Evidence pass
+  (2026-11-25): the hierarchy waves 16-24 completed OneNote's structural
+  surface (sub-sections, section groups, sub-pages with drag); the largest
+  remaining OneNote major neither we nor Joplin carry is the privacy layer —
+  OneNote protects an entire SECTION with a password ("right-click a
+  section tab → Password Protection"; locked sections cannot be opened,
+  exported, or searched; a forgotten password cannot be recovered —
+  support.microsoft.com), while Joplin offers only whole-vault E2EE
+  (joplinapp.org) — per-section privacy on a shared device was the gap.
+  Shipped this cycle, closing #371 into the v1.25.0 milestone.
+- **Design**: `Section.protection?: SectionProtection | null` — the
+  parentId/color/kind precedent exactly (additive, NOT indexed, no Dexie
+  version bump, old rows / backups / sync folders byte-stable). Pure policy
+  + crypto + memory-only unlock cache in `src/lib/section-protection.ts`
+  (no Dexie imports — the wave-21 lesson). Pages of a protected section AND
+  their version snapshots are AES-GCM sealed at rest under a random
+  per-section data key wrapped with PBKDF2-HMAC-SHA256 (600 000 iterations,
+  the OWASP budget, pinned PP-P5); content carries the
+  `enc1.<iv>.<ct>` marker (scene JSON starts with `{`/`[` — no namespace
+  collision). The unlock cache never persists — a reload locks every
+  protected section (OneNote locks on close); unlock runs a re-seal pass
+  that closes the sync-drift window. Search skips locked content (the
+  defensive extract contract reads markers as nothing) and re-includes
+  unlocked sections through a decrypt-aware index. Section/notebook PDF
+  exports refuse locked sections via assertSectionsExportable → typed
+  `sectionLocked` ExportError. The DESTRUCTIVE sync hazard caught in
+  design: the folder builder JSON.parses every content — a marker would
+  parse-fail into an EMPTY scene and silently destroy the page on the next
+  merge round; SyncPageFile gained the additive `enc` field (markers only,
+  pre-#371 files byte-stable) and the parser restores it verbatim.
+  Backups carry ciphertext + envelope (hand-edited envelopes restore
+  unprotected via safeProtection).
+- **Lessons (all measured this cycle)**:
+  - **WebCrypto promises are not Dexie-tracked**: awaiting
+    encryptContent/decryptContent INSIDE a db.transaction commits it early
+    (PrematureCommitError) — every sealing path now computes crypto OUTSIDE
+    the transaction and writes inside it (Dexie-only).
+  - **The createPage hot path must keep its async shape**: an extra
+    `db.sections.get()` on the content-less "+ Page" path flipped a
+    fake-indexeddb transaction race in the sub-sections suite (SB-P15b hung
+    — sometimes for minutes — whenever the protection tests ran alongside);
+    createPage now skips the section read entirely when content is null,
+    and the db-level protection tests derive with a reduced PBKDF2 budget
+    (the shipped default stays pinned at 600k, PP-P5) so bun's
+    concurrently-run test files never stall each other behind a 600k
+    native derive.
+  - **An aria-label on a row-internal icon pollutes the row button's
+    accessible name** — the lock badge broke every
+    `getByRole("button", { name: "New Section" })` locator in the E2E spec
+    (the wave-24 listeners-only lesson, one level deeper). The badge is
+    decorative (aria-hidden) and state rides `data-lock-state`.
+  - **A post-reload single click is not trustworthy on a slow runner**:
+    ensureExpanded's one click landed before the app's handlers re-attached
+    (CI evidence on the release-prep PR's first e2e run) — it now polls and
+    re-clicks until the row really expanded (the wave-22 never-collapse rule
+    kept by the pre-click check).
+  - **Both check re-run APIs (job rerun + check-suite rerun) answer 404 for
+    this token** — the standing "rerun-failed-jobs" recovery for the
+    documented FA-E15/TB-E01 CI flake family is unavailable; when the merge
+    gate cannot go green on an exact head, the content moves to a fresh
+    branch (new head → new CI run). The empty-payload merge PUT that
+    started this detour fell back to GitHub's default MERGE method — the
+    #373 squash intent was lost and both commits landed on develop
+    (content identical; history shape deviates). Lesson: build the JSON
+    payload in a file and `curl -d @file` — never inline `$(python -c …)`
+    payloads whose failure the pipeline cannot detect.
+- **Gate**: 1382 unit / 100 files, 0 fail (base `b90e1ff`: 1357/99 — +25
+  pins: 9 PP-P pure + 13 PP-D db + 3 PP-S sync); 274 e2e / 57 files
+  (`playwright --list`); new spec PWP-N01..05 5/5; neighbors sub-pages +
+  section-move + section-groups + sub-sections 19/19 and search-trash +
+  multiselect + crud + section-colors + export-filename 16/16 and pdf-export
+  + section-pdf-export + notebook-pdf-export 11/11.
+- **Ship**: PR #372 (feature) squash-merged `fba2f6a`; #371 closed via the
+  API. Release train: prep #373 (version files 1.25.0/350 + fdroid entry +
+  metainfo entry + the spec heal), release PR develop-to-main as MERGE
+  commit, tag v1.25.0 + GitHub Release with hand-written notes, milestones
+  rotated (#26 closed, #27 opened, #193 moved forward), flatpak extra-data
+  re-pinned to the real v1.25.0 AppImage (#313/#293/#324/#336/#343/#350/
+  #363/#370 precedent), post-release docs pass (ROADMAP v1.26 block, Next up
+  rotation), this entry.
+
 ## 2026-11-25 — Sub-pages phase 2: drag-to-indent, wave 24 (#365/#366) + v1.24.0 release
 
 - **Task**: wave 24 — the issue-#359 named phase-2 candidate the ROADMAP
