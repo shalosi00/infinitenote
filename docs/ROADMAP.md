@@ -217,7 +217,16 @@ milestones/issues. This file is the plan; the status file is the reality.
       row (whole-row LWW) and backups restore invalid colors as inherit
       (safeSectionColor).
 
-## v1.26 — Parity continues (current)
+## v1.27 — Parity continues (current)
+
+- [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
+      real GPU hardware (carried forward from v1.15.0 through v1.27.0; the
+      release rotated it to the v1.27.0 milestone, the v1.15.0-to-v1.26.0
+      precedent)
+- [ ] Further product-parity candidates from a fresh majors evidence pass
+      (evidence-first, wave by wave)
+
+## v1.26 — Parity continues (shipped in v1.26.0)
 
 - [ ] #193 hardware-blocked remainder: run the committed WebGPU benchmark on
       real GPU hardware (carried forward from v1.15.0 through v1.26.0; the
