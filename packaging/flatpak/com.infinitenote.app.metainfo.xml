@@ -51,6 +51,16 @@
   </screenshots>
 
   <releases>
+    <release version="1.27.0" date="2026-11-26">
+      <description>
+        <p>Page color (OneNote "View > Page Color" parity): the whole page
+        surface takes a pale tint from the header's "Page color" dropdown —
+        eight pastel swatches keyed by the app's hue families, or None for
+        white paper. The tint paints in both themes, rides sync folders,
+        backups, templates and duplicate, and lands in every PDF/PNG/SVG
+        export.</p>
+      </description>
+    </release>
     <release version="1.26.0" date="2026-11-26">
       <description>
         <p>Password-protection phase 2 (OneNote desktop parity): protected
