@@ -19,14 +19,15 @@ import { generatedNames } from "./generated-names";
 import { ancestorSectionIds } from "./section-tree";
 import { makeSubpageTarget, promoteTarget } from "./page-tree";
 import { parseTemplateContent } from "./page-templates";
-import { unlockedSectionIdList } from "./section-protection";
+import { unlockedSectionIdList, readAutoLockMinutes, writeAutoLockMinutes } from "./section-protection";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
 import type { PageBackground } from "./types";
 
 export type SaveIndicator = "idle" | "saving" | "saved" | "error";
 
-/** The "Password protection" dialog modes (issue #371). */
-export type ProtectionDialogMode = "set" | "change" | "remove";
+/** The "Password protection" dialog modes (issue #371). "autolock" is the
+ *  app-global setting dialog (issue #378) — its sectionId is unused. */
+export type ProtectionDialogMode = "set" | "change" | "remove" | "autolock";
 
 interface AppStore {
   loaded: boolean;
@@ -163,6 +164,19 @@ interface AppStore {
     password: string,
   ) => Promise<SectionProtectionResult>;
 
+  /**
+   * Phase 2 (issue #378): auto-lock minutes (0 = off, 1–720 valid —
+   * OneNote desktop's configurable inactivity timeout, default 10). The
+   * number lives in localStorage (per-device UX state, never synced);
+   * the store carries it so the auto-lock effect and the dialog re-render
+   * when it changes.
+   */
+  autoLockMinutes: number;
+  setAutoLockMinutes: (minutes: number) => void;
+  /** OneNote "Lock Protected Sections": lock EVERY unlocked protected
+   *  section at once; returns how many were open (the toast count). */
+  lockAllSections: () => Promise<number>;
+
   /** OneNote-style quick capture (issue #19); opts.title names the page
    * (Web Share Target captures, issue #247) instead of the dated default. */
   createQuickNote: (opts?: { title?: string }) => Promise<void>;
@@ -237,6 +251,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   canvasFocus: 0,
   unlockedSectionIds: [],
   protectionDialog: null,
+  autoLockMinutes: readAutoLockMinutes(),
 
   load: () => {
     if (!initialLoadPromise) {
@@ -441,6 +456,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (result === "done") await get().refresh();
     set({ unlockedSectionIds: unlockedSectionIdList() });
     return result;
+  },
+  // issue #378 — the auto-lock setting (localStorage under the hood) and
+  // the global lock-all action over the phase-1 db primitive
+  setAutoLockMinutes: (minutes) => {
+    writeAutoLockMinutes(minutes);
+    set({ autoLockMinutes: readAutoLockMinutes() });
+  },
+  lockAllSections: async () => {
+    const count = await db.lockAllProtectedSections();
+    set({ unlockedSectionIds: unlockedSectionIdList() });
+    return count;
   },
 
   addPage: async (sectionId, title) => {

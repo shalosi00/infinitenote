@@ -1,4 +1,4 @@
-# Test plan — password-protected sections (issue #371, wave 25)
+# Test plan — password-protected sections (issues #371 + #378, waves 25–26)
 
 OneNote "Password Protection" parity, phase 1: an entire SECTION is
 protected with a password; its pages' scene payloads (and version-history
@@ -70,11 +70,44 @@ a password in OneNote"); unlocked sections return to all three.
 - **PWP-N05**: remove password (verify step) strips the badge, restores
   plaintext (search finds the term after a reload, no unlock card).
 
-## Phase-2 candidates (named for a later wave)
+## E2E (e2e/protection-phase2.spec.ts, 4 checks)
 
-- Auto-lock after inactivity (OneNote's "Lock section automatically when
-  I'm not working for…") and "Lock All Protected Sections".
-- Password hint editing without re-encryption.
+- **PWP2-N01**: with nothing protected the lock-all item is hidden (the
+  auto-lock item always shows); set password → "Lock all protected
+  sections" locks it with the count toast → the open page swaps for the
+  unlock card.
+- **PWP2-N02**: unlock → the auto-lock dialog pre-fills 10 → an
+  over-cap draft shows the inline error and never saves → save 1 minute →
+  the section re-locks within ≤75s (deadline + 15s interval) with the
+  auto-lock toast and the unlock card in place of the canvas.
+- **PWP2-N03**: unlock → dialog pre-fills the saved 1 → save 0 (off) →
+  70s of idleness leaves the section unlocked (the effect tears down) →
+  a reload shows the dialog pre-filling 0 (localStorage persistence).
+- **PWP2-N04**: remove password strips the badge; the lock-all item hides
+  again while the auto-lock item stays.
+
+## Phase 2 (issue #378, wave 26) — auto-lock + lock-all
+
+OneNote desktop's two remaining protection behaviors (#371 named them as
+phase-2 candidates): protected sections re-lock after configurable
+inactivity — the default keeps them unlocked **10 minutes** past the last
+work (File > Options > Password; UWP/web fixes it at 5, Mac at a few
+minutes) — and a global "Lock Protected Sections" command locks ALL
+protected sections at once. The minutes setting is per-device UX state in
+localStorage (0 = off, 1–720 valid, malformed reads degrade to the
+default); the deadline math is pure (`autoLockDue`).
+
+- **PP2-P*** (pure, 4): the setting parse matrix (absent/malformed → the
+  default 10; 0 = off; 1–720 accepted); the strict dialog validator
+  (integer 0–720, everything else null — never rewrites the input);
+  deadline math (fires at the exact boundary, off/degenerate values never
+  fire); the constants pin (default 10, range 1–720).
+- **PP2-D*** (data, 3): the storage round-trip (write/read; malformed
+  stored values degrade to the default; the writer re-sanitizes); the
+  SSR path (no localStorage reads the default, writes no-op);
+  `lockAllProtectedSections` drops every open key, reports the count,
+  reads go null, idempotent at 0.
+- Remaining candidate: password hint editing without re-encryption.
 
 ## Non-goals
 

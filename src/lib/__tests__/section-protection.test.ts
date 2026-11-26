@@ -10,13 +10,15 @@
  *
  * Test plan: docs/test-plans/section-protection.md (ids PP-P*, PP-D*, PP-S*).
  */
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
   PBKDF2_ITERATIONS,
   SectionLockedError,
+  autoLockDue,
   buildProtection,
   cacheUnlockedKey,
   decryptContent,
+  DEFAULT_AUTO_LOCK_MINUTES,
   displayHint,
   dropAllUnlockedKeys,
   dropUnlockedKey,
@@ -24,10 +26,16 @@ import {
   isEncryptedContent,
   isSectionLocked,
   isSectionProtected,
+  MAX_AUTO_LOCK_MINUTES,
+  MIN_AUTO_LOCK_MINUTES,
+  parseAutoLockMinutes,
+  readAutoLockMinutes,
   safeProtection,
   sealContent,
   unlockedSectionIdList,
+  validateAutoLockMinutesDraft,
   verifyPassword,
+  writeAutoLockMinutes,
 } from "../section-protection";
 import type { Section, SectionProtection } from "../types";
 
@@ -490,5 +498,135 @@ describe("protection sync carry (issue #371)", () => {
     const parsed = fmt.parseSyncFolder(files);
     const row = parsed.pages.get("p1")!;
     expect(row.content ?? null).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* phase 2 (issue #378) — auto-lock after inactivity + lock-all         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Bun has no (reliable) localStorage — stub the global the module reads,
+ * the last-page.test.ts pattern. Installed per-test so the "storage
+ * missing" path is also testable; the original (if any) is restored.
+ */
+type LocalStorageStub = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+};
+const originalLocalStorage = (globalThis as unknown as { localStorage?: LocalStorageStub })
+  .localStorage;
+const backing = new Map<string, string>();
+function installStorageStub(): void {
+  (globalThis as unknown as { localStorage: LocalStorageStub }).localStorage = {
+    getItem: (k) => backing.get(k) ?? null,
+    setItem: (k, v) => void backing.set(k, v),
+  };
+}
+function restoreStorage(): void {
+  (globalThis as unknown as { localStorage?: LocalStorageStub }).localStorage =
+    originalLocalStorage;
+  backing.clear();
+}
+
+describe("protection phase 2 — auto-lock setting (issue #378)", () => {
+  afterEach(restoreStorage);
+
+  it("PP2-P1: parseAutoLockMinutes defaults on absent/malformed storage", () => {
+    expect(DEFAULT_AUTO_LOCK_MINUTES).toBe(10);
+    expect(parseAutoLockMinutes(null)).toBe(10);
+    expect(parseAutoLockMinutes(undefined)).toBe(10);
+    expect(parseAutoLockMinutes("")).toBe(10);
+    expect(parseAutoLockMinutes("abc")).toBe(10);
+    expect(parseAutoLockMinutes("-5")).toBe(10);
+    expect(parseAutoLockMinutes("4.5")).toBe(10);
+    expect(parseAutoLockMinutes("721")).toBe(10);
+    expect(parseAutoLockMinutes("NaN")).toBe(10);
+    expect(parseAutoLockMinutes("Infinity")).toBe(10);
+  });
+
+  it("PP2-P2: parseAutoLockMinutes accepts 0 (off) and the 1–720 range", () => {
+    expect(parseAutoLockMinutes("0")).toBe(0);
+    expect(parseAutoLockMinutes("1")).toBe(1);
+    expect(parseAutoLockMinutes("10")).toBe(10);
+    expect(parseAutoLockMinutes("720")).toBe(720);
+    expect(MIN_AUTO_LOCK_MINUTES).toBe(1);
+    expect(MAX_AUTO_LOCK_MINUTES).toBe(720);
+  });
+
+  it("PP2-P3: the dialog validator is strict — never rewrites the input", () => {
+    expect(validateAutoLockMinutesDraft("0")).toBe(0);
+    expect(validateAutoLockMinutesDraft("10")).toBe(10);
+    expect(validateAutoLockMinutesDraft(" 720 ")).toBe(720);
+    expect(validateAutoLockMinutesDraft("")).toBeNull();
+    expect(validateAutoLockMinutesDraft("abc")).toBeNull();
+    expect(validateAutoLockMinutesDraft("721")).toBeNull();
+    expect(validateAutoLockMinutesDraft("4.5")).toBeNull();
+    expect(validateAutoLockMinutesDraft("-1")).toBeNull();
+  });
+
+  it("PP2-P4: autoLockDue fires at the boundary; off never fires", () => {
+    const t0 = 1_000_000;
+    const MIN = 60_000;
+    // 10 minutes of idleness: due at/after the exact boundary
+    expect(autoLockDue(t0, 10, t0 + 10 * MIN - 1)).toBe(false);
+    expect(autoLockDue(t0, 10, t0 + 10 * MIN)).toBe(true);
+    expect(autoLockDue(t0, 10, t0 + 10 * MIN + 15_000)).toBe(true);
+    // off / degenerate values never fire
+    expect(autoLockDue(t0, 0, t0 + 60 * MIN)).toBe(false);
+    expect(autoLockDue(t0, -5, t0 + 60 * MIN)).toBe(false);
+    expect(autoLockDue(t0, Number.NaN, t0 + 60 * MIN)).toBe(false);
+    // degenerate timestamps never fire (defensive)
+    expect(autoLockDue(Number.NaN, 10, t0)).toBe(false);
+    expect(autoLockDue(t0, 10, Number.NaN)).toBe(false);
+    // recent activity resets the deadline: last activity 1s ago with a
+    // 10-minute budget is NOT due, even at the original activity's
+    // would-have-been boundary (the activity marker moved the deadline)
+    expect(autoLockDue(t0 + 10 * MIN - 1_000, 10, t0 + 10 * MIN)).toBe(false);
+  });
+
+  it("PP2-D14: storage round-trip; malformed stored values degrade to the default", () => {
+    installStorageStub();
+    expect(readAutoLockMinutes()).toBe(10); // nothing stored yet
+    writeAutoLockMinutes(0);
+    expect(readAutoLockMinutes()).toBe(0);
+    writeAutoLockMinutes(45);
+    expect(readAutoLockMinutes()).toBe(45);
+    // a hand-edited storage value degrades to the default (last-page
+    // contract) — the raw malformed string never reaches the app
+    backing.set("infinitenote.protection.autolock", "garbage");
+    expect(readAutoLockMinutes()).toBe(10);
+    backing.set("infinitenote.protection.autolock", "999");
+    expect(readAutoLockMinutes()).toBe(10);
+    // the writer re-sanitizes defensively: an out-of-range write stores
+    // the default, not the garbage
+    writeAutoLockMinutes(999);
+    expect(backing.get("infinitenote.protection.autolock")).toBe("10");
+    writeAutoLockMinutes(Number.NaN);
+    expect(backing.get("infinitenote.protection.autolock")).toBe("10");
+  });
+
+  it("PP2-D15: no localStorage (SSR) reads the default and writes no-op", () => {
+    delete (globalThis as unknown as { localStorage?: LocalStorageStub }).localStorage;
+    expect(readAutoLockMinutes()).toBe(10);
+    // the write must not throw without storage
+    expect(() => writeAutoLockMinutes(30)).not.toThrow();
+  });
+
+  it("PP2-D16: lockAllProtectedSections locks every open section and reports the count", async () => {
+    const { sec, open, page } = await home();
+    const r1 = await notes.setSectionPassword(sec.id, "pw1", null, TEST_ITERATIONS);
+    const r2 = await notes.setSectionPassword(open.id, "pw2", null, TEST_ITERATIONS);
+    expect(r1).toBe("done");
+    expect(r2).toBe("done");
+    // both are unlocked right after protect (phase-1 semantics)...
+    expect(unlockedSectionIdList().length).toBe(2);
+    // ...and the lock-all primitive drops both keys and reports 2
+    const count = await notes.lockAllProtectedSections();
+    expect(count).toBe(2);
+    expect(unlockedSectionIdList()).toEqual([]);
+    expect(await notes.getPageContent(page.id)).toBeNull();
+    // idempotent: with nothing open, the count is 0
+    expect(await notes.lockAllProtectedSections()).toBe(0);
   });
 });
