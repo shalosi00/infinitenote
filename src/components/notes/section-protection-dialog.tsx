@@ -10,9 +10,16 @@
  * The honest no-recovery rule is stated in the set-mode description:
  * a forgotten password cannot be recovered (OneNote's own rule), so the
  * hint is the only lifeline.
+ *
+ * Phase 2 (issue #378) adds the app-global "autolock" mode: the
+ * auto-lock-after-inactivity minutes setting (OneNote desktop's File >
+ * Options > Password timeout, default 10). It renders its own dialog
+ * body (AutoLockDialogBody) because it is not section-scoped — the
+ * section lookup is skipped and the draft mounts fresh from the store
+ * value each time the dialog opens.
  */
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +31,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "@/lib/store";
-import { displayHint } from "@/lib/section-protection";
+import {
+  displayHint,
+  validateAutoLockMinutesDraft,
+  DEFAULT_AUTO_LOCK_MINUTES,
+  MAX_AUTO_LOCK_MINUTES,
+} from "@/lib/section-protection";
 
 const RESULT_TOASTS: Record<string, string> = {
   done: "",
@@ -49,9 +61,6 @@ export function SectionProtectionDialog() {
 
   if (!dialog) return null;
 
-  const section = sections.find((s) => s.id === dialog.sectionId);
-  if (!section) return null;
-
   const close = () => {
     setPassword("");
     setAgain("");
@@ -61,6 +70,28 @@ export function SectionProtectionDialog() {
     setBusy(false);
     setOpen();
   };
+
+  // issue #378 — the app-global auto-lock dialog body mounts only in this
+  // mode (fresh draft from the store value each open). It needs no
+  // section, so it branches off BEFORE the section lookup — the
+  // section-scoped modes below keep their `if (!section)` narrowing.
+  if (dialog.mode === "autolock") {
+    return (
+      <Dialog
+        open
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      >
+        <DialogContent className="sm:max-w-md" data-testid="auto-lock-dialog">
+          <AutoLockDialogBody onDone={close} />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const section = sections.find((s) => s.id === dialog.sectionId);
+  if (!section) return null;
 
   const run = async (action: () => Promise<"done" | "invalid" | "invalid-section">) => {
     setBusy(true);
@@ -212,6 +243,76 @@ export function SectionProtectionDialog() {
 }
 
 /**
+ * The auto-lock setting dialog (issue #378, OneNote desktop parity):
+ * minutes of inactivity after which every unlocked protected section
+ * re-locks. 0 = off; 1–720 valid; anything else shows the inline error
+ * instead of silently rewriting the input. Default 10 (OneNote's).
+ */
+function AutoLockDialogBody({ onDone }: { onDone: () => void }) {
+  const autoLockMinutes = useAppStore((s) => s.autoLockMinutes);
+  const setAutoLockMinutes = useAppStore((s) => s.setAutoLockMinutes);
+  const [draft, setDraft] = useState(String(autoLockMinutes));
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = () => {
+    const parsed = validateAutoLockMinutesDraft(draft);
+    if (parsed === null) {
+      setError(`Enter a whole number of minutes from 0 (off) to ${MAX_AUTO_LOCK_MINUTES}.`);
+      return;
+    }
+    setAutoLockMinutes(parsed);
+    onDone();
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Timer className="h-4 w-4" /> {"Auto-lock protected sections"}
+        </DialogTitle>
+        <DialogDescription>
+          {`Protected sections re-lock after this many minutes without activity. OneNote's default is ${DEFAULT_AUTO_LOCK_MINUTES}; enter 0 to keep them unlocked until you close the app or use "Lock all protected sections".`}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-3 py-1">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="autolock-minutes" className="text-sm font-medium">
+            {"Minutes of inactivity"}
+          </label>
+          <Input
+            id="autolock-minutes"
+            type="number"
+            min={0}
+            max={MAX_AUTO_LOCK_MINUTES}
+            step={1}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError(null);
+            }}
+            autoFocus
+            data-testid="autolock-minutes-input"
+          />
+          {error && (
+            <p className="text-sm text-destructive" data-testid="autolock-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onDone} data-testid="autolock-cancel">
+          {"Cancel"}
+        </Button>
+        <Button onClick={submit} data-testid="autolock-save">
+          {"Save"}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/**
  * The unlock card rendered IN PLACE OF the canvas when the selected
  * page's section is protected and this session holds no key (OneNote's
  * locked state). Wrong passwords show an inline error; the hint (when
@@ -303,4 +404,8 @@ export const PROTECTION_TOASTS = {
   removed: (name: string) => `Password removed from "${name}".`,
   locked: (name: string) => `"${name}" is locked.`,
   unlocked: (name: string) => `"${name}" is unlocked.`,
+  // issue #378 — lock-all + auto-lock confirmations
+  lockedAll: (n: number) => `Locked ${n} protected ${n === 1 ? "section" : "sections"}.`,
+  autoLocked: (n: number) =>
+    `Auto-locked ${n} protected ${n === 1 ? "section" : "sections"} after inactivity.`,
 } as const;

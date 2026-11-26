@@ -49,6 +49,63 @@
   arrive byte-intact — only what the agent SEES is filtered. Lesson (2026-11-10, v1.11.1 follow-up): never diagnose byte
   corruption from displayed output; probe with a python count (chr(91)+chr(109)) or a marker-dump before claiming a file is damaged.
 
+## 2026-11-26 — Password-protection phase 2: auto-lock + lock-all, wave 26 (#378)
+
+Re-baselined from git first: the cycle's injected state text (v1.3.0) was stale
+for the fourth consecutive time — origin/develop had v1.25.0 released (#373
+prep, #375 release merge, #376 docs, #377 flatpak re-pin) with the wave-25
+section-protection phase 1 shipped and milestone #27 (v1.26.0) holding only the
+hardware-blocked #193. The ROADMAP v1.26 block names the next candidates: the
+two phase-2 items #371 promised. Evidence pass re-ran on OneNote's own options:
+desktop auto-locks protected sections after configurable inactivity — the
+default keeps them unlocked 10 minutes past the last work (customguide's
+password guide; UWP/web fixes 5, Mac a few minutes) — and the right-click
+"Lock Protected Sections" command locks ALL protected sections at once.
+
+**Built** (branch `protection-phase2`, issue #378 under milestone #27):
+
+- `section-protection.ts` (pure, no Dexie): AUTO_LOCK_STORAGE_KEY /
+  DEFAULT_AUTO_LOCK_MINUTES (10, OneNote desktop's) / range 1-720 (0 = off);
+  parseAutoLockMinutes (absent/malformed → default, the last-page contract),
+  readAutoLockMinutes/writeAutoLockMinutes (SSR-safe), the strict dialog
+  validator validateAutoLockMinutesDraft (integer 0-720 else null — never
+  rewrites the input), autoLockDue (fires AT the boundary), the 15s
+  AUTO_LOCK_CHECK_INTERVAL_MS.
+- store: autoLockMinutes (initialized from localStorage at module scope —
+  SSR-safe read), setAutoLockMinutes (write + re-read), lockAllSections (over
+  the phase-1 db primitive lockAllProtectedSections, mirror re-set).
+- sidebar: "Lock all protected sections" (renders when at least one protected
+  section exists across all notebooks — groups/trash excluded — computed from
+  the whole-tree sections slice) + "Auto-lock after inactivity…" (always)
+  in the "Password protection" submenu.
+- dialog: ProtectionDialogMode gains "autolock" — the app-global body mounts
+  before the section lookup (keeps the `if (!section)` narrowing; its
+  sectionId is unused). PROTECTION_TOASTS gains lockedAll/autoLocked.
+- note-app: the auto-lock effect — document pointerdown/keydown/wheel/
+  touchstart (passive) resets the idle ref; a 15s interval checks autoLockDue
+  via getState (unlock/lock never re-subscribes); fires lockAllSections +
+  toast; re-runs on autoLockMinutes change; minutes <= 0 registers nothing.
+- E2E PWP2-N01..N04; pins PP2-P1..P4 + PP2-D14..D16 (localStorage stubbed the
+  last-page.test.ts way, original restored).
+
+**Gate (actual runs)**: lint + tsc clean; 1389 unit / 100 files, 0 fail (base
+ca67b0e: 1382/100, +7); 278 e2e / 58 files (--list); new spec 4/4 (6.6m — the
+1-minute fire poll and the 70s off-wait dominate); neighbors section-protection
+(phase 1) + section-colors + section-groups + sub-sections + search-trash
+21/21. Chromium re-installed (sandbox wiped the headless-shell cache again).
+
+**Lesson (sandbox restore storm, round two)**: a staging file was seen
+corrupted mid-session (a truncated `const` line) while the gate run moments
+earlier had compiled it cleanly — the corruption was transient, the next read
+showed intact bytes. Rule refined: after ANY surprising read of a staging
+file, re-read before editing; verify staging integrity (diff vs origin +
+marker greps) immediately before every ship; apply.sh re-overlays everything
+from staging each run, so staging is the only source that must stay sane.
+
+**Drive-by docs repair**: the #376 release-docs PR shipped a stray duplicate
+"## v1.25" header (empty block) in docs/ROADMAP.md right above the v1.26
+block — removed on this branch.
+
 ## 2026-11-25 — Password-protected sections: OneNote "Password Protection" parity, wave 25 (#371/#372) + v1.25.0 release
 
 - **Task**: wave 25 — the fifteenth product-parity wave, per the wave-24

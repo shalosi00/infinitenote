@@ -107,7 +107,11 @@ import {
 import { PageLinkPickerDialog } from "./page-link-picker-dialog";
 import { SyncDialog, type SyncOutcome } from "./sync-dialog";
 import { formatSyncSummary } from "@/lib/sync/summary";
-import { isSectionProtected } from "@/lib/section-protection";
+import {
+  isSectionProtected,
+  autoLockDue,
+  AUTO_LOCK_CHECK_INTERVAL_MS,
+} from "@/lib/section-protection";
 import { usePWA } from "./use-pwa";
 import { runSync } from "@/lib/sync/db";
 import { exportSyncFolder, loadSyncFolderHandle } from "@/lib/sync/local";
@@ -414,6 +418,38 @@ export default function NoteApp() {
   }, [load]);
 
   usePWA();
+
+  // issue #378 (phase 2) — auto-lock after inactivity (OneNote desktop
+  // parity: File > Options > Password, default 10 minutes). Document-level
+  // pointerdown/keydown/wheel/touchstart tracking resets the idle
+  // deadline; a lightweight interval checks it and locks every unlocked
+  // protected section when it passes (the phase-1 lock-all primitive) —
+  // the reactive mirror flips the badges and swaps an open canvas for its
+  // unlock card. The store's autoLockMinutes re-runs this effect when the
+  // setting changes (0 = off, no listeners at all); unlockedSectionIds is
+  // read via getState inside the tick so unlock/lock never re-subscribes.
+  const autoLockMinutes = useAppStore((s) => s.autoLockMinutes);
+  useEffect(() => {
+    if (autoLockMinutes <= 0) return;
+    let lastActivity = Date.now();
+    const markActivity = () => {
+      lastActivity = Date.now();
+    };
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    for (const e of events) document.addEventListener(e, markActivity, { passive: true });
+    const interval = setInterval(() => {
+      const state = useAppStore.getState();
+      if (state.unlockedSectionIds.length === 0) return;
+      if (!autoLockDue(lastActivity, autoLockMinutes, Date.now())) return;
+      void state.lockAllSections().then((n) => {
+        if (n > 0) toast(PROTECTION_TOASTS.autoLocked(n));
+      });
+    }, AUTO_LOCK_CHECK_INTERVAL_MS);
+    return () => {
+      for (const e of events) document.removeEventListener(e, markActivity);
+      clearInterval(interval);
+    };
+  }, [autoLockMinutes]);
 
   // Web Share Target drain (issue #247): the OS share sheet POSTs to
   // /share-target, the service worker stashes the payload in the mailbox
