@@ -19,7 +19,8 @@
  * the 10 MiB attachment cap is refused.
  */
 import { MAX_FILE_ATTACHMENT_BYTES } from "./file-attachment";
-import type { PageBackground, ScenePayload } from "./types";
+import { safePageColor } from "./page-colors";
+import type { PageBackground, PageColor, ScenePayload } from "./types";
 
 /** One template as listed in the picker — content stays in the DB. */
 export interface TemplateSummary {
@@ -32,6 +33,8 @@ export interface TemplateSummary {
   byteSize: number;
   /** paper style carried onto created pages (absent = plain) */
   background?: PageBackground;
+  /** page tint carried onto created pages (issue #385; absent = none) */
+  pageColor?: PageColor | null;
 }
 
 /** A stored template row (the summary plus the serialized scene). */
@@ -81,6 +84,7 @@ export function buildTemplateRow(
   payload: ScenePayload,
   background: PageBackground | undefined,
   at: number,
+  pageColor?: PageColor | null,
 ): TemplateRow {
   const content = JSON.stringify(payload);
   return {
@@ -93,6 +97,7 @@ export function buildTemplateRow(
     ).length,
     byteSize: content.length,
     ...(background ? { background } : {}),
+    ...(safePageColor(pageColor) ? { pageColor } : {}),
   };
 }
 

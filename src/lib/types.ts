@@ -117,6 +117,35 @@ export const PAGE_BACKGROUNDS: PageBackground[] = ["plain", "ruled", "grid"];
 export const isPageBackground = (v: unknown): v is PageBackground =>
   typeof v === "string" && (PAGE_BACKGROUNDS as string[]).includes(v);
 
+/**
+ * OneNote "Page Color" parity (issue #385): a page surface carries a pale
+ * tint. The ids reuse the app's eight hue families (NotebookColor naming)
+ * but resolve to their own pale values — PAGE_COLOR_HEX in page-colors.ts.
+ * null/absent = none (white paper). Additive and NOT indexed — the
+ * section-color precedent (issue #319): no Dexie version bump, old rows,
+ * old backups and old sync folders stay valid.
+ */
+export type PageColor =
+  | "violet"
+  | "rose"
+  | "orange"
+  | "amber"
+  | "emerald"
+  | "teal"
+  | "cyan"
+  | "pink";
+
+export const PAGE_COLORS: PageColor[] = [
+  "violet",
+  "rose",
+  "orange",
+  "amber",
+  "emerald",
+  "teal",
+  "cyan",
+  "pink",
+];
+
 export interface PageRow {
   id: string;
   sectionId: string;
@@ -136,6 +165,8 @@ export interface PageRow {
   deletedAt: number | null;
   /** paper style — plain by default (absent on pre-v1.2 rows) */
   background?: PageBackground;
+  /** OneNote "Page Color" tint (issue #385) — pale value in page-colors.ts; absent = none */
+  pageColor?: PageColor | null;
   /** short labels used by the sidebar tag filter and search */
   tags?: string[];
   /** serialized Excalidraw scene: { elements, files } — kept out of tree listings */
@@ -158,6 +189,8 @@ export interface BackupTemplate {
   elementCount: number;
   byteSize: number;
   background?: PageBackground;
+  /** issue #385 — a template carries the tint it was saved from */
+  pageColor?: PageColor | null;
   content: string;
 }
 

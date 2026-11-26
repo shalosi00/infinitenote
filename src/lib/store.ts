@@ -21,7 +21,7 @@ import { makeSubpageTarget, promoteTarget } from "./page-tree";
 import { parseTemplateContent } from "./page-templates";
 import { unlockedSectionIdList, readAutoLockMinutes, writeAutoLockMinutes } from "./section-protection";
 import type { Notebook, NotebookColor, PageMeta, Section } from "./types";
-import type { PageBackground } from "./types";
+import type { PageBackground, PageColor } from "./types";
 
 export type SaveIndicator = "idle" | "saving" | "saved" | "error";
 
@@ -130,6 +130,8 @@ interface AppStore {
   bulkMovePages: (pageIds: string[], targetSectionId: string) => Promise<number>;
   bulkDeletePages: (pageIds: string[]) => Promise<number>;
   setPageBackground: (id: string, background: PageBackground) => Promise<void>;
+  /** OneNote "Page Color" (issue #385) — null = none (white paper) */
+  setPageColor: (id: string, color: PageColor | null) => Promise<void>;
   setPageTags: (id: string, tags: string[]) => Promise<void>;
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
@@ -514,6 +516,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       JSON.stringify(payload),
     );
     if (row.background) await db.setPageBackground(page.id, row.background);
+    if (row.pageColor) await db.setPageColor(page.id, row.pageColor);
     await get().refresh();
     set((s) => ({
       selection: {
@@ -530,6 +533,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   setPageBackground: async (id, background) => {
     await db.setPageBackground(id, background);
+    await get().refresh();
+  },
+  setPageColor: async (id, color) => {
+    await db.setPageColor(id, color);
     await get().refresh();
   },
   setPageTags: async (id, tags) => {

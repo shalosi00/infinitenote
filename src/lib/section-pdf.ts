@@ -26,6 +26,7 @@ import { downloadBlob, titleToFilename } from "./excalidraw-utils";
 import { ExportError } from "./export-errors";
 import { renderPdfDocument, type PdfOrientation, type PdfRenderResult } from "./pdf-sheet-render";
 import { assertSectionsExportable, getPageContent, listPages } from "./notes-db";
+import { safePageColor } from "./page-colors";
 import { isPageBackground } from "./types";
 import { selectSectionPages } from "./section-tree";
 
@@ -51,6 +52,7 @@ export async function exportSectionPdf(
   const inputs = rows.map((r, i) => ({
     title: r.title,
     background: isPageBackground(r.background) ? r.background : "plain",
+    pageColor: safePageColor(r.pageColor),
     elements: contents[i]?.elements ?? [],
     files: contents[i]?.files ?? null,
   }));

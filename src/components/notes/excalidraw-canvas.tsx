@@ -19,7 +19,8 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { NonDeletedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import * as db from "@/lib/notes-db";
 import type { ScenePayload } from "@/lib/types";
-import type { PageBackground } from "@/lib/types";
+import type { PageBackground, PageColor } from "@/lib/types";
+import { canvasColorFor } from "@/lib/page-colors";
 import type { CanvasApi } from "@/lib/excalidraw-utils";
 import { sanitizeScene, sceneSignature, structuralSceneJson, downloadBlob } from "@/lib/excalidraw-utils";
 import {
@@ -159,6 +160,8 @@ export interface ExcalidrawCanvasProps {
   theme: "light" | "dark";
   /** Paper style: plain, ruled (horizontal lines), grid (native gridMode). */
   background: PageBackground;
+  /** OneNote "Page Color" tint (issue #385) — null/absent = white paper. */
+  pageColor?: PageColor | null;
   onApiReady: (api: CanvasApi) => void;
   onSaveIndicator: (state: "saving" | "saved" | "error") => void;
   onToast: (message: string) => void;
@@ -590,6 +593,7 @@ export default function ExcalidrawCanvas({
   title,
   theme,
   background,
+  pageColor,
   onApiReady,
   onSaveIndicator,
   onToast,
@@ -636,13 +640,15 @@ export default function ExcalidrawCanvas({
    */
   const titleRef = useRef(title);
   const backgroundRef = useRef(background);
+  const colorRef = useRef(pageColor ?? null);
   // Refs may only be written outside render (react-hooks/refs) — refresh them
   // in an effect after every commit. The export surface reads them at
   // interaction time (menu click), long after the effect has settled.
   useEffect(() => {
     titleRef.current = title;
     backgroundRef.current = background;
-  }, [title, background]);
+    colorRef.current = pageColor ?? null;
+  }, [title, background, pageColor]);
 
   /**
    * PDF attachment context menu state (docs/test-plans/pdf-attachment.md).
@@ -954,11 +960,17 @@ export default function ExcalidrawCanvas({
         },
         // latest-value refs (issue #72): a rename or paper-style switch must
         // be reflected in the very next export, without remounting the canvas
-        exportPng: () => exportPng(api, titleRef.current),
-        exportSvg: () => exportSvg(api, titleRef.current),
-        exportSceneFile: () => exportSceneFile(api, titleRef.current),
+        exportPng: () => exportPng(api, titleRef.current, canvasColorFor(colorRef.current)),
+        exportSvg: () => exportSvg(api, titleRef.current, canvasColorFor(colorRef.current)),
+        exportSceneFile: () => exportSceneFile(api, titleRef.current, canvasColorFor(colorRef.current)),
         exportPdf: (orientation) =>
-          exportPagePdf(api, titleRef.current, orientation, backgroundRef.current),
+          exportPagePdf(
+            api,
+            titleRef.current,
+            orientation,
+            backgroundRef.current,
+            colorRef.current,
+          ),
         focusContent: () => api.scrollToContent(),
         flushSave,
         hasPendingEdits,
@@ -1001,12 +1013,12 @@ export default function ExcalidrawCanvas({
     if (!api) return;
     api.updateScene({
       appState: {
-        viewBackgroundColor: "#ffffff",
+        viewBackgroundColor: canvasColorFor(colorRef.current),
         gridModeEnabled: background === "grid",
       },
     });
     if (background === "ruled") syncRuledLayer(api.getAppState());
-  }, [theme, background, syncRuledLayer]);
+  }, [theme, background, pageColor, syncRuledLayer]);
 
   // flush pending save when leaving this page
   useEffect(() => {
@@ -1320,10 +1332,12 @@ export default function ExcalidrawCanvas({
     [onPageLinkOpen],
   );
 
-  // white paper in BOTH themes — Excalidraw's dark-mode CSS filter inverts
-  // the canvas, so painting white is what renders as dark (see the sync
-  // effect above)
-  const viewBackgroundColor = "#ffffff";
+  // The light-authored paint in BOTH themes — Excalidraw's dark-mode CSS
+  // filter inverts the canvas, so painting white is what renders as dark
+  // (see the sync effect above). A page tint (issue #385) follows the same
+  // contract: the pale hex is painted in both themes and dark mode dims it
+  // through the standard filter, exactly like the paper-white and the ink.
+  const viewBackgroundColor = canvasColorFor(pageColor);
   const ruledColor = theme === "dark" ? "rgba(120, 120, 128, 0.35)" : "rgba(82, 82, 91, 0.25)";
 
   return (
